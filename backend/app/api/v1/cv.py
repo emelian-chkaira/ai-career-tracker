@@ -101,7 +101,43 @@ def pdf(req: PdfReq):
 
 
 @router.post("/latex", dependencies=[Depends(guard)])
-def latex(body: dict): return {"latex": latexcv.to_latex(body.get("cv") or {})}
+def latex(body: dict): return {"latex": latexcv.render(body.get("cv") or {}, body.get("template", "classic"), body.get("paper", "a4"))}
+
+
+@router.get("/templates", summary="Available layouts and paper sizes")
+def templates(): return {"templates": [{"id": "classic", "label": "Classic"}, {"id": "compact", "label": "Compact"}, {"id": "modern", "label": "Modern"}], "papers": list(latexcv.PAPERS)}
+
+
+@router.post("/rx/export", dependencies=[Depends(guard)], summary="Export the CV as Reactive Resume v5 JSON")
+def rx_export(body: dict):
+    from app.cvtools import rxresume
+    return rxresume.to_rx(body.get("cv") or {}, body.get("template", "classic"), body.get("paper", "a4"))
+
+
+class PreviewReq(BaseModel):
+    cv: dict
+    template: str = "classic"
+    paper: str = "a4"
+
+
+_PREVIEW_CACHE: dict[str, dict] = {}
+
+
+@router.post("/preview", summary="Live preview: build the PDF with the local compiler only (never a third-party service)")
+def preview(req: PreviewReq, request: Request):
+    if not ratelimit.allow("cvprev:" + client_ip(request), 120): raise HTTPException(429, "too many previews, slow down for a moment")
+    if not latexcv.compiler(): raise HTTPException(503, "live preview needs a LaTeX compiler on this server")
+    src = latexcv.render(req.cv, req.template, req.paper)[:200000]
+    if not latexcv.is_safe(src): raise HTTPException(400, "LaTeX contains disallowed commands")
+    import hashlib
+    key = hashlib.sha256(src.encode()).hexdigest()
+    if key in _PREVIEW_CACHE: return _PREVIEW_CACHE[key]
+    pdf, err = latexcv.compile_pdf(src)
+    if not pdf: raise HTTPException(422, {"error": err or "compilation failed"})
+    out = {"pdf_b64": base64.b64encode(pdf).decode(), "engine": "local", "bytes": len(pdf), "cached": False}
+    if len(_PREVIEW_CACHE) > 40: _PREVIEW_CACHE.pop(next(iter(_PREVIEW_CACHE)))
+    _PREVIEW_CACHE[key] = {**out, "cached": True}
+    return out
 
 
 def _key(req: CvReq):

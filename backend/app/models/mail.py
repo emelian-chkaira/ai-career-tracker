@@ -1,4 +1,5 @@
 import uuid, datetime as dt
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import String, Text, Integer, Boolean, Float, DateTime, ForeignKey, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -9,10 +10,12 @@ class UserAiSettings(Base):
     """Which AI (if any) a user lets analyse their job e-mails. The API key is stored encrypted and never sent back to the client."""
     __tablename__ = "user_ai_settings"
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    provider: Mapped[str] = mapped_column(String(30), default="rules")
+    provider: Mapped[str] = mapped_column(String(30), default="")
     model: Mapped[str | None] = mapped_column(String(120))
     base_url: Mapped[str | None] = mapped_column(String(300))
     api_key_enc: Mapped[str | None] = mapped_column(Text)
+    task_models: Mapped[dict] = mapped_column(JSONB, default=dict)      # {"scoring": "model", "tailoring": ..., "inbox": ..., "assistant": ...}: per-task model overrides
+    style: Mapped[dict] = mapped_column(JSONB, default=dict)            # writing style: {tone, formality, avoid: [...], language, instructions}
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
@@ -52,8 +55,17 @@ class MailEvent(Base):
     event_date: Mapped[str | None] = mapped_column(String(80))        # interview / deadline date as written or ISO
     summary: Mapped[str | None] = mapped_column(String(400))
     confidence: Mapped[float] = mapped_column(Float, default=0.5)
-    classifier: Mapped[str] = mapped_column(String(60), default="rules")
+    classifier: Mapped[str] = mapped_column(String(60), default="")
     status: Mapped[str] = mapped_column(String(12), default="new", index=True)     # new | accepted | dismissed
     company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id", ondelete="SET NULL"))
     job_id: Mapped[int | None] = mapped_column(ForeignKey("jobs.id", ondelete="SET NULL"))
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class UserRr(Base):
+    """Connection to a Reactive Resume instance (hosted or self-hosted): base URL and an API key, stored encrypted and never returned."""
+    __tablename__ = "user_rr"
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    base_url: Mapped[str] = mapped_column(String(300))
+    api_key_enc: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

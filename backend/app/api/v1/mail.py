@@ -1,7 +1,7 @@
 """AI settings, the connected Gmail account (Google OAuth) and the extracted job e-mails (accept / dismiss / edit) of the signed-in user."""
 import threading
 from fastapi.responses import RedirectResponse
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
@@ -11,6 +11,7 @@ from app.core.netguard import check_url
 from app.core.secretbox import seal, unseal
 from app.models import User, UserAiSettings, MailAccount, MailEvent, Task, Job, Company
 from app.services import llm_service as llm, mail_service as ms, mail_classifier as mc, task_service, gmail_service as gm
+from app.services.ai_cfg import cfg_of, http_error, TASKS, STYLE_TONES
 from app.core.config import settings
 
 router = APIRouter(prefix="/mail", tags=["mail"])
@@ -18,26 +19,26 @@ ai = APIRouter(prefix="/ai", tags=["ai"])
 
 
 # ------------------------------------------------------------------ AI settings
-def cfg_of(db: Session, user: User) -> llm.Cfg:
-    s = db.get(UserAiSettings, user.id)
-    return llm.Cfg(s.provider, s.model, s.base_url, unseal(s.api_key_enc)) if s else llm.Cfg()
-
-
 class AiIn(BaseModel):
-    provider: str = "rules"
+    provider: str
     model: str | None = Field(None, max_length=120)
     base_url: str | None = Field(None, max_length=300)
     api_key: str | None = Field(None, max_length=400)       # omitted/None keeps the saved key; "" removes it
+    task_models: dict[str, str] | None = None               # {"scoring": "model", ...}; omitted keeps, {} clears
+    style: dict | None = None                               # {tone, formality, language, avoid: [...], instructions}
 
 
-@ai.get("/providers", summary="Every provider preset (editable defaults): free/offline, Chinese models, Claude, OpenAI-compatible…")
+@ai.get("/providers", summary="Every provider preset (editable defaults): local Ollama, free tiers, Chinese models, Claude, OpenAI-compatible…")
 def providers(): return [dict(id=k, **v) for k, v in llm.PROVIDERS.items()]
 
 
 @ai.get("/settings")
 def get_ai(user: User = Depends(current_user), db: Session = Depends(get_db)):
     s = db.get(UserAiSettings, user.id)
-    return {"provider": s.provider if s else "rules", "model": s.model if s else None, "base_url": s.base_url if s else None, "has_key": bool(s and s.api_key_enc)}
+    prov = s.provider if s and s.provider in llm.PROVIDERS else None; default = (s.model if s else None) or (llm.PROVIDERS[prov]["models"][0] if prov and llm.PROVIDERS[prov]["models"] else None)
+    tm = dict(s.task_models or {}) if s else {}
+    return {"provider": prov, "model": s.model if s else None, "base_url": s.base_url if s else None, "has_key": bool(s and s.api_key_enc), "task_models": tm, "style": dict(s.style or {}) if s else {},
+            "tasks": list(TASKS), "tones": list(STYLE_TONES), "resolved": {t: tm.get(t) or default for t in TASKS} if prov else {}}
 
 
 @ai.put("/settings")
@@ -47,6 +48,11 @@ def put_ai(body: AiIn, user: User = Depends(current_user), db: Session = Depends
     s = db.get(UserAiSettings, user.id) or UserAiSettings(user_id=user.id)
     s.provider, s.model, s.base_url = body.provider, (body.model or "").strip() or None, (body.base_url or "").strip() or None
     if body.api_key is not None: s.api_key_enc = seal(body.api_key.strip()) if body.api_key.strip() else None
+    if body.task_models is not None: s.task_models = {k: v.strip()[:120] for k, v in body.task_models.items() if k in TASKS and v.strip()}
+    if body.style is not None:
+        st = body.style; s.style = {"tone": st.get("tone") if st.get("tone") in STYLE_TONES else None, "formality": st.get("formality") if st.get("formality") in ("formal", "neutral", "informal") else None,
+                                    "language": str(st.get("language") or "")[:40] or None, "avoid": [str(x)[:30] for x in (st.get("avoid") or [])[:20] if str(x).strip()], "instructions": str(st.get("instructions") or "")[:600] or None}
+        s.style = {k: v for k, v in s.style.items() if v}
     db.add(s); db.commit(); return get_ai(user, db)
 
 
@@ -55,7 +61,7 @@ def test_ai(user: User = Depends(current_user), db: Session = Depends(get_db)):
     cfg = cfg_of(db, user)
     if cfg.base_url: check_url(cfg.base_url)
     try: return llm.test(cfg)
-    except llm.LlmError as e: raise HTTPException(502, str(e))
+    except llm.LlmError as e: raise http_error(e, "The AI test failed")
 
 
 # ------------------------------------------------------------------ mailboxes
@@ -119,11 +125,12 @@ class SyncIn(BaseModel):
     account_id: int
     days: int | None = Field(None, ge=1, le=365)
     consent: bool = False
+    auto_apply: bool = False          # move the pipeline automatically for very confident matches (undoable)
 
 
 def _need_consent(cfg: llm.Cfg, consent: bool):
     if cfg.external and not consent:
-        raise HTTPException(400, f"Your e-mails are sent to {llm.PROVIDERS[cfg.provider]['label']} to be analysed. Confirm with consent=true, or choose the built-in rules / a local model.")
+        raise HTTPException(400, f"Your e-mails are sent to {llm.PROVIDERS[cfg.provider]['label']} to be analysed. Confirm with consent=true, or choose a local Ollama model.")
 
 
 def _run_sync(tid: int):
@@ -139,10 +146,18 @@ def _run_sync(tid: int):
 
 @router.post("/sync", status_code=202, summary="Read the mailbox in the background and extract job e-mails")
 def sync(body: SyncIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    a = _mine(db, user, body.account_id); _need_consent(cfg_of(db, user), body.consent)
+    a = _mine(db, user, body.account_id); cfg = cfg_of(db, user, "inbox")
+    if not cfg.configured: raise HTTPException(400, "Choose an AI model first: open the web app, Inbox, AI model.")
+    _need_consent(cfg, body.consent)
     # runs in this process (not the crawler queue), so reading your mailbox never waits behind company scans
-    t = Task(kind="mail_sync", status="running", payload={"user_id": str(user.id), "account_id": a.id, "days": body.days or a.days_back}); db.add(t); db.commit()
+    t = Task(kind="mail_sync", status="running", payload={"user_id": str(user.id), "account_id": a.id, "days": body.days or a.days_back, "auto_apply": body.auto_apply}); db.add(t); db.commit()
     threading.Thread(target=_run_sync, args=(t.id,), daemon=True).start(); return {"task_id": t.id}
+
+
+@router.get("/sync-history", summary="The last mailbox syncs: when, how many e-mails, what was found, what failed")
+def sync_history(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    rows = db.scalars(select(Task).where(Task.kind == "mail_sync", Task.payload["user_id"].astext == str(user.id)).order_by(Task.id.desc()).limit(20)).all()
+    return [{"id": t.id, "status": t.status, "at": t.created_at, "finished_at": t.finished_at, "error": t.error, "stats": {k: v for k, v in (t.progress or {}).items() if k in ("scanned", "skipped", "found", "duplicate", "ai_failed", "auto_applied")}} for t in rows]
 
 
 @router.get("/sync/{tid}")
@@ -150,33 +165,6 @@ def sync_status(tid: int, user: User = Depends(current_user), db: Session = Depe
     t = db.get(Task, tid)
     if not t or t.kind != "mail_sync" or (t.payload or {}).get("user_id") != str(user.id): raise HTTPException(404)
     return {"id": t.id, "status": t.status, "progress": t.progress, "error": t.error}
-
-
-class ImportIn(BaseModel):
-    text: str = Field(min_length=10, max_length=20000)
-    subject: str = ""
-    sender: str = ""
-    consent: bool = False
-
-
-def _import(db: Session, user: User, mails: list[dict], consent: bool) -> dict:
-    cfg = cfg_of(db, user); _need_consent(cfg, consent)
-    return mc.process(db, user.id, cfg, mails)
-
-
-@router.post("/import", summary="Paste one e-mail's text to classify it (no mailbox needed)")
-def import_text(body: ImportIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    import hashlib
-    m = {"message_id": "paste-" + hashlib.sha1((body.subject + body.text).encode()).hexdigest()[:20], "sender": body.sender, "sender_addr": body.sender.lower().split("<")[-1].strip(">"),
-         "subject": body.subject, "date": None, "body": body.text[:ms.MAX_BODY]}
-    return _import(db, user, [m], body.consent)
-
-
-@router.post("/import-eml", summary="Upload .eml files exported from any mail app")
-async def import_eml(files: list[UploadFile] = File(...), consent: bool = False, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    if len(files) > 50: raise HTTPException(400, "at most 50 files at a time")
-    mails = [ms.parse_eml((await f.read())[:2_000_000]) for f in files]
-    return _import(db, user, mails, consent)
 
 
 # ------------------------------------------------------------------ events: review inbox
@@ -189,10 +177,11 @@ def _ev(e: MailEvent, jobs: dict, companies: dict) -> dict:
 
 
 @router.get("/events")
-def events(status: str | None = None, category: str | None = None, q: str | None = None, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def events(status: str | None = None, category: str | None = None, q: str | None = None, job_id: int | None = None, user: User = Depends(current_user), db: Session = Depends(get_db)):
     w = [MailEvent.user_id == user.id]
     if status: w.append(MailEvent.status == status)
     if category: w.append(MailEvent.category == category)
+    if job_id: w.append(MailEvent.job_id == job_id)
     if q: w.append((MailEvent.company.ilike(f"%{q}%")) | (MailEvent.role.ilike(f"%{q}%")) | (MailEvent.subject.ilike(f"%{q}%")))
     rows = db.scalars(select(MailEvent).where(*w).order_by(MailEvent.received_at.desc().nullslast(), MailEvent.id.desc()).limit(500)).all()
     jobs = {j.id: {"id": j.id, "title": j.title} for j in db.scalars(select(Job).where(Job.id.in_([r.job_id for r in rows if r.job_id])))} if rows else {}
@@ -238,6 +227,13 @@ def _accept(db: Session, user: User, e: MailEvent) -> str | None:
 @router.post("/events/{eid}/accept", summary="Keep it, and move the linked job in your pipeline (applied / interview / offer / rejected)")
 def accept(eid: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     e = _event(db, user, eid); stage = _accept(db, user, e); db.commit(); return {"ok": True, "stage": stage}
+
+
+@router.post("/events/{eid}/undo", summary="Undo an automatic pipeline move")
+def undo(eid: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    e = _event(db, user, eid)
+    if e.status != "auto": raise HTTPException(400, "this e-mail was not applied automatically")
+    stage = mc.undo_auto(db, user.id, e); db.commit(); return {"ok": True, "stage": stage}
 
 
 @router.post("/events/{eid}/dismiss")

@@ -18,6 +18,10 @@ HEADERS = {"X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY", "Refe
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     os.makedirs(os.path.join(settings.data_dir, "logos"), exist_ok=True)
+    from sqlalchemy import text as _t                                   # mail syncs run in threads of this process: after a restart any "running" one is dead
+    from app.core.db import SessionLocal
+    with SessionLocal() as db:
+        db.execute(_t("UPDATE tasks SET status='failed', error='interrupted by a server restart: press Sync now again' WHERE kind IN ('mail_sync','fit_score') AND status='running'")); db.commit()
     if settings.env == "prod" and settings.jwt_secret.startswith("change-me"): raise RuntimeError("CAREERS_JWT_SECRET must be set in production")
     yield
 

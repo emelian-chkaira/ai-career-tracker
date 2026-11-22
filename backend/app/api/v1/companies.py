@@ -14,11 +14,12 @@ def _out(c: Company, open_jobs: int = 0) -> dict:
 
 
 @router.get("")
-def list_companies(q: str = "", city: str = "", hiring: bool = False, page: int = Query(1, ge=1), limit: int = Query(30, ge=1, le=100), db: Session = Depends(get_db)):
+def list_companies(q: str = "", city: str = "", hiring: bool = False, sponsor: bool = False, page: int = Query(1, ge=1), limit: int = Query(30, ge=1, le=100), db: Session = Depends(get_db)):
     cnt = select(Job.company_id.label("cid"), func.count().label("n")).where(Job.status == "open").group_by(Job.company_id).subquery()
     stmt = select(Company, func.coalesce(cnt.c.n, 0)).outerjoin(cnt, cnt.c.cid == Company.id)
     if q: stmt = stmt.where(or_(Company.name.ilike(f"%{q}%"), Company.description.ilike(f"%{q}%")))
     if city: stmt = stmt.where(Company.city.ilike(f"%{city}%"))
+    if sponsor: stmt = stmt.where(Company.sponsor_status.in_(("recognised", "possible")))
     if hiring: stmt = stmt.where(func.coalesce(cnt.c.n, 0) > 0)
     total = db.scalar(select(func.count()).select_from(stmt.subquery()))
     rows = db.execute(stmt.order_by(func.coalesce(cnt.c.n, 0).desc(), Company.name).offset((page - 1) * limit).limit(limit)).all()

@@ -7,10 +7,10 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.db import get_db
 from app.core.deps import current_user
 from app.models import User, UserJob, SavedSearch, Notification, Job
-from app.services import jobs_service, search_service as ss, alert_service
+from app.services import jobs_service, search_service as ss, alert_service, tracking_service as ts
 
 router = APIRouter(prefix="/me", tags=["me"])
-STAGES = ["shortlisted", "applied", "screening", "interview", "offer", "accepted", "rejected", "withdrawn", "skipped"]
+STAGES = ["shortlisted", "applied", "screening", "assessment", "team_match", "interview", "final_round", "offer", "accepted", "rejected", "withdrawn", "skipped"]
 
 
 # ---------- pipeline
@@ -22,9 +22,9 @@ class StageIn(BaseModel):
 @router.get("/pipeline")
 def pipeline(db: Session = Depends(get_db), user: User = Depends(current_user)):
     rows = db.execute(select(UserJob, Job).join(Job, Job.id == UserJob.job_id).where(UserJob.user_id == user.id).options(selectinload(Job.company), selectinload(Job.skills)).order_by(UserJob.updated_at.desc())).all()
-    out = []
+    out = []; from app.services import fit_service as fs; ai = fs.scores_for(db, user.id, [j.id for _, j in rows])
     for uj, j in rows:
-        o = jobs_service.to_out(j, user, {j.id: uj.stage}).model_dump(mode="json"); o["notes"] = uj.notes; o["updated_at"] = uj.updated_at; out.append(o)
+        o = jobs_service.to_out(j, user, {j.id: uj.stage}, ai=fs.out(ai.get(j.id))).model_dump(mode="json"); o.update(ts.view(uj)); o["updated_at"] = uj.updated_at; out.append(o)
     return {"stages": STAGES, "items": out}
 
 
@@ -32,11 +32,11 @@ def pipeline(db: Session = Depends(get_db), user: User = Depends(current_user)):
 def set_stage(job_id: int, body: StageIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
     if body.stage and body.stage not in STAGES: raise HTTPException(400, "bad stage")
     if not db.get(Job, job_id): raise HTTPException(404, "job not found")
-    uj = db.get(UserJob, (user.id, job_id)) or UserJob(user_id=user.id, job_id=job_id, stage="shortlisted")
-    if body.stage: uj.stage = body.stage
+    uj = db.get(UserJob, (user.id, job_id)) or UserJob(user_id=user.id, job_id=job_id, stage=None)
+    ts.change_stage(db, user.id, job_id, body.stage or uj.stage or "shortlisted", uj=uj)
     if body.notes is not None: uj.notes = body.notes
-    db.add(uj); db.commit()
-    return {"job_id": job_id, "stage": uj.stage, "notes": uj.notes}
+    db.commit()
+    return {"job_id": job_id, **ts.view(uj)}
 
 
 @router.delete("/jobs/{job_id}", status_code=204)
@@ -118,3 +118,31 @@ def mark_read(nid: int, db: Session = Depends(get_db), user: User = Depends(curr
 @router.post("/notifications/read-all", status_code=204)
 def mark_all(db: Session = Depends(get_db), user: User = Depends(current_user)):
     db.query(Notification).filter(Notification.user_id == user.id, Notification.read.is_(False)).update({"read": True}); db.commit()
+
+
+# ---------- follow a company (a saved search on one employer, with alerts)
+@router.get("/following")
+def following(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    from app.models import Company
+    out = []
+    for s in db.scalars(select(SavedSearch).where(SavedSearch.user_id == user.id, SavedSearch.params["follow_company"].astext.is_not(None))):
+        c = db.get(Company, int(s.params["follow_company"])); 
+        if c: out.append({"company_id": c.id, "name": c.name, "search_id": s.id, "alert_frequency": s.alert_frequency})
+    return out
+
+
+@router.post("/following/{company_id}", status_code=201, summary="Get an alert whenever this employer posts a new job")
+def follow(company_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    from app.models import Company
+    c = db.get(Company, company_id)
+    if not c: raise HTTPException(404, "company not found")
+    for s in db.scalars(select(SavedSearch).where(SavedSearch.user_id == user.id)):
+        if (s.params or {}).get("follow_company") == company_id: return {"search_id": s.id}
+    s = SavedSearch(user_id=user.id, name=f"New jobs at {c.name}", params={"company_id": company_id, "follow_company": company_id, "category": None}, alert_frequency="daily"); db.add(s); db.commit(); return {"search_id": s.id}
+
+
+@router.delete("/following/{company_id}", status_code=204)
+def unfollow(company_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    for s in db.scalars(select(SavedSearch).where(SavedSearch.user_id == user.id)):
+        if (s.params or {}).get("follow_company") == company_id: db.delete(s)
+    db.commit()

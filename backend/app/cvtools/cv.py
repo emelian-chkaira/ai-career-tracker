@@ -453,6 +453,14 @@ def import_cv(data: bytes, filename: str = "") -> dict:
     from . import latexcv, pdflayout
     if len(data) > MAX_BYTES: raise ValueError("file too large (max 3 MB)")
     name = (filename or "").lower()
+    if name.endswith(".json") or data.lstrip()[:1] == b"{":
+        import json
+        from . import rxresume
+        try: j = json.loads(data.decode("utf8", "ignore"))
+        except ValueError: j = None
+        if rxresume.looks_like_rx(j) or (isinstance(j, dict) and rxresume.looks_like_rx(j.get("data"))):
+            cvd = rxresume.from_rx(j); return {"cv": cvd, "latex": latexcv.to_latex(cvd), "text": "", "source": "rxresume"}
+        if name.endswith(".json"): raise ValueError("this JSON is not a Reactive Resume export")
     if data[:4] == b"%PDF" or name.endswith(".pdf"):
         text, footer = "", ""
         try: d = pdflayout.pdf_to_doc(data); text, footer = d["text"], d["footer"]
@@ -495,21 +503,34 @@ def _ai_input(cv: dict) -> tuple[str, dict]:
             for x in b.get("bullets", []): lines.append(f"    - {x}")
     return "\n".join(lines), secs
 
+def _anthropic_ask(api_key: str, model: str = "claude-sonnet-5-5"):
+    def ask(system: str, user: str) -> str:
+        import httpx
+        r = httpx.post("https://api.anthropic.com/v1/messages", timeout=90,
+                       headers={"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                       json={"model": model, "max_tokens": 4000, "system": system, "messages": [{"role": "user", "content": user}]})
+        r.raise_for_status()
+        return "".join(b.get("text", "") for b in r.json().get("content", []))
+    return ask
+
 def ai_tailor(cv: dict, job: dict, api_key: str, model: str = "claude-sonnet-5-5") -> dict:
-    """-> {cv: tailored copy, changes: [{section, title, before, after}], gaps, notes}. Only summary, bullets, descriptions and skill order can change."""
-    import copy, json, httpx
+    return ai_tailor_with(cv, job, _anthropic_ask(api_key, model))
+
+def ai_tailor_with(cv: dict, job: dict, ask, guard=None) -> dict:
+    """-> {cv: tailored copy, changes: [{section, title, before, after}], rejected, gaps, notes}. Only summary, bullets, descriptions and skill order can change.
+    ask(system, user) -> text is any model; guard(text) -> list of problems rejects an edit that smuggles in facts the CV does not have."""
+    import copy, json
     text, secs = _ai_input(cv)
     posting = f"{job.get('title', '')} at {job.get('company', '')}\n{(job.get('description') or '')[:6000]}"
-    r = httpx.post("https://api.anthropic.com/v1/messages", timeout=90,
-                   headers={"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-                   json={"model": model, "max_tokens": 4000, "system": _AI_SYS, "messages": [{"role": "user", "content": f"JOB POSTING:\n{posting}\n\nCV:\n{text}"}]})
-    r.raise_for_status()
-    raw = "".join(b.get("text", "") for b in r.json().get("content", []))
+    raw = ask(_AI_SYS, f"JOB POSTING:\n{posting}\n\nCV:\n{text}")
     m = re.search(r"\{.*\}", raw, re.S)
     if not m: raise ValueError("the model did not return JSON")
-    out = json.loads(m.group(0))
+    out = json.loads(m.group(0)); rejected = []
+    guard = guard or (lambda t: [])
     new = copy.deepcopy(cv); changes = []
-    if isinstance(out.get("summary"), str) and out["summary"].strip() and out["summary"].strip() != (cv.get("summary") or "").strip():
+    bad = guard(out["summary"]) if isinstance(out.get("summary"), str) else []
+    if bad: rejected.append({"section": "Summary", "why": ", ".join(bad)})
+    elif isinstance(out.get("summary"), str) and out["summary"].strip() and out["summary"].strip() != (cv.get("summary") or "").strip():
         changes.append({"section": "Summary", "title": "", "before": cv.get("summary", ""), "after": out["summary"].strip()}); new["summary"] = out["summary"].strip()
     nsecs = {"experience": new.get("experience") or [], "projects": new.get("projects") or [], "education": new.get("education") or []}
     for e in new.get("extras") or []: nsecs["x:" + e["title"]] = e["blocks"]
@@ -520,6 +541,8 @@ def ai_tailor(cv: dict, job: dict, api_key: str, model: str = "claude-sonnet-5-5
             try: i = int(ed.get("i"))
             except Exception: continue
             if not 0 <= i < len(blocks): continue
+            bad = guard(" ".join([str(ed.get("desc") or "")] + [str(x) for x in (ed.get("bullets") or [])]))
+            if bad: rejected.append({"section": sid.replace("x:", ""), "title": plain(blocks[i].get("title", "")), "why": ", ".join(bad)}); continue
             b = blocks[i]; before = " / ".join(x for x in [b.get("desc", "")] + list(b.get("bullets", [])) if x)
             if isinstance(ed.get("desc"), str) and ed["desc"].strip(): b["desc"] = ed["desc"].strip()
             if isinstance(ed.get("bullets"), list) and ed["bullets"] and len(ed["bullets"]) <= max(len(b.get("bullets", [])), 1) + 1: b["bullets"] = [str(x).strip() for x in ed["bullets"] if str(x).strip()]
@@ -530,4 +553,4 @@ def ai_tailor(cv: dict, job: dict, api_key: str, model: str = "claude-sonnet-5-5
         rank = {x: i for i, x in enumerate(first)}
         new["skills"] = sorted(cv.get("skills") or [], key=lambda x: rank.get(x, 999))
         for g in new.get("skill_groups") or []: g["items"] = sorted(g["items"], key=lambda x: rank.get(x, 999))
-    return {"cv": new, "changes": changes, "gaps": [str(x) for x in (out.get("gaps") or [])][:12], "notes": str(out.get("notes") or "")[:400]}
+    return {"cv": new, "changes": changes, "rejected": rejected, "gaps": [str(x) for x in (out.get("gaps") or [])][:12], "notes": str(out.get("notes") or "")[:400]}

@@ -146,6 +146,7 @@ def to_latex_jake(cv: dict) -> str:
     order = [k for k in (cv.get("order") or []) if k in _DEF_TITLES or k.startswith("x:")] or ["summary", "experience", "education", "projects", "skills"]
     for k in ("experience", "education", "projects", "skills", "summary", "languages", "certifications", "references"):
         if k not in order and (cv.get(k) or (k == "skills" and cv.get("skills"))): order.append(k)
+    order = [k for k in order if k not in (cv.get("hidden") or [])]
     titles = cv.get("titles") or {}
     contact = [esc(x) for x in (cv.get("phone"), cv.get("location")) if x]
     if cv.get("email"): contact.append(f"\\href{{mailto:{cv['email']}}}{{{esc(cv['email'])}}}")
@@ -296,6 +297,7 @@ def to_latex(cv: dict) -> str:
     order = [k for k in (cv.get("order") or []) if k in _DEF_TITLES or k.startswith("x:")] or ["summary", "experience", "education", "projects", "skills"]
     for k in ("summary", "experience", "education", "projects", "skills", "languages", "certifications"):
         if k not in order and cv.get(k): order.append(k)
+    order = [k for k in order if k not in (cv.get("hidden") or [])]
     titles = cv.get("titles") or {}
     name = (cv.get("name") or "").strip()
     footer = cv.get("footer") or ""
@@ -592,3 +594,36 @@ def compile_any(src: str, mode: str = "auto") -> dict:
         else: out["error"] = err
     elif not out["error"]: out["error"] = "no LaTeX compiler available on this server"
     return out
+
+
+# ------------------------------------------------------------------ layouts and paper size
+TEMPLATES = ("classic", "compact", "modern")
+PAPERS = ("a4", "letter")
+
+
+def _modern(src: str) -> str:
+    """Same content, different look: sans-serif, deep-blue accent, a bold rule under each section title, slightly wider margins."""
+    src = src.replace(r"\usepackage{lmodern}", "\\usepackage[scaled=0.95]{helvet}\n\\renewcommand{\\familydefault}{\\sfdefault}")
+    src = src.replace("{HTML}{0E7490}", "{HTML}{1D4ED8}").replace("margin=1.7cm", "margin=1.9cm")
+    src = re.sub(r"\\titleformat\{\\section\}.*?\\titlespacing\{\\section\}\{0pt\}\{7pt\}\{2pt\}",
+                 "\\\\titleformat{\\\\section}{\\\\large\\\\bfseries\\\\color{accent}}{}{0em}{}[\\\\vspace{1pt}{\\\\color{accent}\\\\hrule height 1.1pt}\\\\vspace{4pt}]\n\\\\titlespacing{\\\\section}{0pt}{9pt}{3pt}", src, flags=re.S)
+    return src
+
+
+def _drop_hidden_items(cv: dict) -> dict:
+    """Entries the user switched off ("hidden": true) stay in their data but are left out of the PDF."""
+    out = dict(cv)
+    for k in ("experience", "education", "projects"):
+        if isinstance(cv.get(k), list): out[k] = [b for b in cv[k] if not (isinstance(b, dict) and b.get("hidden"))]
+    if isinstance(cv.get("extras"), list):
+        out["extras"] = [dict(e, blocks=[b for b in e.get("blocks", []) if not (isinstance(b, dict) and b.get("hidden"))]) for e in cv["extras"]]
+    return out
+
+
+def render(cv: dict, template: str = "classic", paper: str = "a4") -> str:
+    """Structured CV -> LaTeX in one of the layouts and paper sizes. Unknown values fall back to classic / A4."""
+    template = template if template in TEMPLATES else "classic"; paper = paper if paper in PAPERS else "a4"
+    cv = _drop_hidden_items(cv)
+    src = to_latex_jake(cv) if template == "compact" else to_latex(cv)
+    if template == "modern": src = _modern(src)
+    return src.replace("letterpaper", "a4paper") if paper == "a4" else src.replace("a4paper", "letterpaper")
