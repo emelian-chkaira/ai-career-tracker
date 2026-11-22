@@ -35,6 +35,8 @@ class Company(Base):
     next_scan: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     scan_note: Mapped[str | None] = mapped_column(Text)
     fail_count: Mapped[int] = mapped_column(Integer, default=0)
+    student_scan_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))   # last internship / student-page pass (weekly)
+    scan_memory: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")     # crawl memory: dead links, real internship pages, fruitless ATS guesses (crawler/discovery.py)
     notes: Mapped[str | None] = mapped_column(Text)
     jobs: Mapped[list["Job"]] = relationship(back_populates="company", cascade="all, delete-orphan", passive_deletes=True)
 

@@ -1,7 +1,8 @@
 """Company web-resolution: name -> website -> careers page -> ATS -> postings.
 Order (career-ops style): ATS public APIs by slug guess, then website + careers-page crawl, JSON-LD, generic links.
 Polite: robots.txt honoured, 1 req/sec/host, UA names the project. Never scrapes LinkedIn/Indeed/Glassdoor or search-engine result pages."""
-import re, json, time, os, urllib.robotparser, threading
+import re, json, time, os, urllib.robotparser, threading, contextvars
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urljoin, urlparse
 import httpx
 from bs4 import BeautifulSoup
@@ -35,12 +36,62 @@ def allowed(url):
     rp = _robots[base]
     return True if rp is None else rp.can_fetch(UA, url)
 
+# ---- crawl memory: what one employer's earlier scans learned (stored per company, companies.scan_memory) ----
+# dead     {url: date}   pages that answered 404 / 410 Not Found / Gone: skipped (no request, no wait) for DEAD_DAYS, then tried once more
+# student  {urls, full}  internship pages that really exist, and when every candidate path was last tried
+# probe    date          last time guessing ATS slugs found nothing
+# Only 404 and 410 count as dead. Timeouts, 403, 429 and 5xx are usually temporary and are retried as before.
+DEAD_STATUS, DEAD_DAYS, DEAD_MAX = (404, 410), 60, 400
+_mem: contextvars.ContextVar = contextvars.ContextVar("crawl_memory", default=None)
+_gone: dict[str, float] = {}                             # process-wide: URLs that answered 404 / 410 recently (job pages opened by users)
+
+
+def _today(): return time.strftime("%Y-%m-%d")
+
+
+def remember(memory: dict | None):
+    """Use this memory for every get() in the current thread (one employer's scan). -> token for forget()"""
+    m = memory if memory is not None else {}
+    m.setdefault("dead", {}); m["_skipped"] = 0; m["_new_dead"] = []
+    return _mem.set(m)
+
+
+def forget(token): _mem.reset(token)
+
+
+def is_dead(url, m=None) -> bool:
+    m = m if m is not None else _mem.get()
+    when = (m or {}).get("dead", {}).get(url)
+    if not when: return False
+    try: return (time.time() - time.mktime(time.strptime(when, "%Y-%m-%d"))) < DEAD_DAYS * 86400
+    except ValueError: return False
+
+
+def gone(url) -> bool:
+    """True when this URL answered 404 / 410 in the last DEAD_DAYS (any scan or page view in this process, or this employer's memory)."""
+    return time.time() - _gone.get(url, 0) < DEAD_DAYS * 86400 or is_dead(url)
+
+
+def _mark_dead(url):
+    _gone[url] = time.time()
+    if len(_gone) > 20000: _gone.clear()
+    m = _mem.get()
+    if m is None: return
+    d = m.setdefault("dead", {}); d[url] = _today(); m["_new_dead"].append(url)
+    if len(d) > DEAD_MAX:                                   # keep the newest entries
+        for k in sorted(d, key=d.get)[: len(d) - DEAD_MAX]: d.pop(k, None)
+
+
 def get(url, json_=False, check_robots=True):
+    m = _mem.get()
+    if m is not None and is_dead(url, m): m["_skipped"] += 1; return None       # known dead: no request, no polite wait
     if check_robots and not allowed(url): return None
     _wait(urlparse(url).netloc)
     try:
         r = client.get(url)
+        if r.status_code in DEAD_STATUS: _mark_dead(url); return None
         if r.status_code != 200: return None
+        if m is not None: m["dead"].pop(url, None)
         return r.json() if json_ else r.text
     except Exception:
         return None
@@ -237,12 +288,20 @@ STUDENT_PATHS = ("/internships", "/internship", "/stages", "/stage", "/stage-afs
                  "/en/internships", "/en/students", "/nl/stage", "/nl/studenten", "/werken-bij/stage", "/werken-bij/studenten", "/vacatures/stage", "/jobs/internships", "/jobs/students", "/student-jobs", "/werkstudent")
 STUDENT_MAX_PAGES = 14
 
+STUDENT_RECHECK_DAYS = 56                                # every 8 weeks all candidate paths are tried again (new pages appear)
+
 def scan_student_pages(base, home_html, careers_html, known_urls):
-    """Extra pass for internships: each student page is read via ATS embed -> JSON-LD -> job links -> headless browser. Postings are tagged kind=internship."""
+    """Extra pass for internships: each student page is read via ATS embed -> JSON-LD -> job links -> headless browser. Postings are tagged kind=internship.
+    With crawl memory, only the pages that existed last time are read, except every STUDENT_RECHECK_DAYS when every candidate is tried again."""
     found = []
-    for u in student_pages(base, home_html, careers_html)[:STUDENT_MAX_PAGES]:
+    m = _mem.get(); st = (m or {}).get("student") or {}
+    fresh = st.get("full") and time.time() - time.mktime(time.strptime(st["full"], "%Y-%m-%d")) < STUDENT_RECHECK_DAYS * 86400
+    cands = list(st.get("urls") or []) if m is not None and fresh else student_pages(base, home_html, careers_html)[:STUDENT_MAX_PAGES]
+    worked = []
+    for u in cands:
         h = get(u)
         if not h: continue
+        worked.append(u)
         jobs = []
         a = detect_ats(h)
         if a and a[0] in ADAPTERS: jobs = ADAPTERS[a[0]](a[1]) or []
@@ -252,6 +311,7 @@ def scan_student_pages(base, home_html, careers_html, known_urls):
             if j["url"] not in known_urls and len(j["title"]) > 5:
                 j["kind"] = "internship"; known_urls.add(j["url"]); found.append(j)
         if len(found) > 150: break
+    if m is not None: m["student"] = {"urls": worked, "full": st.get("full") if fresh else _today()}
     return found
 
 _ATS_KEY = {"workday": "myworkdayjobs", "teamtailor": "teamtailor", "personio": "personio", "bamboohr": "bamboohr", "homerun": "homerun", "greenhouse": "greenhouse", "lever": "lever.co", "ashby": "ashbyhq",
@@ -303,55 +363,97 @@ def _find_job_arrays(node, out, depth=0):
     elif isinstance(node, dict):
         for v in node.values(): _find_job_arrays(v, out, depth + 1)
 
-PW = threading.Semaphore(max(1, BROWSER_SLOTS + 1))   # at most 4 headless browsers at once
+# Headless browsers live in a fixed pool of BROWSER_SLOTS + 1 threads. Each thread starts Chromium once and reuses it for many pages
+# (a fresh, isolated context per page), instead of launching a whole browser for every scan. Playwright's sync API belongs to the
+# thread that started it, so a page is always rendered on the browser thread that owns the browser.
+_browsers = ThreadPoolExecutor(max(1, BROWSER_SLOTS + 1), thread_name_prefix="browser")
+_tl = threading.local()
+RECYCLE_AFTER = 50                                       # pages per browser before a clean restart (keeps memory in check)
+BLOCKED = {"image", "media", "font"}                     # never needed to find job links; skipping them makes pages load much faster
+stats = {"launches": 0, "pages": 0}
+
+
+def _browser():
+    b = getattr(_tl, "browser", None)
+    if b is not None and (_tl.used >= RECYCLE_AFTER or not b.is_connected()): _drop_browser(); b = None
+    if b is None:
+        if getattr(_tl, "pw", None) is None:
+            from playwright.sync_api import sync_playwright
+            _tl.pw = sync_playwright().start()
+        _tl.browser = b = _tl.pw.chromium.launch(); _tl.used = 0; stats["launches"] += 1
+    _tl.used += 1; stats["pages"] += 1
+    return b
+
+
+def _drop_browser():
+    b = getattr(_tl, "browser", None); _tl.browser = None
+    try: b and b.close()
+    except Exception: pass
+
+
+def _block(route):
+    try: route.abort() if route.request.resource_type in BLOCKED else route.continue_()
+    except Exception: pass
+
+
 def render_scan(url, click=()):
-    with PW: return _render_scan(url, click)
+    """Render one page on a pooled headless browser. -> (jobs, html + the JSON URLs the page called, for ATS detection)"""
+    try: import playwright  # noqa: F401
+    except ImportError: return [], ""
+    try: return _browsers.submit(_render_scan, url, click).result(timeout=300)
+    except Exception: return [], ""
+
+
 def _render_scan(url, click=()):
     """Headless Chromium: render JS pages, intercept XHR/JSON job lists, then fall back to rendered DOM (JSON-LD, links). -> (jobs, final_html)"""
-    try: from playwright.sync_api import sync_playwright
-    except ImportError: return [], ""
     captured = []
     html = ""; pages_html = []
+    ctx = None
     try:
-        with sync_playwright() as pw:
-            b = pw.chromium.launch()
-            pg = b.new_context(user_agent=UA, locale="en-NL").new_page()
-            def on_resp(r):
-                try:
-                    if "json" in (r.headers.get("content-type") or "") and r.status == 200 and len(captured) < 30: captured.append((r.url, r.json()))
-                except Exception: pass
-            pg.on("response", on_resp)
-            pg.goto(url, wait_until="networkidle", timeout=30000)
-            try: pg.get_by_role("button", name="Accept all cookies").click(timeout=1500)
+        ctx = _browser().new_context(user_agent=UA, locale="en-NL")
+        ctx.route("**/*", _block)
+        pg = ctx.new_page()
+        def on_resp(r):
+            try:
+                if "json" in (r.headers.get("content-type") or "") and r.status == 200 and len(captured) < 30: captured.append((r.url, r.json()))
             except Exception: pass
-            for label in click:   # site-specific filters, e.g. ASML "Internships"
-                try:
-                    pg.get_by_text(label, exact=True).first.click(timeout=3000); pg.wait_for_timeout(2500)
-                except Exception: pass
-            for _ in range(4):  # lazy lists / "load more"
-                pg.mouse.wheel(0, 4000); pg.wait_for_timeout(600)
-                for label in ("Load more", "Show more", "Meer laden", "Toon meer"):
-                    try:
-                        btn = pg.get_by_role("button", name=label)
-                        if btn.count(): btn.first.click(timeout=1500); pg.wait_for_timeout(800)
-                    except Exception: pass
-            html = pg.content(); final = pg.url
-            # numbered pagination (e.g. ASML: 27 pages): click 2,3,4… and collect each page's links
-            pages_html = [html]
-            try: pg.get_by_role("button", name="Accept all cookies").click(timeout=1500)
+        pg.on("response", on_resp)
+        pg.goto(url, wait_until="domcontentloaded", timeout=20000)
+        try: pg.wait_for_load_state("networkidle", timeout=6000)      # most job lists arrive within a few seconds; pages with endless analytics never go quiet
+        except Exception: pass
+        try: pg.get_by_role("button", name="Accept all cookies").click(timeout=1500)
+        except Exception: pass
+        for label in click:   # site-specific filters, e.g. ASML "Internships"
+            try:
+                pg.get_by_text(label, exact=True).first.click(timeout=3000); pg.wait_for_timeout(2500)
             except Exception: pass
-            for n in range(2, 60):
-                first = len(generic_links(pages_html[-1], url))
-                if not first: break
-                el = pg.get_by_role("button", name=str(n), exact=True)
-                if not el.count(): el = pg.get_by_role("link", name=str(n), exact=True)
-                if not el.count(): break
-                try: el.first.click(timeout=2500); pg.wait_for_timeout(1300)
-                except Exception: break
-                pages_html.append(pg.content())
-            b.close()
+        for _ in range(4):  # lazy lists / "load more"
+            pg.mouse.wheel(0, 4000); pg.wait_for_timeout(600)
+            for label in ("Load more", "Show more", "Meer laden", "Toon meer"):
+                try:
+                    btn = pg.get_by_role("button", name=label)
+                    if btn.count(): btn.first.click(timeout=1500); pg.wait_for_timeout(800)
+                except Exception: pass
+        html = pg.content(); final = pg.url
+        # numbered pagination (e.g. ASML: 27 pages): click 2,3,4… and collect each page's links
+        pages_html = [html]
+        try: pg.get_by_role("button", name="Accept all cookies").click(timeout=1500)
+        except Exception: pass
+        for n in range(2, 60):
+            first = len(generic_links(pages_html[-1], url))
+            if not first: break
+            el = pg.get_by_role("button", name=str(n), exact=True)
+            if not el.count(): el = pg.get_by_role("link", name=str(n), exact=True)
+            if not el.count(): break
+            try: el.first.click(timeout=2500); pg.wait_for_timeout(1300)
+            except Exception: break
+            pages_html.append(pg.content())
     except Exception:
+        if ctx is None: _drop_browser()                  # the browser itself failed: start a new one next time
         return [], html
+    finally:
+        try: ctx and ctx.close()
+        except Exception: pass
     d = detect_ats(html)
     jobs = jsonld_jobs(html, url)
     for u, data in captured:
@@ -366,41 +468,77 @@ def _render_scan(url, click=()):
     seen, uniq = set(), []
     for j in jobs:
         if j["url"] not in seen: seen.add(j["url"]); uniq.append(j)
-    return uniq, html
+    return uniq, "".join(f"<!-- xhr {u} -->\n" for u, _ in captured) + html          # JSON URLs first: detect_ats only reads the first 600 kB
 
-def scan_company(c: dict):
+def scan_company(c: dict, students: bool = True):
+    """One employer: its job list, plus (when `students`) the extra pass over internship / student pages.
+    The homepage and careers page read by the main scan are reused by that pass instead of being downloaded again.
+    c["memory"] (optional) is this employer's crawl memory; it is updated in place and returned as res["memory"].
+    -> dict(website, careers_url, ats, ats_slug, resolved_via, jobs, note, students_skipped, memory)"""
+    token = remember(c.get("memory"))
+    try: return _scan_with_memory(c, students)
+    finally: forget(token)
+
+
+def _scan_with_memory(c, students):
     res = _scan_company(c)
+    home, careers = res.pop("_home", None), res.pop("_careers", None)
+    res["students_skipped"] = False
     try:
         if res.get("website") and res.get("careers_url") and not (c.get("ats") or "").startswith("board:"):
+            if not students: res["students_skipped"] = True; return _finish(res)
+            if home is None: home = get(res["website"], check_robots=False) or ""
+            if careers is None: careers = get(res["careers_url"]) or ""
             have = {j["url"] for j in res["jobs"]}
-            extra = scan_student_pages(res["website"], get(res["website"], check_robots=False) or "", get(res["careers_url"]) or "", have)
+            extra = scan_student_pages(res["website"], home, careers, have)
             if extra: res["jobs"] = res["jobs"] + extra; res["note"] += f" + {len(extra)} from student pages"
     except Exception: pass
+    return _finish(res)
+
+
+def _finish(res):
+    m = _mem.get()
+    skipped, new_dead = m.pop("_skipped", 0), m.pop("_new_dead", [])
+    if skipped: res["note"] += f" · skipped {skipped} dead link{'s' if skipped != 1 else ''}"
+    res["memory"], res["dead_links"] = m, new_dead
     return res
 
 def _scan_company(c: dict):
-    """-> dict(website, careers_url, ats, ats_slug, resolved_via, jobs, note)"""
+    """-> dict(website, careers_url, ats, ats_slug, resolved_via, jobs, note) and, when they were read, the pages in _home / _careers"""
     res = dict(website=c.get("website"), careers_url=c.get("careers_url"), ats=c.get("ats"), ats_slug=c.get("ats_slug"),
                resolved_via=c.get("resolved_via"), jobs=[], note="")
     # 1. known board
+    m = _mem.get()
     if res["ats"] in ADAPTERS and res["ats_slug"]:
+        before = len(m["_new_dead"])
         jobs = ADAPTERS[res["ats"]](res["ats_slug"])
         if jobs: res.update(jobs=jobs, note=f"{res['ats']} API"); return res   # empty board: keep looking (stale boards are common)
+        if jobs is None and len(m["_new_dead"]) > before: res.update(ats=None, ats_slug=None)      # the board itself is gone (404): forget it
     # 2. slug-guess every ATS API - only for companies with no saved career page / board yet. Re-guessing on every scan is what produced
     #    hundreds of 404/301 requests per run; a saved careers_url or ats_slug is reused instead (step 3 still re-detects a changed ATS).
-    b = None if (res["careers_url"] or res["ats_slug"]) else find_board(c["name"])
+    #    A guess that found nothing is not repeated for DEAD_DAYS (and every 404 it met is skipped anyway).
+    probed = bool(m.get("probe")) and is_dead("probe", {"dead": {"probe": m["probe"]}})       # same "within DEAD_DAYS" rule
+    b = None if (res["careers_url"] or res["ats_slug"] or probed) else find_board(c["name"])
     if b and b[2]:
         res.update(ats=b[0], ats_slug=b[1], jobs=b[2], resolved_via="ats-probe", note=f"{b[0]} API"); return res
-    # 3. website -> careers page
-    site = (res["website"], None) if res["website"] else None
-    html = get(res["website"], check_robots=False) if res["website"] else None
-    if not html:
-        r = resolve_website(c["name"])
-        if not r: res["note"] = "website not found"; return res
-        res["website"], html, res["resolved_via"] = r
-    cp = (res["careers_url"], get(res["careers_url"])) if res["careers_url"] else find_careers(res["website"], html)
+    if not (res["careers_url"] or res["ats_slug"] or probed): m["probe"] = _today()
+    # 3. careers page: the saved one first (no homepage download needed); otherwise website -> careers page
+    html, cp = None, None
+    if res["careers_url"]:
+        chtml = get(res["careers_url"])
+        if chtml: cp = (res["careers_url"], chtml)
+        elif is_dead(res["careers_url"], m): res["careers_url"] = None             # the saved careers page is gone (404): find the new one
+    if not cp:
+        html = get(res["website"], check_robots=False) if res["website"] else None
+        if not html:
+            r = resolve_website(c["name"])
+            if not r: res["note"] = "website not found"; return res
+            res["website"], html, res["resolved_via"] = r
+        res["_home"] = html
+        cp = find_careers(res["website"], html)
     if not cp or not cp[1]: res["note"] = "no careers page found (or robots.txt disallows)"; return res
     res["careers_url"], chtml = cp
+    res["_careers"] = chtml
     d = detect_ats(chtml) or detect_ats(html)
     if d and d[0] in ADAPTERS:
         jobs = ADAPTERS[d[0]](d[1])
@@ -413,10 +551,11 @@ def _scan_company(c: dict):
         res.update(jobs=jobs, ats="html", note="generic link extraction"); return res
     # 4. JS-rendered page: Playwright (network interception + rendered DOM)
     jobs, rhtml = render_scan(res["careers_url"])
-    d = detect_ats(rhtml)
-    if not jobs and d and d[0] in ADAPTERS:
+    d = detect_ats(rhtml)                                  # also sees the JSON URLs the page called, e.g. a Recruitee or Personio API behind a custom page
+    if d and d[0] in ADAPTERS:
         j2 = ADAPTERS[d[0]](d[1])
-        if j2: res.update(ats=d[0], ats_slug=d[1], jobs=j2, note=f"{d[0]} API (found after JS render)"); return res
+        if j2 and len(j2) * 2 >= len(jobs):                # remember the ATS: every later scan is one fast API call instead of a browser
+            res.update(ats=d[0], ats_slug=d[1], jobs=j2, note=f"{d[0]} API (found after JS render)"); return res
     if "asml.com" in res["careers_url"]:   # ASML's default list is "Jobs"; internships sit behind a filter
         extra, _h = render_scan(res["careers_url"], click=("Netherlands", "Internships"))
         have = {j["url"] for j in jobs}; jobs += [j for j in extra if j["url"] not in have]
@@ -446,7 +585,7 @@ def fetch_detail(url):
         o = (d.get("result") or {}).get("jobOpening") or {}
         return {"description": _txt(o.get("description")), "posted_at": o.get("datePosted")}
     html = get(url)
-    if not html: return out
+    if not html: return {"gone": True} if gone(url) else out
     for j in jsonld_jobs(html, url):
         if j.get("description"): return {"description": j["description"], "posted_at": j.get("posted_at")}
     soup = BeautifulSoup(html, "lxml")

@@ -40,7 +40,7 @@ def personalize(p: ss.SearchParams, user: User | None) -> tuple[ss.SearchParams,
         q.job_type = want + (["job"] if "job" not in want and set(want) - {"internship", "traineeship"} else [])
     if not q.language and pr.get("english_only"): q.language = ["english_ok", "dutch_plus"]; applied["language"] = q.language
     if q.sponsor is None and pr.get("sponsor_needed"): q.sponsor = True; applied["sponsor"] = True
-    if q.sort is None and not q.q.strip() and scoring.has_signal(pr): q.sort = "fit"; applied["sort"] = "fit"
+    # no automatic "fit" order: the feed opens newest first (a well-matched posting from weeks ago must not bury today's); "Profile match" stays one click away
     return q, applied
 
 

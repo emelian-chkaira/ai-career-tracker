@@ -97,7 +97,9 @@ def worker(db: Session = Depends(get_db)):
 def policy(db: Session = Depends(get_db)):
     from app.crawler import places
     return {**policy_service.current(), "defaults": policy_service.defaults(), "places": places.public(),
-            "by_country": dict(db.execute(text("SELECT cc, count(*) FROM jobs, unnest(countries) cc WHERE status='open' GROUP BY 1 ORDER BY 2 DESC")).all()), "by_domain": {(r[0] or "unclassified"): r[1] for r in db.execute(text("SELECT domain, count(*) FROM jobs WHERE status='open' GROUP BY 1 ORDER BY 2 DESC"))}}
+            "by_country": dict(db.execute(text("SELECT cc, count(*) FROM jobs, unnest(countries) cc WHERE status='open' GROUP BY 1 ORDER BY 2 DESC")).all()),
+            "by_age": dict(zip(("older_10", "older_30", "older_90", "older_180", "undated", "open"), db.execute(text(      # for the "How recent" choice: what each limit would remove
+                "SELECT " + ", ".join(f"count(*) FILTER (WHERE COALESCE(posted_at, first_seen::date) < current_date - {d})" for d in (10, 30, 90, 180)) + ", count(*) FILTER (WHERE posted_at IS NULL), count(*) FROM jobs WHERE status='open'")).one())), "by_domain": {(r[0] or "unclassified"): r[1] for r in db.execute(text("SELECT domain, count(*) FROM jobs WHERE status='open' GROUP BY 1 ORDER BY 2 DESC"))}}
 
 
 class BoardPlanIn(BaseModel):

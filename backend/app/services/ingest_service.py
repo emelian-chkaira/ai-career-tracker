@@ -124,7 +124,7 @@ def clean_title(title: str, url: str) -> str | None:
     return t
 
 
-def store_jobs(db: Session, company: Company, jobs: list[dict], source="company-site", expire=True) -> int:
+def store_jobs(db: Session, company: Company, jobs: list[dict], source="company-site", expire=True, still_listed: set[str] = frozenset()) -> int:
     """Store what one source lists for one employer. Returns the number of NEW roles.
     One role = one job: the same role from another city, link or source is folded into the existing job (see fold)."""
     seen, new = set(), 0
@@ -162,7 +162,7 @@ def store_jobs(db: Session, company: Company, jobs: list[dict], source="company-
                   posted_at=posted, dedupe_key=dk, alternates=[])
         job.skills = [JobSkill(skill=s) for s in sk]
         db.add(job); db.flush(); new += 1
-    if seen and expire: _expire_missing(db, company.id, seen)
+    if seen and expire: _expire_missing(db, company.id, seen | set(still_listed))       # still_listed: links not re-read this time, still counted as listed
     db.flush()
     return new
 
@@ -198,23 +198,53 @@ def ensure_logo(db: Session, c: Company):
     except Exception: pass
 
 
+STUDENT_EVERY = dt.timedelta(days=7)
+
+
 def scan_company(db: Session, company_id: int) -> int:
     """Crawl one company's own career site and store what it lists. Returns number of NEW jobs."""
     c = db.get(Company, company_id)
     if not c or (c.ats or "").startswith("board:"): return 0
     cd = {k: getattr(c, k) for k in ("name", "website", "careers_url", "ats", "ats_slug", "resolved_via")}
-    try: r = discovery.scan_company(cd)
+    cd["memory"] = dict(c.scan_memory or {})                   # what earlier scans learned: dead links, real internship pages, fruitless ATS guesses
+    students = c.student_scan_at is None or now() - c.student_scan_at >= STUDENT_EVERY      # the internship pass is slow (up to 14 pages): weekly is enough
+    try: r = discovery.scan_company(cd, students=students)
     except Exception as e: r = dict(jobs=[], note=f"error: {e}", website=c.website, careers_url=c.careers_url, ats=c.ats, ats_slug=c.ats_slug, resolved_via=c.resolved_via)
     c.website, c.careers_url, c.ats, c.ats_slug, c.resolved_via = r["website"], r["careers_url"], r["ats"], r["ats_slug"], r["resolved_via"]
     n = len(r["jobs"])
     c.last_scan, c.scan_note = now(), f"{r['note']} ({n} postings)"
+    if r.get("memory") is not None: c.scan_memory = {k: v for k, v in r["memory"].items() if not k.startswith("_")}
+    if students and not r.get("students_skipped") and "error" not in r["note"]: c.student_scan_at = now()
+    # internship pass skipped this time: its postings were not re-read, so they must not be expired as "gone" (the weekly pass re-checks them)
+    not_reread = set(db.scalars(select(Job.url).where(Job.company_id == c.id, Job.status == "open", Job.job_type.in_(("internship", "traineeship"))))) if r.get("students_skipped") else set()
     c.sponsor_status, c.sponsor_match = sponsor_service.check(db, c.name, c.kvk)
-    failed = n == 0 and any(k in r["note"] for k in ("not found", "no careers", "error"))
+    failed = n == 0 and any(k in r["note"] for k in ("not found", "no careers", "no postings found", "error"))      # dead ends back off (a week, then longer)
     c.fail_count = 0 if n else min((c.fail_count or 0) + (1 if failed else 0), 6)
     from . import schedule_service
     hours = schedule_service.current()["revisit_hours"] if n else 168 * (1 + c.fail_count)      # back off on dead ends
     c.next_scan = now() + dt.timedelta(hours=hours)
     db.commit()
     ensure_logo(db, c); db.commit()
-    new = store_jobs(db, c, r["jobs"]); db.commit()
+    new = store_jobs(db, c, r["jobs"], still_listed=not_reread)
+    drop_dead_links(db, c.id, r.get("dead_links") or []); db.commit()
     return new
+
+
+def drop_dead_links(db: Session, company_id: int | None, urls: list[str]) -> int:
+    """Links that answered 404 / 410: a job whose own page is gone expires (it leaves every feed; saved and pipeline jobs keep their
+    history), unless the same role is still online at another of its links, which then becomes the main one. Returns jobs expired."""
+    dead = set(urls)
+    if not dead: return 0
+    q = select(Job).where(Job.status == "open")
+    q = q.where(Job.company_id == company_id) if company_id else q.where(Job.url.in_(dead))
+    n = 0
+    for jb in db.scalars(q):
+        alts = [a for a in (jb.alternates or []) if a.get("url") not in dead]
+        if jb.url not in dead:
+            if len(alts) != len(jb.alternates or []): jb.alternates = alts
+            continue
+        if alts:
+            top = alts[0]; jb.url, jb.location, jb.city, jb.source = top["url"], top.get("location"), top.get("city"), top.get("source") or jb.source
+            jb.alternates = alts[1:]
+        else: jb.status = "expired"; n += 1
+    db.flush(); return n

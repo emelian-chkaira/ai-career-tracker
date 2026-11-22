@@ -107,7 +107,8 @@ def run(db: Session, p: dict, progress=None, on_step=None) -> dict:
             reason = b["skip"] or (f"resting until {resting(_load(db), site)[11:16]} UTC" if resting(_load(db), site) else None)   # a block earlier in this run counts too
             if reason: ps["skipped"] += 1; stats["skipped"] += 1; line.append(f"{boards.INFO[site]['label']}: skipped ({reason})"); continue
             if on_step: on_step(current=f"{s['term']} in {s['country']}", current_site=site, current_where=b["where"], done=i, total=len(p["searches"]))
-            rows, err = boards.search_site(site, s["term"], s["country"], results=settings.board_results)
+            age = policy_service.current()["max_job_age_days"]                      # "How recent" on the Crawler page: boards only return postings that new
+            rows, err = boards.search_site(site, s["term"], s["country"], results=settings.board_results, hours_old=age * 24 if age else 168)
             st = record(db, site, len(rows), err)
             if err: ps["errors"] += 1; stats["blocked" if st.get("kind") == "blocked" else "errors"] += 1
             n = 0

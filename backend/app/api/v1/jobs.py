@@ -91,6 +91,8 @@ def job_detail(job_id: int, db: Session = Depends(get_db), user: User | None = D
         from app.crawler import discovery
         try:
             d = discovery.fetch_detail(j.url)
+            if d.get("gone"):                                                    # the employer removed the posting (404 / 410)
+                from app.services import ingest_service; ingest_service.drop_dead_links(db, None, [j.url])
             if d.get("description"): j.description = d["description"]
             pd = dates.norm_date(d.get("posted_at"))
             if pd and not j.posted_at:

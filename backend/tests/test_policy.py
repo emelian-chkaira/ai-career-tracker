@@ -86,3 +86,20 @@ def test_search_filters_by_domain_and_returns_facet(db, client, monkeypatch):
     r = client.get("/api/v1/jobs", params={"domain": "mobile"}).json()
     assert [j["title"] for j in r["items"]] == ["Flutter Developer"] and r["items"][0]["domain"] == "mobile"
     assert {f["value"] for f in r["facets"]["domain"]} == {"mobile"} or "mobile" in {f["value"] for f in r["facets"]["domain"]}
+
+
+def test_how_recent_counts_and_board_window(client, make_user, db, monkeypatch):
+    h = make_user("admin@example.com")[0]; c = ing.add_company(db, "Acme")
+    ing.store_jobs(db, c, [J("Backend Engineer", days_ago=2), J("Data Engineer", days_ago=45), J("Platform Engineer", days_ago=200), J("Go Developer")]); db.commit()
+    a = client.get("/api/v1/admin/policy", headers=h).json()["by_age"]
+    assert (a["older_10"], a["older_30"], a["older_90"], a["older_180"], a["undated"], a["open"]) == (2, 2, 1, 1, 1, 4)
+    p = client.get("/api/v1/admin/policy", headers=h).json()
+    body = {k: p[k] for k in ("countries", "keep_remote", "keep_domains", "delete_expired_after_days")}
+    assert client.put("/api/v1/admin/policy", headers=h, json={**body, "max_job_age_days": 30}).status_code == 200
+    from app.crawler import boards; from app.services import boards_service
+    seen = {}
+    monkeypatch.setattr(boards, "search_site", lambda site, term, country, results=30, hours_old=168, **k: (seen.setdefault("hours", hours_old), ([], None))[1])
+    boards_service.run(db, {"searches": [{"term": "python", "country": "NL", "boards": [{"site": "indeed", "skip": None, "where": "Netherlands"}]}]})
+    assert seen["hours"] == 30 * 24                                                  # boards are asked for the same window
+    r = client.post("/api/v1/admin/maintenance/purge", headers=h, json={}).json()
+    assert r["too_old_deleted"] == 2                                                 # 45 and 200 days old

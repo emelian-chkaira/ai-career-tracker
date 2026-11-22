@@ -64,7 +64,7 @@ def test_my_feed_follows_each_users_profile(client, make_user, db):
     client.put(f"{H}/auth/profile", headers=hd, json={"sectors": ["tech"], "titles": ["Backend Developer"]})
     arch = client.get(f"{H}/jobs", headers=ha, params={"scope": "mine"}).json()
     assert [j["title"] for j in arch["items"]] == ["Junior Architect"]                      # architecture + Rotterdam (or remote)
-    assert arch["query"]["profile"]["sector"] == ["architecture"] and arch["sort"] == "fit"
+    assert arch["query"]["profile"]["sector"] == ["architecture"] and arch["sort"] == "newest"                     # newest first; profile match is a choice
     assert arch["items"][0]["sector"] == "architecture" and arch["items"][0]["fit"] > 50
     dev = client.get(f"{H}/jobs", headers=hd, params={"scope": "mine"}).json()
     assert [j["title"] for j in dev["items"]] == ["Backend Developer"]

@@ -35,6 +35,8 @@ def _job(db: Session, jid: int) -> dict:
         from app.crawler import discovery
         try:
             d = discovery.fetch_detail(j.url)
+            if d.get("gone"):
+                from app.services import ingest_service as ing; ing.drop_dead_links(db, None, [j.url]); db.commit()
             if d.get("description"): j.description = d["description"]; db.commit()
         except Exception: db.rollback()
     return {"id": j.id, "title": j.title, "description": j.description or "", "job_type": j.job_type, "location": j.location, "url": j.url, "company": j.company.name, "cdesc": j.company.description}
