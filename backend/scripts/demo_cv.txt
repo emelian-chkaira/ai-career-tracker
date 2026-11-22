@@ -1,0 +1,17 @@
+Alex Demo
+alex@example.com | Amsterdam
+Summary
+Backend engineer who builds data-heavy APIs in Python and ships them on Kubernetes.
+Experience
+Backend Developer  Fintech BV  2021 - 2025
+- Built FastAPI services handling 2M requests a day
+- Cut p95 latency by 40% with PostgreSQL query tuning
+- Moved 30 services to Kubernetes on AWS
+Data Engineer  Retail Group  2019 - 2021
+- Designed Airflow pipelines feeding the BI warehouse
+Skills
+Python, FastAPI, SQL, PostgreSQL, Docker, Kubernetes, AWS, Airflow
+Education
+MSc Computer Science  TU Delft  2017 - 2019
+Languages
+English, Dutch
