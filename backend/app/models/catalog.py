@@ -1,6 +1,6 @@
 import datetime as dt
 from sqlalchemy import String, Text, Integer, Float, Boolean, Date, DateTime, ForeignKey, Index, Computed, func, text
-from sqlalchemy.dialects.postgresql import TSVECTOR, ARRAY
+from sqlalchemy.dialects.postgresql import TSVECTOR, ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from pgvector.sqlalchemy import Vector
 from app.core.db import Base
@@ -55,6 +55,7 @@ class Job(Base):
     countries: Mapped[list[str]] = mapped_column(ARRAY(String(2)), default=list, server_default="{}")        # every country the posting names
     work_mode: Mapped[str] = mapped_column(String(8), default="onsite", server_default="onsite", index=True)  # onsite | hybrid | remote
     remote_scope: Mapped[str | None] = mapped_column(String(16))                                              # remote jobs: region open to (europe, emea, world...)
+    alternates: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")                       # the same role elsewhere: [{url, location, city, countries, source, seen}] (crawler/dedupe.py)
     domain: Mapped[str | None] = mapped_column(String(16), index=True)               # mobile | backend | frontend | data | devops … (see crawler/domains.py)
     job_type: Mapped[str] = mapped_column(String(16), default="job", index=True)     # internship | traineeship | junior | job | senior
     language: Mapped[str] = mapped_column(String(20), default="english_ok")

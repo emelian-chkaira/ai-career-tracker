@@ -71,6 +71,9 @@ def parse_query(q: str) -> dict:
     return {"text": re.sub(r"\s+", " ", q).strip(), "phrases": phrases, "excl": excl, "fields": fields}
 
 
+ALT_CITY = "EXISTS (SELECT 1 FROM jsonb_array_elements(j.alternates) alt WHERE lower(alt->>'city') = ANY(:{0}))"     # the same role in another city counts there too
+
+
 def _filters(p: SearchParams) -> tuple[str, dict]:
     w, a = ["j.status = :status"], {"status": p.status}
     if p.category and not p.sector: w.append("j.category = :category"); a["category"] = p.category
@@ -81,17 +84,17 @@ def _filters(p: SearchParams) -> tuple[str, dict]:
         if p.remote_open: w.append("(j.countries && CAST(:countries AS varchar[]) OR (j.work_mode = 'remote' AND j.remote_scope = ANY(:scopes)))"); a["scopes"] = places.scopes_for(cs)
         else: w.append("j.countries && CAST(:countries AS varchar[])")
     if p.work_mode: w.append("j.work_mode = ANY(:modes)"); a["modes"] = p.work_mode
-    if p.near_cities and not p.city and not p.near: w.append("(lower(j.city) = ANY(:mycities) OR j.remote)"); a["mycities"] = [c.lower() for c in p.near_cities]
+    if p.near_cities and not p.city and not p.near: w.append("(lower(j.city) = ANY(:mycities) OR j.remote OR " + ALT_CITY.format("mycities") + ")"); a["mycities"] = [c.lower() for c in p.near_cities]
     if p.kind == "internship": w.append("j.job_type IN ('internship','traineeship')")
     elif p.kind == "job": w.append("j.job_type NOT IN ('internship','traineeship')")
     if p.job_type: w.append("j.job_type = ANY(:job_types)"); a["job_types"] = p.job_type
     if p.domain: w.append("j.domain = ANY(:domains)"); a["domains"] = p.domain
     if p.language: w.append("j.language = ANY(:langs)"); a["langs"] = p.language
-    if p.city: w.append("lower(j.city) = ANY(:cities)"); a["cities"] = [c.lower() for c in p.city]
+    if p.city: w.append("(lower(j.city) = ANY(:cities) OR " + ALT_CITY.format("cities") + ")"); a["cities"] = [c.lower() for c in p.city]
     if p.near and p.radius_km:
         from . import geo
         near = geo.within(p.near, p.radius_km)
-        if near is not None: w.append("(lower(j.city) = ANY(:near) OR j.remote)"); a["near"] = near
+        if near is not None: w.append("(lower(j.city) = ANY(:near) OR j.remote OR " + ALT_CITY.format("near") + ")"); a["near"] = near
         else: w.append("lower(j.city) = :nearone"); a["nearone"] = p.near.strip().lower()          # unknown city: exact match only
     if p.location: w.append("j.location ILIKE :loc"); a["loc"] = f"%{p.location}%"
     if p.remote is not None: w.append("j.remote = :remote"); a["remote"] = p.remote
