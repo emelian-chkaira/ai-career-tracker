@@ -2,21 +2,46 @@
 
 <h1 align="center">AI Career Tracker</h1>
 
-<h3 align="center">Find work straight from employers. Apply with a CV that fits. Let your inbox move your pipeline.</h3>
+<h3 align="center">Your job hunt on autopilot: jobs from employers' career pages <i>and</i> LinkedIn, Indeed, Glassdoor, Google Jobs and Bayt,<br>filtered to your spec, ranked against your CV, applied to with an AI-tailored CV, and tracked from your inbox.</h3>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/employer--direct-1f6feb?style=for-the-badge" alt="Employer-direct">
-  <img src="https://img.shields.io/badge/one_role_·_one_card-1f6feb?style=for-the-badge" alt="One role, one card">
-  <img src="https://img.shields.io/badge/AI_CV_tailoring-1f6feb?style=for-the-badge" alt="AI CV tailoring">
-  <img src="https://img.shields.io/badge/self--updating_pipeline-1f6feb?style=for-the-badge" alt="Self-updating pipeline">
-  <img src="https://img.shields.io/badge/59_countries-1f6feb?style=for-the-badge" alt="59 countries">
-  <img src="https://img.shields.io/badge/bring_your_own_AI-1f6feb?style=for-the-badge" alt="Bring your own AI">
+  <img src="https://img.shields.io/badge/LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn">
+  <img src="https://img.shields.io/badge/Indeed-2164F3?style=for-the-badge&logo=indeed&logoColor=white" alt="Indeed">
+  <img src="https://img.shields.io/badge/Glassdoor-0CAA41?style=for-the-badge&logo=glassdoor&logoColor=white" alt="Glassdoor">
+  <img src="https://img.shields.io/badge/Google_Jobs-EA4335?style=for-the-badge&logo=google&logoColor=white" alt="Google Jobs">
+  <img src="https://img.shields.io/badge/Bayt-F26522?style=for-the-badge" alt="Bayt">
+  <img src="https://img.shields.io/badge/Employer_career_pages-1F2937?style=for-the-badge&logo=greenhouse&logoColor=white" alt="Employer career pages">
+  <img src="https://img.shields.io/badge/Gmail_inbox-D14836?style=for-the-badge&logo=gmail&logoColor=white" alt="Gmail">
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/tests-165_backend_·_16_unit_·_8_e2e-2ea043" alt="Tests">
-  <img src="https://img.shields.io/badge/FastAPI-Postgres_+_pgvector-336791?logo=postgresql&logoColor=white" alt="FastAPI and Postgres">
-  <img src="https://img.shields.io/badge/React_18-TypeScript-3178c6?logo=typescript&logoColor=white" alt="React and TypeScript">
+  <img src="https://img.shields.io/badge/🎯_jobs_matched_to_your_spec_+_CV-16a34a?style=flat-square" alt="Matched to your spec and CV">
+  <img src="https://img.shields.io/badge/🧩_one_role_·_one_card-ea580c?style=flat-square" alt="One role, one card">
+  <img src="https://img.shields.io/badge/📄_AI_CV_tailoring_+_Reactive_Resume-db2777?style=flat-square" alt="AI CV tailoring">
+  <img src="https://img.shields.io/badge/📬_AI_reads_your_mail-dc2626?style=flat-square" alt="AI inbox">
+  <img src="https://img.shields.io/badge/🌍_59_countries-0891b2?style=flat-square" alt="59 countries">
+  <img src="https://img.shields.io/badge/🤖_bring_your_own_LLM-7c3aed?style=flat-square" alt="Bring your own LLM">
+  <img src="https://img.shields.io/badge/✅_165_+_16_+_8_tests-15803d?style=flat-square" alt="Tests">
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL">
+  <img src="https://img.shields.io/badge/pgvector-336791" alt="pgvector">
+  <img src="https://img.shields.io/badge/SQLAlchemy-D71F00?logo=sqlalchemy&logoColor=white" alt="SQLAlchemy">
+  <img src="https://img.shields.io/badge/Playwright-2EAD33?logo=playwright&logoColor=white" alt="Playwright">
+  <img src="https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB" alt="React">
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white" alt="Vite">
+  <img src="https://img.shields.io/badge/Flutter-02569B?logo=flutter&logoColor=white" alt="Flutter">
+  <img src="https://img.shields.io/badge/LaTeX-008080?logo=latex&logoColor=white" alt="LaTeX">
+  <img src="https://img.shields.io/badge/Reactive_Resume-000000?logo=readthedocs&logoColor=white" alt="Reactive Resume">
+  <img src="https://img.shields.io/badge/Ollama-000000?logo=ollama&logoColor=white" alt="Ollama">
+  <img src="https://img.shields.io/badge/Claude-D97757?logo=anthropic&logoColor=white" alt="Claude">
+  <img src="https://img.shields.io/badge/OpenAI-412991?logo=openai&logoColor=white" alt="OpenAI">
+  <img src="https://img.shields.io/badge/Firebase-FFCA28?logo=firebase&logoColor=black" alt="Firebase">
+  <img src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white" alt="Docker">
   <img src="https://img.shields.io/badge/licence-MIT-6e7681" alt="MIT">
 </p>
 
@@ -69,95 +94,192 @@
 </table>
 </details>
 
-## 🧠 What makes it different
+## 🎯 Jobs customized to your spec and your CV
 
-| Principle | What it means |
+You tell it what you want once: **field, countries or regions, cities, job titles, level, work mode, language, visa needs**, and upload your **CV**. From then on every job, from an employer's career page or from a job board, is filtered and ranked for you.
+
+```mermaid
+flowchart LR
+  P["👤 Your spec<br/>field · countries · cities<br/>titles · level · work mode"]:::you
+  CV["📄 Your CV<br/>skills · experience"]:::you
+  subgraph SRC["Job sources"]
+    E["🏢 Career pages<br/>Greenhouse · Lever · Workday<br/>Personio · Ashby · Recruitee…"]:::src
+    JB["🌐 Job boards<br/>LinkedIn · Indeed · Glassdoor<br/>Google Jobs · Bayt"]:::src
+  end
+  N["🧩 Normalize<br/>places · field · level<br/>one role, one card"]:::core
+  F["🔍 Filter<br/>country · city · remote<br/>level · language · sponsor"]:::core
+  R["📊 Rank<br/>title 30 · skills 35 · field 15<br/>place 10 · keywords 10"]:::core
+  AI["🤖 AI fit score<br/>strengths · gaps · deal-breakers"]:::ai
+  OUT["🎯 Your feed<br/>+ daily alerts"]:::out
+  E & JB --> N --> F --> R --> OUT
+  P --> F
+  P & CV --> R
+  CV --> AI --> OUT
+  P -. "new country picked" .-> E
+  classDef you fill:#fde68a,stroke:#b45309,color:#1f2937
+  classDef src fill:#bfdbfe,stroke:#1d4ed8,color:#0b1220
+  classDef core fill:#bbf7d0,stroke:#15803d,color:#0b1220
+  classDef ai fill:#fbcfe8,stroke:#be185d,color:#0b1220
+  classDef out fill:#fed7aa,stroke:#c2410c,color:#0b1220
+```
+
+- **Employer-direct first, boards on top.** Career pages are crawled continuously. LinkedIn, Indeed, Glassdoor, Google Jobs and Bayt are searched with *your* job titles in *your* countries (via [JobSpy](https://github.com/speedyapply/JobSpy), opt-in), and the Crawler page shows the exact keywords before it runs.
+- **Your countries drive the crawler.** Pick the UAE or Germany in your profile and the crawler starts finding employers there; the job list tells you while it fills.
+- **CV-aware ranking.** Skills read from your CV join your profile skills in the match score; with an AI model the fit score explains itself and is capped by hard facts ("Dutch required, your CV lists no Dutch").
+
+## 📄 CV Studio, Reactive Resume and AI tailoring
+
+| | |
 |---|---|
-| **🏢 Employer-direct** | Reads official job-system feeds and career pages. Polite: `robots.txt`, rate limits, a schedule, a named user agent. |
-| **🧩 One role, one card** | A role is the employer plus its title without places, gender tags or hours. Repeats fold into one job; junk link labels become real titles. |
-| **🌍 Places as data** | "Berlin, de", "DE-Germany-Remote", "Remote - Europe" become countries, city, work mode and remote scope, so country and region filters are exact. |
-| **🎯 One catalogue, a feed per person** | Jobs are stored once; each feed is a live view ranked by that person's profile and CV skills. |
-| **🛡️ Honest AI** | Fit scores explain themselves and are capped by hard facts; tailored CVs cannot add numbers, employers or skills the original lacks. |
-| **🔒 Private by default** | CVs and API keys encrypted at rest, read-only Gmail, self-hosted fonts, full export and delete. |
+| **Import anything** | PDF, Word, LaTeX or **Reactive Resume** JSON is parsed into structured sections you can edit one by one. |
+| **Real typesetting** | Three LaTeX layouts compiled by **Tectonic** in a sandbox (no shell escape), rebuilt live as you type; A4 or Letter. |
+| **Reactive Resume** | Connect your own Reactive Resume instance (REST API key): import a resume, push your edits back, export its PDF. |
+| **AI tailoring per job** | Rewrites your summary and bullets for one posting and writes the cover letter. A **fact guard** rejects any new number, employer or skill your CV does not already contain. |
+| **Private** | Your CV is encrypted at rest and only sent to the AI provider you chose, after you agree. |
 
-## 🏗️ How it works
+## 📬 AI that reads your mail and moves your pipeline
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant G as 📬 Gmail API
+  participant W as ⚙️ Worker
+  participant L as 🤖 Your LLM
+  participant DB as 🐘 Postgres
+  participant U as 👤 You
+  W->>G: read-only OAuth, new messages since last sync
+  G-->>W: headers + text
+  W->>W: keyword pre-filter (skip newsletters, marketing)
+  W->>L: classify one e-mail → JSON
+  L-->>W: category · company · role · date · confidence
+  W->>DB: link to employer and to your tracked job
+  alt very confident and auto-apply on
+    W->>DB: move stage (applied → interview → offer / rejected), log timeline
+  else otherwise
+    W-->>U: suggestion in the Inbox
+    U->>DB: accept, correct or undo
+  end
+```
+
+Interview invites, assessments, offers, rejections and recruiter messages are recognised in English, Dutch and German. Only the extracted facts are stored, never the e-mail text, and the Gmail token is encrypted.
+
+## 🏗️ Architecture
+
+<p align="center"><img src="docs/media/system-design.png" width="100%" alt="AI Career Tracker system design: clients, Caddy, FastAPI, hybrid search, PostgreSQL, AI layer, task and notification queues, worker, outside world"></p>
+
+<sub>Vector version: <a href="docs/media/system-design.svg">system-design.svg</a> · regenerate with <code>python3 docs/media/system_design.py</code></sub>
+
+<details>
+<summary><b>Layered view</b> (clients → API → AI and database → worker → outside world)</summary>
 
 ```mermaid
 flowchart TB
-  subgraph SRC[" 1 · Sources "]
+  subgraph CLIENT["Clients"]
     direction LR
-    A["🏢 Career pages<br/>11 job systems + HTML"]
-    B["🗺️ Open data<br/>maps · Wikipedia · IND"]
-    C["🌐 Job boards<br/>optional"]
-    D["📬 Gmail<br/>read-only"]
-    A ~~~ B ~~~ C ~~~ D
+    WEB["💻 React 18 + TypeScript<br/>Vite · TanStack Query · Radix"]:::fe
+    MOB["📱 Flutter app"]:::fe
+    WEB ~~~ MOB
   end
-  subgraph WRK[" 2 · Worker "]
+  subgraph API["FastAPI · /api/v1"]
     direction LR
-    E["⏱️ Schedule + heartbeat"] --> F["🕷️ Scanner pool<br/>polite, robots.txt"] --> G["🧩 Ingest<br/>places · fields · one role, one card"]
+    A1["auth<br/>JWT · Firebase · Google"]:::api
+    A2["jobs<br/>hybrid search: tsvector + pgvector, RRF"]:::api
+    A3["me<br/>feed · pipeline · alerts"]:::api
+    A4["cv · tailor · rr<br/>LaTeX · Reactive Resume"]:::api
+    A5["mail · fit · assistant"]:::api
+    A6["admin<br/>crawler · schedule · boards"]:::api
+    A1 ~~~ A2 ~~~ A3 ~~~ A4 ~~~ A5 ~~~ A6
   end
-  H[("🐘 Postgres + pgvector")]
-  subgraph API[" 3 · FastAPI "]
+  subgraph AI["LLM gateway"]
     direction LR
-    I["🔎 Hybrid search"]
-    J["🎯 Feeds & alerts"]
-    K["🧠 AI: fit · tailoring · inbox"] <--> L[["🤖 Any LLM"]]
-    I ~~~ J ~~~ K
+    LLM["Ollama · Claude · OpenAI · Groq · OpenRouter<br/>DeepSeek · Qwen · Kimi · GLM · Grok · custom"]:::ai
   end
-  subgraph UI[" 4 · Apps "]
+  subgraph DB["PostgreSQL 16"]
     direction LR
-    M["💻 React web app"]
-    N["📱 Flutter app"]
-    M ~~~ N
+    T1[("companies · jobs<br/>tsvector · vector(384) · alternates")]:::db
+    T2[("users · profiles · CVs (encrypted)<br/>pipeline · alerts · mail events")]:::db
+    T3[("kv: schedule · policy<br/>board health · heartbeat")]:::db
+    T1 ~~~ T2 ~~~ T3
   end
-  SRC --> WRK --> H --> API --> UI
+  subgraph WK["Worker · app.workers.run"]
+    direction LR
+    S["⏱️ scheduler<br/>window · heartbeat thread"]:::wk
+    D["🔎 discover<br/>maps · Wikipedia · ATS census"]:::wk
+    SC["🕷️ scan pool (up to 40)<br/>httpx · Playwright · robots.txt"]:::wk
+    B["🌐 board_search<br/>JobSpy · back-off"]:::wk
+    I["🧩 ingest<br/>places · sectors · dedupe"]:::wk
+    X["🧠 embed · alerts<br/>fastembed ONNX · SMTP"]:::wk
+    S --> D --> SC --> I --> X
+    B --> I
+  end
+  subgraph EXT["Outside world"]
+    direction LR
+    O1["Career pages<br/>11 ATS APIs + HTML"]:::ext
+    O2["LinkedIn · Indeed · Glassdoor<br/>Google Jobs · Bayt"]:::ext
+    O3["Gmail API"]:::ext
+    O1 ~~~ O2 ~~~ O3
+  end
+  CLIENT -- "HTTPS · JWT" --> API
+  API -- "prompts · JSON" --> AI
+  API -- "SQL" --> DB
+  DB <-- "SQL" --> WK
+  WK -- "crawl · search · mail" --> EXT
+  classDef fe fill:#bfdbfe,stroke:#1d4ed8,color:#0b1220
+  classDef api fill:#a7f3d0,stroke:#047857,color:#0b1220
+  classDef ai fill:#fbcfe8,stroke:#be185d,color:#0b1220
+  classDef db fill:#c7d2fe,stroke:#4338ca,color:#0b1220
+  classDef wk fill:#fde68a,stroke:#b45309,color:#1f2937
+  classDef ext fill:#e5e7eb,stroke:#4b5563,color:#111827
 ```
+</details>
+
+<details>
+<summary><b>The life of one posting</b> (read → clean → place → classify → fold → index)</summary>
+
+```mermaid
+flowchart LR
+  R["📥 Read<br/>ATS JSON · JSON-LD · HTML · JobSpy"]:::a --> T{"Link label<br/>as title?"}:::q
+  T -- yes --> U["✂️ Title from URL<br/>or drop"]:::b
+  T -- no --> P
+  U --> P["🌍 places.parse<br/>countries · city · work mode"]:::b
+  P --> K{"Country<br/>collected?"}:::q
+  K -- no --> X["⛔ skip"]:::x
+  K -- yes --> C["🏷️ classify<br/>field · level · language<br/>salary · skills"]:::b
+  C --> F{"role_key exists<br/>at employer?"}:::q
+  F -- yes --> M["🧩 fold<br/>extra place / link"]:::c
+  F -- no --> N["🆕 insert job"]:::c
+  M & N --> E["🧠 tsvector + embedding<br/>feeds · alerts"]:::d
+  classDef a fill:#bfdbfe,stroke:#1d4ed8,color:#0b1220
+  classDef b fill:#bbf7d0,stroke:#15803d,color:#0b1220
+  classDef c fill:#fed7aa,stroke:#c2410c,color:#0b1220
+  classDef d fill:#fbcfe8,stroke:#be185d,color:#0b1220
+  classDef q fill:#fde68a,stroke:#b45309,color:#1f2937
+  classDef x fill:#e5e7eb,stroke:#6b7280,color:#111827
+```
+</details>
 
 <table>
 <tr>
 <td width="55%"><img src="docs/screenshots/web-crawler.png" alt="The crawler explained in the app"></td>
-<td><b>The same pipeline, explained inside the app.</b><br><br>The Crawler page shows each step (<i>find employers → find careers pages → read postings → understand → keep → tell people</i>) with what it does, when it runs and live numbers.<br><br>It is <b>Running</b>, <b>Paused</b> by its schedule, or <b>Stopped</b>, with a heartbeat. Every task can be paused, resumed or stopped between steps.</td>
+<td><b>The same pipeline, inside the app.</b><br><br>The Crawler page shows each step with what it does, when it runs and live numbers. It is <b>Running</b>, <b>Paused</b> by its schedule, or <b>Stopped</b>, with a heartbeat, and every task can be paused, resumed or stopped between steps.</td>
 </tr>
 </table>
 
-<details>
-<summary><b>The life of one posting</b></summary>
+## 🧰 Technology
 
-```mermaid
-flowchart LR
-  R["Read from the<br/>employer's job system"] --> T{"Link label as title?"}
-  T -- yes --> U["Title from the link,<br/>or drop it"]
-  T -- no --> P
-  U --> P["Countries, city,<br/>work mode"]
-  P --> K{"Country collected?"}
-  K -- no --> X["Skip"]
-  K -- yes --> C["Field, level, language,<br/>salary, skills"]
-  C --> F{"Same role at<br/>this employer?"}
-  F -- yes --> M["Fold in as another<br/>place or link"]
-  F -- no --> N["New job"]
-  M & N --> E["Search vector,<br/>feeds and alerts"]
-```
-</details>
-
-<details>
-<summary><b>Code structure and tech stack</b></summary>
-
-```
-backend/app   api/v1 (routes) · services (search, ingest, alerts, boards, schedule, AI) · crawler (discovery, adapters,
-              places, sectors, dedupe) · cvtools · models · workers          migrations: Alembic 0001–0014
-frontend/src  app (shell) · features (jobs, cv, pipeline, inbox, admin, onboarding …) · shared/ui (Logo, PageHeader,
-              StatTiles, CountUp, EmptyState, kit) · shared/api · styles (tokens → primitives → pages → theme)
-```
-
-| Layer | Stack |
+| Layer | Technologies |
 |---|---|
-| Backend | Python 3.12, FastAPI, SQLAlchemy 2, Alembic, httpx, Playwright for JS career pages |
-| Data | Postgres 16, pgvector (HNSW), weighted full-text search, trigram typo tolerance, local ONNX embeddings |
-| AI | Provider-agnostic client (OpenAI-compatible + Anthropic), JSON mode with fallbacks, fact guard |
-| Web | React 18, strict TypeScript, TanStack Query, React Router, Radix primitives |
-| Quality | pytest on real Postgres, Vitest, Playwright end-to-end, scripted screenshots and video |
-| Ops | Docker Compose, Caddy HTTPS, Render blueprint, Oracle free-tier guide |
-</details>
+| **API** | Python 3.12 · FastAPI · Pydantic v2 · SQLAlchemy 2 · Alembic · Uvicorn · PyJWT · Argon2 · cryptography (Fernet) |
+| **Data & search** | PostgreSQL 16 · pgvector (HNSW) · weighted full-text `tsvector` · `pg_trgm` typo tolerance · reciprocal rank fusion · fastembed (ONNX) embeddings |
+| **Crawling** | httpx · BeautifulSoup + lxml · Playwright (Chromium) · 11 ATS adapters (Greenhouse, Lever, Workday, Personio, Ashby, Recruitee, SmartRecruiters, Teamtailor, BambooHR, Workable, Homerun) · JSON-LD · robots.txt |
+| **Job boards** | JobSpy: LinkedIn · Indeed · Glassdoor · Google Jobs · Bayt, with per-board health and back-off |
+| **CV** | pypdf · pdfminer.six · LaTeX templates compiled by Tectonic · Reactive Resume REST API and JSON |
+| **AI** | Provider-agnostic LLM client: Ollama · Claude · OpenAI · Groq · OpenRouter · DeepSeek · Qwen · Kimi · GLM · Grok · any OpenAI-compatible endpoint; JSON mode with fallbacks; fact guard |
+| **Mail & auth** | Gmail API (read-only OAuth) · Firebase Auth · Google Sign-In · SMTP alerts |
+| **Web** | React 18 · TypeScript (strict) · Vite · TanStack Query & Virtual · React Router · Radix UI · cmdk · Recharts · Sonner |
+| **Mobile** | Flutter ([separate repository](https://github.com/emelian-chkaira/nl-career-tracker-mobile)) |
+| **Quality** | pytest on real Postgres (165) · Vitest + Testing Library (16) · Playwright end-to-end (8) · scripted screenshots and video |
+| **Ops** | Docker Compose · Caddy (HTTPS) · Render blueprint · Oracle Cloud free tier · GitHub Actions |
 
 ## 🚀 Run it
 
