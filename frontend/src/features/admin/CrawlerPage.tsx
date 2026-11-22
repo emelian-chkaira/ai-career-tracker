@@ -6,7 +6,7 @@ import { api } from "@/shared/api/client";
 import { useAuth } from "@/features/auth/AuthContext";
 import { SourceHealth } from "./SourceHealth";
 import { WorkerPanel, type WorkerInfo } from "./WorkerPanel";
-import { CountriesCard, PauseButton, ScheduleCard, StatusBanner } from "./CrawlerSetup";
+import { CountriesCard, PauseButton, RecencyCard, ScheduleCard, StatusBanner } from "./CrawlerSetup";
 import { PipelineExplorer, type CrawlTab } from "./PipelineExplorer";
 import { BoardsTab } from "./BoardsTab";
 import { RunningNow } from "./RunningNow";
@@ -15,30 +15,32 @@ import { JobsTab } from "./JobsTab";
 import { StorageTab } from "./StorageTab";
 import { TasksPanel } from "./TasksTab";
 import { UsersTab } from "./UsersTab";
-import { NotifyProvider, num } from "./ui";
+import { Fold, NotifyProvider, num } from "./ui";
 
 type Stats = { companies: number; companies_scanned: number; companies_with_jobs: number; open_jobs: number; users: number; sponsors: number; scan_outcomes: { note: string; n: number }[] };
-const TABS: [CrawlTab, string, string][] = [["overview", "crawler", "How it works"], ["boards", "search", "Job boards"], ["setup", "filter", "Schedule & countries"], ["companies", "company", "Companies"],
-  ["jobs", "jobs", "Jobs"], ["storage", "collapse", "Storage & clean-up"], ["tasks", "menu", "Tasks"], ["users", "profile", "Users"]];
-const BLURB: Record<CrawlTab, string> = {
-  overview: "The crawler in six steps, live numbers for each, and what it is doing this minute.",
-  boards: "Optional searches on LinkedIn, Indeed, Glassdoor and Bayt: see exactly which keywords and countries, and how each board is doing.",
-  setup: "When the crawler may run on its own, how often it revisits employers, and which countries it collects.",
-  companies: "Every employer the crawler watches: search, fix a careers link, re-scan or remove one.",
-  jobs: "Every stored posting: browse, filter and delete.",
-  storage: "Which fields and how old postings to keep, and clean-ups.",
+type Main = "overview" | "boards" | "settings" | "data" | "tasks" | "users";
+const TABS: [Main, string, string][] = [["overview", "crawler", "Overview"], ["boards", "search", "Job boards"], ["settings", "filter", "Settings"], ["data", "company", "Companies & jobs"], ["tasks", "menu", "Tasks"], ["users", "profile", "Users"]];
+const BLURB: Record<Main, string> = {
+  overview: "The crawler in six steps, with live numbers.",
+  boards: "Optional searches on LinkedIn, Indeed, Glassdoor and Bayt.",
+  settings: "When it runs, how recent, which countries, what to keep.",
+  data: "Every employer it watches and every stored posting.",
   tasks: "One-off jobs you can start by hand, and their history.",
   users: "Accounts and roles.",
 };
+/** Older tab names still work (bookmarks, step buttons): they open a section of Settings or Data. */
+const ALIAS: Record<string, [Main, string?]> = { setup: ["settings"], storage: ["settings", "storage"], companies: ["data", "companies"], jobs: ["data", "jobs"] };
 
 export function CrawlerPage() {
   const isAdmin = useAuth().user?.role === "admin";
-  const [sp, setSp] = useSearchParams(); const tab = (TABS.find((t) => t[0] === sp.get("tab"))?.[0] ?? "overview") as CrawlTab;
-  const go = (t: CrawlTab) => { setSp(t === "overview" ? {} : { tab: t }, { replace: true }); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const [sp, setSp] = useSearchParams(); const raw = sp.get("tab") ?? "overview";
+  const [tab, aliasView] = (ALIAS[raw] ?? [TABS.find((t) => t[0] === raw)?.[0] ?? "overview"]) as [Main, string?];
+  const view = (sp.get("view") ?? aliasView) === "jobs" ? "jobs" : "companies"; const openStorage = aliasView === "storage";
+  const go = (t: CrawlTab, v?: string) => { const [m, av] = ALIAS[t] ?? [t as Main, undefined]; const vv = v ?? av; setSp(m === "overview" ? {} : { tab: m, ...(vv ? { view: vv } : {}) }, { replace: true }); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const stats = useQuery({ queryKey: ["admin-stats"], refetchInterval: 15000, queryFn: () => api.get<Stats>("/admin/stats") });
   const w = useQuery({ queryKey: ["admin-worker"], refetchInterval: 5000, queryFn: () => api.get<WorkerInfo>("/admin/worker") }).data;
   const s = stats.data;
-  const count: Partial<Record<CrawlTab, string>> = s ? { companies: num(s.companies), jobs: num(s.open_jobs), users: num(s.users) } : {};
+  const count: Partial<Record<Main, string>> = s ? { data: `${num(s.companies)} · ${num(s.open_jobs)}`, users: num(s.users) } : {};
   return (
     <NotifyProvider>
       <div className="stack crawler">
@@ -52,23 +54,29 @@ export function CrawlerPage() {
         <div className="fadein" key={tab}>
           {tab === "overview" && <div className="stack">
             <PipelineExplorer go={go} />
-            <WorkerPanel />
-            <div className="sgrid2" style={{ alignItems: "start" }}>
-              {!!s?.scan_outcomes?.length && <div className="card stack"><h2 style={{ margin: 0 }}>How the last visits ended</h2><div className="small muted">What happened on each employer's site the last time it was read.</div>
-                {s.scan_outcomes.slice(0, 10).map((o) => <div key={o.note} className="obar"><span className="small">{o.note}</span><span className="small muted">{num(o.n)}</span><i style={{ width: `${Math.min(100, (o.n / Math.max(...s.scan_outcomes.map((x) => x.n))) * 100)}%` }} /></div>)}</div>}
-              <div className="card stack"><div className="row"><h2 style={{ margin: 0 }}>Start something now</h2><button className="btn ghost small right" onClick={() => go("tasks")}>All tasks →</button></div><TasksPanel compact /></div>
-            </div>
-            <SourceHealth />
+            <Fold title="Live activity" hint="visits per minute, what is waiting, the latest scans"><WorkerPanel bare /></Fold>
+            {!!s?.scan_outcomes?.length && <Fold title="How the last visits ended" hint="what happened on each employer's site"><Outcomes rows={s.scan_outcomes} /></Fold>}
+            <Fold title="Source health" hint="failing and stale employers, coverage per job system"><SourceHealth bare /></Fold>
           </div>}
           {tab === "boards" && <BoardsTab />}
-          {tab === "setup" && <div className="sgrid2"><ScheduleCard isAdmin={isAdmin} /><CountriesCard isAdmin={isAdmin} /></div>}
-          {tab === "companies" && <CompaniesTab isAdmin={isAdmin} />}
-          {tab === "jobs" && <JobsTab isAdmin={isAdmin} />}
-          {tab === "storage" && <StorageTab isAdmin={isAdmin} />}
+          {tab === "settings" && <div className="stack">
+            <div className="sgrid2"><div className="stack"><RecencyCard isAdmin={isAdmin} /><ScheduleCard isAdmin={isAdmin} /></div><CountriesCard isAdmin={isAdmin} /></div>
+            <Fold title="Storage & clean-up" hint="which fields to keep, old jobs, housekeeping" open={openStorage}><StorageTab isAdmin={isAdmin} /></Fold>
+          </div>}
+          {tab === "data" && <div className="stack">
+            <div className="seg" role="tablist" aria-label="Show"><button role="tab" aria-selected={view === "companies"} className={view === "companies" ? "on" : ""} onClick={() => go("data", "companies")}>Companies {s && <span className="count">{num(s.companies)}</span>}</button>
+              <button role="tab" aria-selected={view === "jobs"} className={view === "jobs" ? "on" : ""} onClick={() => go("data", "jobs")}>Jobs {s && <span className="count">{num(s.open_jobs)}</span>}</button></div>
+            {view === "companies" ? <CompaniesTab isAdmin={isAdmin} /> : <JobsTab isAdmin={isAdmin} />}
+          </div>}
           {tab === "tasks" && <TasksPanel />}
           {tab === "users" && isAdmin && <UsersTab />}
         </div>
       </div>
     </NotifyProvider>
   );
+}
+
+function Outcomes({ rows }: { rows: { note: string; n: number }[] }) {
+  const max = Math.max(...rows.map((x) => x.n));
+  return <div className="stack" style={{ gap: 6 }}>{rows.slice(0, 10).map((o) => <div key={o.note} className="obar"><span className="small">{o.note}</span><span className="small muted">{num(o.n)}</span><i style={{ width: `${Math.min(100, (o.n / max) * 100)}%` }} /></div>)}</div>;
 }

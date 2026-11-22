@@ -6,7 +6,8 @@ import { flag } from "@/shared/lib/geo";
 import { useSectors } from "@/shared/api/meta";
 import { ActionButton, ago, num, useNotify } from "./ui";
 
-export type CrawlTab = "overview" | "boards" | "setup" | "companies" | "jobs" | "storage" | "tasks" | "users";
+/** Where a link or a step can send you. "setup", "storage", "companies" and "jobs" are older names that now open a section of Settings or Data. */
+export type CrawlTab = "overview" | "boards" | "settings" | "data" | "tasks" | "users" | "setup" | "storage" | "companies" | "jobs";
 type Last = { kind: string; status: string; at: string | null } | null;
 export type Pipeline = {
   discover: { companies: number; by_source: { source: string; n: number }[]; last: Last };

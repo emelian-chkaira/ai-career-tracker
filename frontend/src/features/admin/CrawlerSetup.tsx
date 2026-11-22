@@ -8,7 +8,7 @@ import { ActionButton, num, useNotify } from "./ui";
 
 export type WorkerStatus = { state: "running" | "idle" | "paused" | "stopped"; seen_seconds: number | null; pid?: number; host?: string; inflight: number; task?: string | null; allowed: boolean; why: string; next_start: string | null; note: string };
 type Schedule = { enabled: boolean; days: number[]; start: string; end: string; tz: string; revisit_hours: number; parallel: number; allowed_now: boolean; why: string; next_start: string | null };
-type Policy = { countries: string[]; keep_remote: boolean; by_country: Record<string, number>; places: { countries: { code: string; name: string; regions: string[] }[]; regions: { key: string; label: string; countries: string[] }[] } };
+type Policy = { countries: string[]; keep_remote: boolean; keep_domains: string[]; max_job_age_days: number; delete_expired_after_days: number; by_age: Record<string, number>; by_country: Record<string, number>; places: { countries: { code: string; name: string; regions: string[] }[]; regions: { key: string; label: string; countries: string[] }[] } };
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const TZ = ["Europe/Amsterdam", "Europe/London", "Europe/Berlin", "Europe/Warsaw", "Europe/Athens", "Asia/Dubai", "Asia/Riyadh", "Asia/Qatar", "Africa/Cairo", "UTC"];
@@ -29,18 +29,22 @@ export function PauseButton({ schedule, isAdmin }: { schedule?: Sched; isAdmin: 
   return (<ActionButton className={`btn small ${on ? "danger" : ""}`} run={flip} disabled={!isAdmin} title={isAdmin ? undefined : "Only admins can pause the crawler"}>{on ? "⏸ Pause crawler" : "▶ Resume crawler"}</ActionButton>);
 }
 
-/** One line that says plainly what the crawler is doing, with a live dot. */
+/** What the crawler is doing right now: a status light, one headline, one detail line, the worker's pulse and the pause control, in one tidy row. */
 export function StatusBanner({ s, rate, control }: { s?: WorkerStatus; rate?: number; control?: React.ReactNode }) {
-  if (!s) return <div className="cstatus"><span className="cdot" /> Checking the worker…</div>;
-  const text = {
-    running: <>Running · <b>{s.inflight}</b> career site{s.inflight === 1 ? "" : "s"} being read{s.task ? <> · task <b>{s.task.replace(/_/g, " ")}</b></> : null}{rate ? <> · {rate}/min</> : null}</>,
-    idle: <>Running · nothing due right now, it checks again every few seconds</>,
-    paused: <>Paused · {s.why}{s.next_start ? <> · starts again <b>{at(s.next_start)}</b></> : null}{s.inflight ? <> · finishing <b>{s.inflight}</b> site{s.inflight === 1 ? "" : "s"} it had already started</> : null}. Tasks you start still run.</>,
-    stopped: <>Stopped · {s.note}</>,
+  if (!s) return <div className="cstatus"><span className="cdot" /><div className="cs-main"><b className="cs-title">Checking the worker…</b></div></div>;
+  const sites = <><b>{s.inflight}</b> career site{s.inflight === 1 ? "" : "s"} being read</>;
+  const head = { running: "Crawler running", idle: "Crawler running", paused: "Crawler paused", stopped: "Crawler stopped" }[s.state];
+  const detail = {
+    running: <>{sites}{s.task ? <> · task <b>{s.task.replace(/_/g, " ")}</b></> : null}{rate ? <> · {rate}/min</> : null}</>,
+    idle: <>Nothing due right now. It checks again every few seconds.</>,
+    paused: <>{s.why}{s.next_start ? <> · starts again <b>{at(s.next_start)}</b></> : null}{s.inflight ? <> · finishing <b>{s.inflight}</b> site{s.inflight === 1 ? "" : "s"} already started</> : null}. Tasks you start still run.</>,
+    stopped: <>{s.note}</>,
   }[s.state];
-  return (<div className={`cstatus ${s.state}`} role="status"><span className="cdot" aria-hidden />{text}
-    {s.state !== "stopped" && s.seen_seconds != null && <span className="small muted right">worker {s.pid ? `#${s.pid}` : ""} · heartbeat {s.seen_seconds}s ago</span>}
-    {control && <span className={s.state !== "stopped" && s.seen_seconds != null ? "" : "right"}>{control}</span>}</div>);
+  const pulse = s.state !== "stopped" && s.seen_seconds != null;
+  return (<div className={`cstatus ${s.state}`} role="status"><span className="cdot" aria-hidden />
+    <div className="cs-main"><b className="cs-title">{head}</b><span className="cs-sub">{detail}</span></div>
+    {pulse && <div className="cs-meta"><span>Worker {s.pid ? `#${s.pid}` : ""}</span><span>heartbeat {s.seen_seconds}s ago</span></div>}
+    {control && <div className="cs-ctl">{control}</div>}</div>);
 }
 
 export function ScheduleCard({ isAdmin }: { isAdmin: boolean }) {
@@ -86,5 +90,33 @@ export function CountriesCard({ isAdmin }: { isAdmin: boolean }) {
     <div className="ctable">{(cs.length ? cs : Object.keys(q.data.by_country)).map((c) => <div key={c} className="crow"><span>{flag(c)} {name(c)}</span><span className="small muted">{num(q.data!.by_country[c] ?? 0)} open jobs</span>
       <ActionButton className="btn ghost small" run={() => discover(c)} title={`Find employers based in ${name(c)} from free public sources`}>Find employers</ActionButton></div>)}</div>
     <div className="small muted">Most employers come from Dutch sources so far. “Find employers” searches European Tech Map, OpenStreetMap and Wikipedia for that country; their career pages are then read like any other.</div>
+  </div>);
+}
+
+const RECENT: [number, string][] = [[10, "Last 10 days"], [30, "Last month"], [90, "Last 3 months"], [180, "Last 6 months"], [0, "Any date"]];
+
+/** How recent a posting must be to be collected: applies to career pages and job boards, and old stored jobs can be removed in one click. */
+export function RecencyCard({ isAdmin }: { isAdmin: boolean }) {
+  const qc = useQueryClient(); const notify = useNotify();
+  const q = useQuery({ queryKey: ["admin-policy"], queryFn: () => api.get<Policy>("/admin/policy") });
+  if (!q.data) return <div className="card muted">Loading…</div>;
+  const p = q.data; const cur = p.max_job_age_days; const age = p.by_age ?? {};
+  const older = (d: number) => (d ? age[`older_${d}`] ?? 0 : 0);
+  const pick = async (d: number) => {
+    await api.put("/admin/policy", { countries: p.countries, keep_remote: p.keep_remote, keep_domains: p.keep_domains, max_job_age_days: d, delete_expired_after_days: p.delete_expired_after_days });
+    await qc.invalidateQueries({ queryKey: ["admin-policy"] });
+    notify(d ? `Saved. From now on only postings from the last ${d} days are collected, from career pages and job boards.` : "Saved. Postings of any date are collected.", "ok");
+  };
+  const purge = async () => {
+    if (!window.confirm(`Delete ${num(older(cur))} stored jobs older than ${cur} days? Jobs saved in someone's pipeline stay. This cannot be undone.`)) return;
+    const r = await api.post<Record<string, number>>("/admin/maintenance/purge", {}); await qc.invalidateQueries({ queryKey: ["admin-policy"] });
+    notify(`Removed ${num(r.too_old_deleted ?? 0)} old jobs.`, "ok");
+  };
+  return (<div className="card stack"><div className="row"><h2 style={{ margin: 0 }}>How recent</h2><span className="small muted right">{num(age.open ?? 0)} open jobs stored</span></div>
+    <div className="small muted">Collect only postings published in this period. Job boards are asked for this window directly; career-page postings older than it are skipped.</div>
+    <div className="cpick-row" role="radiogroup" aria-label="How recent">{RECENT.map(([d, l]) => <button type="button" key={d} role="radio" aria-checked={cur === d} disabled={!isAdmin} className={`cchip${cur === d ? " on" : ""}`} onClick={() => cur !== d && pick(d)}
+      title={d ? `${num(older(d))} stored jobs are older than this` : undefined}>{l}{d > 0 && <span className="small muted"> · {num(older(d))} older</span>}</button>)}</div>
+    {cur > 0 && older(cur) > 0 && isAdmin && <div className="row"><span className="small">{num(older(cur))} stored jobs are older than {cur} days. They are removed in the daily clean-up, or now:</span><ActionButton className="btn ghost small" run={purge}>Remove them now</ActionButton></div>}
+    <div className="small muted">{num(age.undated ?? 0)} postings give no publish date; for those the day the crawler first saw them counts.</div>
   </div>);
 }

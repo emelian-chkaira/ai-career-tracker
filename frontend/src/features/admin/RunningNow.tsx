@@ -52,15 +52,17 @@ export function TaskCard({ t, compact = false }: { t: TaskRow; compact?: boolean
   const plan = p.plan as { terms?: string[]; countries?: string[]; sites?: string[] } | undefined;
   return (<div className={`tcard ${st}`}>
     <div className="tc-top"><span className="tc-icon ph-icon" aria-hidden><Icon name={i.icon} size={17} /></span>
-      <div className="tc-main"><div className="row" style={{ gap: 8 }}><b>{i.title}</b><span className={`tc-pill ${st}`}><i />{st === "running" ? "Running" : st === "paused" ? "Paused" : "Queued"}</span><span className="small muted">#{t.id} · started {ago(t.created_at)}</span></div>
+      <div className="tc-main"><div className="tc-head"><b>{i.title}</b><span className={`tc-pill ${st}`}><i />{st === "running" ? "Running" : st === "paused" ? "Paused" : "Queued"}</span><span className="small muted">#{t.id} · started {ago(t.created_at)}</span></div>
         <div className="tc-now small">{t.status === "paused" ? <>Paused. It stopped between two steps and keeps everything found so far. Press Resume to carry on.</> : doingNow(t)}</div></div>
       <div className="tc-act">
         {t.status === "running" && <ActionButton className="btn ghost small" run={() => act("pause")} title="Pause at the next step; nothing is lost">⏸ Pause</ActionButton>}
         {t.status === "paused" && <ActionButton className="btn small" run={() => act("resume")}>▶ Resume</ActionButton>}
         <ActionButton className="btn ghost small danger-text" run={() => act("cancel")} title="Stop at the next step; what was found so far is kept">■ Stop</ActionButton></div></div>
-    {pct !== null && <div className={`tc-bar ${st}`} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><div style={{ width: `${Math.max(2, pct)}%` }} /><span>{num(done)} / {num(total)}</span></div>}
-    {!compact && t.kind === "board_search" && plan && <div className="tc-plan small"><span className="muted">Searching for</span> {(plan.terms ?? []).map((x) => <span key={x} className="cchip on">{x}</span>)}
-      <span className="muted">in</span> {(plan.countries ?? []).map((c) => <span key={c} className="cchip">{flag(c)} {c}</span>)}<span className="muted">on</span> {(plan.sites ?? []).map((s) => <BoardIcon key={s} board={s} size={18} />)}</div>}
+    {pct !== null && <div className="tc-prog"><div className={`tc-bar ${st}`} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><div style={{ width: `${Math.max(2, pct)}%` }} /></div><span className="tc-count">{num(done)} / {num(total)} · {pct}%</span></div>}
+    {!compact && t.kind === "board_search" && plan && <dl className="tc-plan">
+      <div><dt>Searching for</dt><dd>{(plan.terms ?? []).map((x) => <span key={x} className="cchip on">{x}</span>)}</dd></div>
+      <div><dt>In</dt><dd>{(plan.countries ?? []).map((c) => <span key={c} className="cchip">{flag(c)} {c}</span>)}</dd></div>
+      <div><dt>On</dt><dd>{(plan.sites ?? []).map((x) => <span key={x} className="cchip"><BoardIcon board={x} size={16} /> {boardName(x)}</span>)}</dd></div></dl>}
     {!compact && (p.found !== undefined || p.new_jobs !== undefined) && <div className="tc-stats small">{p.found !== undefined && <span><b>{num(Number(p.found))}</b> found</span>}{p.new_jobs !== undefined && <span><b>{num(Number(p.new_jobs))}</b> new jobs</span>}{Number(p.blocked ?? 0) > 0 && <span className="berr"><b>{String(p.blocked)}</b> blocked</span>}{Number(p.skipped ?? 0) > 0 && <span><b>{String(p.skipped)}</b> skipped</span>}</div>}
   </div>);
 }
@@ -73,7 +75,6 @@ export function RunningNow() {
   if (!q.data) return null;
   return (<div className="running">
     {active.length ? active.map((t) => <TaskCard key={t.id} t={t} />)
-      : <div className="tc-idle small"><Icon name="crawler" size={15} /> No task started by hand is running. The crawler's own reading of career pages (step 3) runs by itself and is shown in the bar above.
-        {last && <span className="muted"> Last task: {info(last.kind).title} {last.error === "stopped by operator" ? "stopped" : last.status}{last.finished_at ? ` ${ago(last.finished_at)}` : ""}{(last.progress as Record<string, unknown> | null)?.new_jobs !== undefined ? `, ${num(Number((last.progress as Record<string, unknown>).new_jobs))} new jobs` : ""}.</span>}</div>}
+      : last && <div className="tc-idle small"><Icon name="crawler" size={15} /> Last task: <b>{info(last.kind).title}</b> {last.error === "stopped by operator" ? "stopped" : last.status}{last.finished_at ? ` ${ago(last.finished_at)}` : ""}{(last.progress as Record<string, unknown> | null)?.new_jobs !== undefined ? ` · ${num(Number((last.progress as Record<string, unknown>).new_jobs))} new jobs` : ""}</div>}
   </div>);
 }

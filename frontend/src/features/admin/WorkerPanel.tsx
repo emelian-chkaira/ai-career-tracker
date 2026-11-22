@@ -14,7 +14,7 @@ const eta = (m: number | null) => (m == null ? "–" : m < 60 ? `${m} min` : `${
 
 /** Live view of the crawler worker: status, throughput chart, backlog progress and the latest scans. Refreshes every 5 s. */
 export type WorkerInfo = Worker;
-export function WorkerPanel() {
+export function WorkerPanel({ bare = false }: { bare?: boolean }) {
   const q = useQuery({ queryKey: ["admin-worker"], refetchInterval: 5000, queryFn: () => api.get<Worker>("/admin/worker") });
   const w = q.data;
   if (q.isError || (w && !Array.isArray(w.per_min))) return <div className="card muted">Worker status is unavailable. Restart the API (<code>./run.sh api</code>) so it picks up the new <code>/admin/worker</code> endpoint.</div>;
@@ -24,10 +24,10 @@ export function WorkerPanel() {
   const now = Math.floor(Date.now() / 60000), by = new Map(w.per_min.map((p) => [Math.floor(new Date(p.t).getTime() / 60000), p.n]));
   const series = Array.from({ length: 30 }, (_, i) => by.get(now - 29 + i) ?? 0), max = Math.max(1, ...series);
   return (
-    <div className="card stack">
-      <div className="row" style={{ justifyContent: "space-between" }}>
+    <div className={bare ? "stack" : "card stack"}>
+      {!bare && <div className="row" style={{ justifyContent: "space-between" }}>
         <h2 style={{ margin: 0 }}>Live activity</h2><span className="small muted">refreshes every 5 seconds</span>
-      </div>
+      </div>}
       <div className="statrow">
         <div><b>{w.rate_per_min}</b><span>companies read per minute</span></div>
         <div><b>{w.due.toLocaleString()}</b><span>still waiting for a visit</span></div>

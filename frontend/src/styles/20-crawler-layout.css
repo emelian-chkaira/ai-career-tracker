@@ -1,0 +1,91 @@
+/* Crawler page layout: one status row, tidy task cards, an even tab bar. Solid colours, thin borders, no gradients. */
+
+/* ---------- status banner: light | headline + detail | worker pulse | control ---------- */
+.cstatus{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;column-gap:14px;row-gap:8px;padding:14px 16px;font-size:13.5px}
+.cdot{width:12px;height:12px;margin:0 4px}
+.cs-main{display:flex;flex-direction:column;gap:2px;min-width:0;text-align:left}
+.cs-title{font-size:15.5px;letter-spacing:-.005em}
+.cs-sub{color:var(--muted);line-height:1.45}.cs-sub b{color:var(--text);font-weight:600}
+.cs-meta{display:flex;flex-direction:column;align-items:flex-end;gap:1px;font-size:12px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.cs-ctl{display:flex;justify-content:flex-end}
+@media (max-width:760px){.cstatus{grid-template-columns:auto minmax(0,1fr)}.cs-meta{display:none}.cs-ctl{grid-column:1/-1;justify-content:stretch}.cs-ctl .btn{width:100%;justify-content:center}}
+
+/* ---------- running task card ---------- */
+.crawler .chead{gap:12px}
+.running{gap:12px}
+.tcard{padding:14px 16px;gap:12px}
+.tcard.running{background:color-mix(in srgb,var(--brand) 6%,var(--panel))}
+.tc-top{align-items:center;gap:14px}
+.tc-icon{flex:none;width:36px;height:36px;font-size:inherit}
+.tc-main{gap:4px}
+.tc-head{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px}.tc-head b{font-size:15px}.tc-head .small{margin-left:2px}
+.tc-now{gap:6px;font-size:13.5px;color:var(--text)}
+.tc-act{gap:8px}
+.tc-prog{display:flex;align-items:center;gap:12px}
+.tc-bar{flex:1;height:8px;border:0;background:var(--panel2)}
+.tc-bar span{display:none}
+.tc-count{flex:none;font-size:12.5px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums;min-width:96px;text-align:right}
+.tc-plan{display:grid;gap:8px;margin:0;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
+.tc-plan>div{display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;align-items:baseline}
+.tc-plan dt{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.tc-plan dd{margin:0;display:flex;flex-wrap:wrap;gap:6px}
+.tc-plan .cchip{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;font-size:12.5px}
+.tc-stats{gap:18px;padding-top:2px}
+.tc-idle{padding:10px 14px}
+@media (max-width:760px){.tc-top{flex-wrap:wrap}.tc-act{width:100%}.tc-plan>div{grid-template-columns:1fr;gap:4px}}
+
+/* ---------- tab bar: equal-width segments that scroll sideways on small screens ---------- */
+.ctabs{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;overflow-x:auto;scrollbar-width:none}
+.ctabs::-webkit-scrollbar{display:none}
+.ctab{justify-content:center;white-space:nowrap;padding:9px 14px}
+@media (max-width:980px){.ctabs{grid-auto-columns:max-content}}
+
+/* ---------- polish ---------- */
+.tc-pill{display:inline-flex;flex-direction:row;align-items:center;height:22px;padding:0 9px;line-height:1;white-space:nowrap}
+.tc-pill i{display:inline-block;flex:none}
+.tc-plan>div{grid-template-columns:112px minmax(0,1fr)}.tc-plan dt{white-space:nowrap}
+.cs-ctl .btn.danger{background:transparent;color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 45%,var(--line))}
+.cs-ctl .btn.danger:not(:disabled):hover{background:color-mix(in srgb,var(--bad) 10%,transparent)}
+.ctab{padding:9px 10px;font-size:13px;gap:6px}
+@media (max-width:760px){.tc-plan>div{grid-template-columns:1fr;gap:4px}.tc-icon{display:none}}
+
+/* ---------- icon + name always on one line, centred ---------- */
+.bname{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.bname .bicon,.cchip .bicon,.tc-now .bicon{vertical-align:0;flex:none}
+.cchip{display:inline-flex;align-items:center;gap:6px}
+.dtable th .bname{font-weight:600}
+
+/* ---------- last run: one aligned table per board ---------- */
+.persite{width:100%;border-collapse:collapse;font-size:13.5px;font-variant-numeric:tabular-nums}
+.persite th,.persite td{padding:8px 12px;text-align:right;border-bottom:1px solid var(--line)}
+.persite thead th{font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.persite th:first-child{text-align:left}.persite tbody th{font-weight:600}
+.persite tbody tr:last-child>*{border-bottom:0}
+.persite .err{color:var(--bad);font-weight:600}.persite .muted{color:var(--muted)}
+
+/* ---------- collapsible sections ---------- */
+.fold{border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.fold>summary{list-style:none;display:flex;align-items:baseline;gap:12px;padding:12px 16px;cursor:pointer;border-radius:12px}
+.fold>summary::-webkit-details-marker{display:none}
+.fold>summary:hover{background:var(--panel2)}
+.fold>summary b{font-size:14.5px}
+.fold-caret{margin-left:auto;font-size:18px;line-height:1;color:var(--muted);transition:transform .15s}
+.fold[open]>summary{border-bottom:1px solid var(--line);border-bottom-left-radius:0;border-bottom-right-radius:0}
+.fold[open] .fold-caret{transform:rotate(90deg)}
+.fold-body{padding:16px;display:flex;flex-direction:column;gap:12px}
+.fold-body>.card{border:0;padding:0;background:none;box-shadow:none}
+.fold-note>summary{cursor:pointer;list-style:none}.fold-note>summary::-webkit-details-marker{display:none}
+.fold-note[open]>summary{margin-bottom:6px}
+
+/* ---------- tasks: three short groups ---------- */
+.tgroups{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0;padding:0;overflow:hidden}
+.tgroups section{padding:14px 16px;border-right:1px solid var(--line)}.tgroups section:last-child{border-right:0}
+.tgroups h3{margin:0 0 6px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.trow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--line)}
+.trow:first-of-type{border-top:0}
+.trow>div{display:flex;flex-direction:column;gap:1px;min-width:0}.trow b{font-size:13.5px}
+@media (max-width:760px){.tgroups section{border-right:0;border-bottom:1px solid var(--line)}.tgroups section:last-child{border-bottom:0}}
+
+/* ---------- companies / jobs switch ---------- */
+.seg .count{margin-left:6px;font-size:11px;opacity:.75}
+.cchip.on .muted{color:inherit;opacity:.85}

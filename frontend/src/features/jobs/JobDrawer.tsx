@@ -44,6 +44,7 @@ export function JobDetail({ id, onClose }: { id: number; onClose?: () => void })
         </div>
         {onClose && <><Link className="btn ghost small" to={`/jobs/${j.id}`} title="Open the full job page">Open full page ↗</Link><button className="btn ghost small" onClick={onClose}>✕</button></>}
       </div>
+      {j.status === "expired" && <div className="notice warn" role="status">This posting is no longer online: the employer removed it. It stays here only for your history.</div>}
       <div style={{ margin: "12px 0 4px" }}>{sponsorChip(j.company.sponsor_status)}<span className="chip">{label(j.job_type)}</span>{j.language !== "unknown" && <span className="chip">{label(j.language)}</span>}{j.remote && <span className="chip">Remote friendly</span>}</div>
       <div className="row">
         <a className="btn" href={j.url} target="_blank" rel="noreferrer noopener">Apply on company site ↗</a>

@@ -68,3 +68,8 @@ export async function download(path: string, filename: string, token?: string) {
   const url = URL.createObjectURL(new Blob([typeof text === "string" ? text : JSON.stringify(text)], { type: "text/csv" }));
   const a = document.createElement("a"); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url); void token;
 }
+
+/** A collapsed section: one tidy line (title, short summary) that opens on click. Keeps secondary detail out of the way. */
+export function Fold({ title, hint, open = false, children }: { title: string; hint?: ReactNode; open?: boolean; children: ReactNode }) {
+  return (<details className="fold" open={open}><summary><b>{title}</b>{hint && <span className="small muted">{hint}</span>}<span className="fold-caret" aria-hidden>›</span></summary><div className="fold-body">{children}</div></details>);
+}

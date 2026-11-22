@@ -35,6 +35,7 @@ export function JobPage() {
     <div className="card stack"><div className="row" style={{ alignItems: "flex-start", flexWrap: "nowrap" }}><Logo c={j.company} big />
       <div className="grow" style={{ minWidth: 0 }}><h1 style={{ fontSize: 24 }}>{j.title}</h1><div className="muted">{[j.company.name, j.location || (j.work_mode === "remote" ? "Remote" : ""), ago(j.posted_at ?? j.first_seen)].filter(Boolean).join(" · ")}</div></div>
       {j.ai && <span className="chip plain" title="AI fit score">Fit {j.ai.score}</span>}</div>
+      {j.status === "expired" && <div className="notice warn" role="status">This posting is no longer online: the employer removed it. It stays here only for your history.</div>}
       <div>{sponsorChip(j.company.sponsor_status)}<span className="chip">{label(j.job_type)}</span>{j.language !== "unknown" && <span className="chip">{label(j.language)}</span>}{j.remote && <span className="chip">Remote friendly</span>}</div>
       <div className="row"><a className="btn" href={j.url} target="_blank" rel="noreferrer noopener">Apply on company site ↗</a>
         {user && <select value={j.stage ?? ""} onChange={(e) => setStage.mutate({ id: j.id, stage: e.target.value })} aria-label="Pipeline stage"><option value="" disabled>Track…</option>{STAGES.map((s) => <option key={s} value={s}>{label(s)}</option>)}</select>}

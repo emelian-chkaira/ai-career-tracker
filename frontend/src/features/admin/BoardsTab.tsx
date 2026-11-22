@@ -4,7 +4,7 @@ import { api } from "@/shared/api/client";
 import { flag } from "@/shared/lib/geo";
 import { ChipPicker } from "@/features/onboarding/SetupWizard";
 import { useSectors } from "@/shared/api/meta";
-import { ActionButton, ago, num, useNotify } from "./ui";
+import { ActionButton, Fold, ago, num, useNotify } from "./ui";
 import { BoardIcon } from "@/shared/ui/BoardIcon";
 import { TaskCard } from "./RunningNow";
 
@@ -18,7 +18,7 @@ const time = (iso?: string | null) => (iso ? new Date(iso).toLocaleTimeString(un
 function BoardCard({ h, on, toggle }: { h: Health; on: boolean; toggle(): void }) {
   const state = !h.enabled ? ["off", "Off in settings"] : h.resting_until ? ["rest", `Resting until ${time(h.resting_until)}`] : h.kind && h.error_at && (!h.last_ok || h.error_at > h.last_ok) ? ["bad", "Last run failed"] : h.last_ok ? ["ok", "Working"] : ["new", "Not run yet"];
   return (<div className={`bcard ${state[0]}${on ? " on" : ""}`}>
-    <div className="row" style={{ gap: 8 }}><label className="row" style={{ gap: 6 }}><input type="checkbox" checked={on} disabled={!h.enabled} onChange={toggle} /><BoardIcon board={h.site} size={22} /><b>{h.label}</b></label><span className={`bstate ${state[0]}`}>{state[1]}</span></div>
+    <div className="row" style={{ gap: 8 }}><label className="bname"><input type="checkbox" checked={on} disabled={!h.enabled} onChange={toggle} /><BoardIcon board={h.site} size={22} /><b>{h.label}</b></label><span className={`bstate ${state[0]}`}>{state[1]}</span></div>
     <div className="small muted">{h.note}</div>
     <div className="bfacts small">
       <span>Last success: <b>{h.last_ok ? ago(h.last_ok) : "never"}</b></span>
@@ -46,7 +46,7 @@ export function BoardsTab() {
   const start = async () => { const r = await api.post<{ id: number }>("/admin/tasks", { kind: "board_search", payload: { terms, countries, sites } }); notify(`Board search started (task #${r.id}): ${p.searches.length} searches.`, "ok"); qc.invalidateQueries({ queryKey: ["admin-tasks"] }); };
   const pr = run?.progress ?? {};
   return (<div className="stack fadein">
-    <div className="notice">⚠️ <b>Experimental.</b> These boards' terms do not allow automated searching and they block busy visitors. The crawler stays polite: one board at a time, requests spaced out, and a board that blocks it <b>rests</b> (10 min for LinkedIn, doubling if it happens again) instead of being pushed. Use it for personal job hunting.</div>
+    <details className="notice fold-note"><summary>⚠️ <b>Experimental.</b> Use for personal job hunting only. <span className="muted">Why?</span></summary>These boards' terms do not allow automated searching and they block busy visitors. The crawler stays polite: one board at a time, requests spaced out, and a board that blocks it <b>rests</b> (10 min for LinkedIn, doubling if it happens again) instead of being pushed.</details>
     {!d.enabled && <div className="card stack"><h2 style={{ margin: 0 }}>Switched off</h2><div className="small">Add <code>CAREERS_BOARD_SITES=linkedin,indeed,glassdoor,bayt</code> to <code>backend/.env.local</code>, run <code>pip install -r requirements-boards.txt</code> and restart the API and worker.</div></div>}
     {d.enabled && !d.installed && <div className="notice err">JobSpy is not installed in this API's Python: <code>pip install -r requirements-boards.txt</code>, then restart.</div>}
 
@@ -66,9 +66,11 @@ export function BoardsTab() {
           <div className="bsum"><div><b>{p.searches.length}</b><span>searches</span></div><div><b>{p.requests}</b><span>board requests</span></div><div><b>~{num(p.requests * p.results_per_board)}</b><span>postings at most</span></div></div>
           {p.dropped > 0 && <div className="small warn">{p.dropped} more keyword × country combinations are left out: one run does at most {p.cap} searches (CAREERS_BOARD_MAX_SEARCHES). Remove keywords or countries to choose which.</div>}
         </div></div>
-      <div className="tablewrap"><table className="dtable splan"><thead><tr><th>#</th><th>Keyword</th><th>Country</th>{(p.sites ?? []).map((s) => <th key={s}><span className="row" style={{ gap: 5, flexWrap: "nowrap" }}><BoardIcon board={s} size={15} />{d.health.find((h) => h.site === s)?.label ?? s}</span></th>)}</tr></thead>
+      <Fold title={`All ${p.searches.length} searches`} hint="exactly what each board is asked">
+      <div className="tablewrap"><table className="dtable splan"><thead><tr><th>#</th><th>Keyword</th><th>Country</th>{(p.sites ?? []).map((s) => <th key={s}><span className="bname"><BoardIcon board={s} size={16} />{d.health.find((h) => h.site === s)?.label ?? s}</span></th>)}</tr></thead>
         <tbody>{p.searches.map((s, i) => <tr key={`${s.term}-${s.country}`}><td className="muted">{i + 1}</td><td><b>{s.term}</b></td><td>{flag(s.country)} {s.country}</td>
           {s.boards.map((b) => <td key={b.site} className="small">{b.skip ? <span className="muted" title={b.skip}>skipped · {b.skip.length > 28 ? b.skip.slice(0, 28) + "…" : b.skip}</span> : <span>searches “{b.where}”</span>}</td>)}</tr>)}</tbody></table></div>
+      </Fold>
       <div className="row"><ActionButton className="btn" disabled={!d.enabled || !d.installed || !!live || !p.requests} run={start} title={!p.requests ? "Nothing to search: every board is skipped" : undefined}>{live ? "Running…" : `▶ Search now (${p.searches.length} searches)`}</ActionButton>
         <span className="small muted">Each finished search is saved right away, so stopping early keeps what was found.</span></div></div>
 
@@ -78,8 +80,9 @@ export function BoardsTab() {
         <div className="pbar"><div style={{ width: `${Math.round(((pr.done ?? 0) / pr.total) * 100)}%` }} /></div></div> : null}
       <div className="bsum"><div><b>{num(pr.found ?? 0)}</b><span>postings found</span></div><div><b>{num(pr.new_jobs ?? 0)}</b><span>new jobs saved</span></div><div><b>{pr.blocked ?? 0}</b><span>blocked</span></div><div><b>{pr.skipped ?? 0}</b><span>skipped</span></div></div>
       {live && <TaskCard t={run as never} compact />}
-      {pr.per_site && <div className="cpick-row">{Object.entries(pr.per_site).map(([s, v]) => <span key={s} className={`cchip ${v.errors ? "" : "on"}`}><BoardIcon board={s} size={14} /> {d.health.find((h) => h.site === s)?.label ?? s}: {v.found} found, {v.new} new{v.errors ? `, ${v.errors} failed` : ""}{v.skipped ? `, ${v.skipped} skipped` : ""}</span>)}</div>}
-      {!!pr.log?.length && <ol className="blog small">{[...pr.log].reverse().map((l, i) => <li key={i}>{l}</li>)}</ol>}
+      {pr.per_site && <table className="persite"><thead><tr><th>Board</th><th>Found</th><th>New</th><th>Failed</th><th>Skipped</th></tr></thead>
+        <tbody>{Object.entries(pr.per_site).map(([s, v]) => <tr key={s}><th scope="row"><span className="bname"><BoardIcon board={s} size={18} />{d.health.find((h) => h.site === s)?.label ?? s}</span></th><td>{num(v.found)}</td><td>{num(v.new)}</td><td className={v.errors ? "err" : "muted"}>{v.errors}</td><td className="muted">{v.skipped}</td></tr>)}</tbody></table>}
+      {!!pr.log?.length && <Fold title="Run log" hint={`${pr.log.length} searches, newest first`}><ol className="blog small">{[...pr.log].reverse().map((l, i) => <li key={i}>{l}</li>)}</ol></Fold>}
     </div>}
   </div>);
 }
