@@ -9,7 +9,7 @@ from app.models import Task, Company, Job, User, Sponsor, EmailOutbox
 from app.services import task_service, maintenance_service, policy_service
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(operator_user)])
-KINDS = {"discover_country", "scan_all", "scan_unscanned", "scan_company", "discover", "census", "internships", "broad_sources", "logos", "sponsors_refresh", "embed", "live_search"}
+KINDS = {"board_search", "discover_country", "scan_all", "scan_unscanned", "scan_company", "discover", "census", "internships", "broad_sources", "logos", "sponsors_refresh", "embed", "live_search"}
 
 
 class TaskIn(BaseModel):

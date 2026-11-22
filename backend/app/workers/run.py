@@ -17,7 +17,7 @@ log = logging.getLogger("worker")
 STOP = False
 HANDLERS = {
     "scan_all": lambda t, db: tasks.scan_all(t, db), "scan_unscanned": lambda t, db: tasks.scan_all(t, db, unscanned=True), "scan_company": tasks.scan_company,
-    "discover": tasks.discover, "discover_country": tasks.discover_country, "census": tasks.census, "internships": tasks.internships, "broad_sources": tasks.broad_sources, "logos": tasks.logos, "live_search": tasks.live_search,
+    "discover": tasks.discover, "discover_country": tasks.discover_country, "board_search": tasks.board_search, "census": tasks.census, "internships": tasks.internships, "broad_sources": tasks.broad_sources, "logos": tasks.logos, "live_search": tasks.live_search,
     "sponsors_refresh": lambda t, db: (sponsor_service.refresh(db), sponsor_service.recheck_all(db)),
     "mail_sync": tasks.mail_sync,
     "embed": lambda t, db: task_service.progress(db, t, embedded=embeddings.backfill()),
@@ -69,6 +69,8 @@ def main():
                     if _every(last, "refresh", 5):                  # keep jobs fresh: top up the scan pool with the next due companies, inside the schedule
                         ok, why, nxt = schedule_service.window()
                         if ok: _refresh(db)
+                        if ok and settings.board_sites.strip() and settings.board_every_hours and _every(last, "boards", settings.board_every_hours * 3600):
+                            task_service.enqueue(db, "board_search")                  # EXPERIMENTAL job boards, only when switched on
                         elif _every(last, "paused-log", 600): log.info("automatic crawling paused: %s%s", why, f" (next start {nxt})" if nxt else "")
                         last["state"] = ("running" if _inflight else "idle") if ok else "paused"; last["why"] = why
                     _now.update(state=last.get("state", "idle"), task=None, note=last.get("why", ""))

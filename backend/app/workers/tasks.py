@@ -94,6 +94,40 @@ def discover_country(t, db):
         except Exception as e: logs.append(f"{src}: failed ({e})"); task_service.progress(db, t, country=code, log=logs)
 
 
+def board_search(t, db):
+    """EXPERIMENTAL: search LinkedIn / Indeed / Glassdoor / Google Jobs / Bayt (crawler/boards.py) and store what they list.
+    Payload (all optional): {"sites": [...], "terms": [...], "countries": [...]}. Defaults: the configured sites, the job titles users
+    chose in their preferences (or each chosen field's preset titles), and the countries the crawler collects."""
+    from app.core.config import settings
+    from app.crawler import boards, places, sectors
+    from app.models import User
+    from app.services import policy_service
+    p = t.payload or {}
+    sites = [s for s in (p.get("sites") or [x.strip() for x in settings.board_sites.split(",")]) if s in boards.SITES]
+    if not sites: raise ValueError("no job boards switched on (set CAREERS_BOARD_SITES, e.g. linkedin,indeed)")
+    countries = [c for c in (p.get("countries") or policy_service.current()["countries"] or ["NL"]) if c in places.COUNTRIES]
+    terms = list(p.get("terms") or [])
+    if not terms:                                                              # what people are actually looking for
+        for u in db.scalars(select(User).where(User.is_active.is_(True))):
+            pr = u.profile or {}
+            terms += pr.get("titles") or [x for s in pr.get("sectors") or [] for x in sectors.PRESETS.get(s, {}).get("titles", [])[:3]]
+    terms = list(dict.fromkeys(x.strip() for x in terms if x and x.strip()))[:12] or ["software engineer", "data engineer", "developer"]
+    pairs = [(term, c) for c in countries for term in terms][:max(1, settings.board_max_searches)]
+    stats = dict(searches=0, found=0, new_jobs=0, failed_sites=0); logs = []
+    for i, (term, c) in enumerate(pairs):
+        try: rows = boards.search(sites, term, c, results=settings.board_results)
+        except boards.BoardsUnavailable as e: raise ValueError(str(e))
+        stats["searches"] += 1; stats["found"] += len(rows); new = 0
+        for company, job in rows:
+            existed = db.scalar(select(Company.id).where(Company.name == company))
+            co = ing.add_company(db, company, website=job.get("company_site"), source=f"board:{job['board']}")
+            if not existed: co.country = c                                       # found through a search in that country
+            new += ing.store_jobs(db, co, [job], source=f"board:{job['board']}", expire=False)
+        db.commit(); stats["new_jobs"] += new
+        logs = (logs + [f"{term} in {c}: {len(rows)} found, {new} new"])[-12:]
+        task_service.progress(db, t, done=i + 1, total=len(pairs), sites=", ".join(sites), log=logs, **stats)
+
+
 def logos(t, db):
     ids = list(db.scalars(select(Company.id).where(Company.website.is_not(None), (Company.logo.is_(None)) | (Company.description.is_(None)))))
     task_service.progress(db, t, total=len(ids), done=0)

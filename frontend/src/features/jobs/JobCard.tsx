@@ -23,6 +23,7 @@ export function JobCard({ job, selected, onOpen, picked, onPick }: { job: Job; s
         <div className="jchips">
           {isNew(when) && <span className="chip ok">New</span>}
           <span className="chip">{label(job.job_type)}</span>
+          {job.source?.startsWith("board:") && <span className="chip plain" title="Found on a job board, not on the employer's own careers page">via {job.source.slice(6).replace(/^./, (c) => c.toUpperCase())}</span>}
           {job.work_mode && job.work_mode !== "onsite" && <span className="chip plain" title={job.remote_scope ? `Remote, open to ${SCOPE[job.remote_scope] ?? job.remote_scope}` : undefined}>{job.work_mode === "remote" ? "🏠 Remote" : "🔀 Hybrid"}{job.remote_scope && job.remote_scope !== "world" ? ` · ${SCOPE[job.remote_scope] ?? job.remote_scope}` : job.remote_scope === "world" ? " · anywhere" : ""}</span>}
           {sponsorChip(job.company.sponsor_status)}
           <FitBadge ai={job.ai} />

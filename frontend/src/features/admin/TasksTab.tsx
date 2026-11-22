@@ -7,6 +7,7 @@ export const TASKS: { kind: string; title: string; what: string }[] = [
   { kind: "scan_unscanned", title: "Scan new companies", what: "Scan only companies that were never scanned." },
   { kind: "scan_all", title: "Re-scan everything", what: "Re-read every company's careers page. Slow: the worker also does this continuously." },
   { kind: "discover", title: "Discover companies", what: "Find new employers from free public sources." },
+  { kind: "board_search", title: "Search job boards (experimental)", what: "LinkedIn, Indeed, Glassdoor, Google Jobs, Bayt via JobSpy, for users' titles and the collected countries. Needs CAREERS_BOARD_SITES; against those sites' terms." },
   { kind: "census", title: "Find ATS boards", what: "Look for companies on public job-board providers." },
   { kind: "internships", title: "Find internships", what: "Look for internship and graduate programmes." },
   { kind: "sponsors_refresh", title: "Refresh sponsor list", what: "Download the IND recognised-sponsor register and re-check companies." },
@@ -30,7 +31,7 @@ export function TasksPanel({ compact = false }: { compact?: boolean }) {
   return (
     <div className="stack">
       <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(250px,1fr))" }}>
-        {TASKS.slice(0, compact ? 4 : 8).map((t) => <div key={t.kind} className="opt" style={{ flexDirection: "column" }}><div><b>{t.title}</b><div className="small muted">{t.what}</div></div><ActionButton className="btn ghost small" run={() => run(t)}>Run</ActionButton></div>)}
+        {TASKS.slice(0, compact ? 4 : 9).map((t) => <div key={t.kind} className="opt" style={{ flexDirection: "column" }}><div><b>{t.title}</b><div className="small muted">{t.what}</div></div><ActionButton className="btn ghost small" run={() => run(t)}>Run</ActionButton></div>)}
       </div>
       {!compact && <><div className="row" style={{ justifyContent: "space-between" }}><h3 style={{ margin: 0 }}>Task history {active > 0 && <span className="badge ok">{active} active</span>}</h3>
         <ActionButton className="btn ghost small" run={async () => { const r = await api.del<{ removed: number }>("/admin/tasks"); notify(`Removed ${r.removed} finished task(s).`, "ok"); qc.invalidateQueries({ queryKey: ["admin-tasks"] }); }}>Clear finished</ActionButton></div>

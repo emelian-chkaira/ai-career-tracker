@@ -328,3 +328,20 @@ Built and tested locally. Be aware of what is **prepared but not yet exercised i
 
 [PLAN.md](PLAN.md) — design notes · [DATA_SOURCES.md](DATA_SOURCES.md) — data licences & etiquette · [CONTRIBUTING.md](CONTRIBUTING.md) · MIT licensed.
 Inspired by [career-ops](https://github.com/career-ops-hq/career-ops).
+
+## Experimental: job boards (branch `experimental/job-boards`)
+
+Optional search of **LinkedIn, Indeed, Glassdoor, Google Jobs and Bayt** through the open-source [JobSpy](https://github.com/speedyapply/JobSpy) library (MIT).
+It is off by default and **not** part of the employer-direct crawler: these boards' terms of use do not allow automated searching, and they block or rate-limit it, so use it for personal job hunting only and keep the volume low.
+
+```bash
+cd backend && .venv/bin/pip install -r requirements-boards.txt
+# backend/.env.local
+CAREERS_BOARD_SITES=linkedin,indeed,glassdoor,google,bayt
+CAREERS_BOARD_EVERY_HOURS=12      # 0 = only when started from Crawler → Tasks
+CAREERS_BOARD_RESULTS=30          # postings per site per search
+CAREERS_BOARD_MAX_SEARCHES=24     # title × country searches per run
+```
+
+It searches the job titles users chose in their preferences, in the countries the crawler collects (Bayt only for the Gulf and Middle East).
+Postings go through the same pipeline (dedupe, field, country, work mode) and are labelled “via LinkedIn” etc. When a board gives the employer's own apply link, that link is stored, and the employer is added to the crawler so its careers page is read directly from then on.
