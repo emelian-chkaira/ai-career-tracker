@@ -22,6 +22,8 @@ class JobOut(BaseModel):
     work_mode: str = "onsite"
     remote_scope: str | None = None
     url: str
+    source: str | None = None             # company-site, an ATS name, or board:<site> for job-board postings (experimental)
+    alternates: list[dict] = []           # the same role in other places / on other sites: [{url, location, city, countries, source}]
     job_type: str
     category: str
     sector: str | None = None

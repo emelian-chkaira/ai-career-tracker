@@ -43,21 +43,6 @@ export function StatusBanner({ s, rate, control }: { s?: WorkerStatus; rate?: nu
     {control && <span className={s.state !== "stopped" && s.seen_seconds != null ? "" : "right"}>{control}</span>}</div>);
 }
 
-const STEPS: [string, string, string][] = [
-  ["🔎", "Discover", "Finds employers in free public sources: European Tech Map, OpenStreetMap, Wikipedia/Wikidata, public ATS boards."],
-  ["🧭", "Locate the careers page", "Visits each website, follows the 'jobs/careers/werken bij' link and recognises the job system (Greenhouse, Lever, Workday, Personio…)."],
-  ["📥", "Read postings", "Reads every posting through that system's public feed, or from the page itself. Polite: robots.txt and rate limits."],
-  ["🏷️", "Understand them", "Country, city, remote/hybrid, field, level, language, salary and skills, from the posting text."],
-  ["🗂️", "Keep what you want", "Stores only the countries and fields set below; removes duplicates; marks postings that disappeared as expired."],
-  ["🔔", "Tell people", "Each user's feed, match score and alerts pick up new jobs within minutes."],
-];
-
-export function HowItWorks() {
-  return (<div className="card stack"><h2 style={{ margin: 0 }}>How the crawler works</h2>
-    <ol className="hiw">{STEPS.map(([i, t, d], n) => <li key={t} style={{ animationDelay: `${n * 70}ms` }}><span className="hiw-i" aria-hidden>{i}</span><b>{t}</b><span className="small muted">{d}</span></li>)}</ol>
-    <div className="small muted">Each company is visited again after the revisit interval (or later when its site keeps failing). The schedule decides when this happens on its own.</div></div>);
-}
-
 export function ScheduleCard({ isAdmin }: { isAdmin: boolean }) {
   const qc = useQueryClient(); const notify = useNotify();
   const q = useQuery({ queryKey: ["admin-schedule"], refetchInterval: 30000, queryFn: () => api.get<Schedule>("/admin/schedule") });

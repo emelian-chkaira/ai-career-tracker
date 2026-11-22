@@ -28,7 +28,7 @@ def _mail(db: Session, to: str, subject: str, text: str, button: str, url: str):
 def send_verification(db: Session, user: User):
     if user.email_verified: return
     raw = _issue(db, user, "verify", dt.timedelta(hours=settings.verify_ttl_hours))
-    _mail(db, user.email, "Confirm your CareerNL email", "Confirm your email address to finish setting up your account.", "Confirm email", f"{settings.public_url}/verify?token={raw}")
+    _mail(db, user.email, "Confirm your AI Career Tracker email", "Confirm your email address to finish setting up your account.", "Confirm email", f"{settings.public_url}/verify?token={raw}")
     db.commit()
 
 
@@ -37,7 +37,7 @@ def send_reset(db: Session, email: str):
     u = db.scalar(select(User).where(User.email == email.strip().lower()))
     if not u or not u.is_active: return
     raw = _issue(db, u, "reset", dt.timedelta(minutes=settings.reset_ttl_min))
-    _mail(db, u.email, "Reset your CareerNL password", f"Use this link within {settings.reset_ttl_min} minutes to choose a new password. If you did not ask for it, ignore this email.", "Choose a new password", f"{settings.public_url}/reset?token={raw}")
+    _mail(db, u.email, "Reset your AI Career Tracker password", f"Use this link within {settings.reset_ttl_min} minutes to choose a new password. If you did not ask for it, ignore this email.", "Choose a new password", f"{settings.public_url}/reset?token={raw}")
     db.commit()
 
 

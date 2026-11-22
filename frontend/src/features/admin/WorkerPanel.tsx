@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/shared/api/client";
-import { PauseButton, StatusBanner, type WorkerStatus } from "./CrawlerSetup";
-import { useAuth } from "@/features/auth/AuthContext";
+import type { WorkerStatus } from "./CrawlerSetup";
 
 type Worker = {
   status?: WorkerStatus; schedule?: { enabled: boolean; days: number[]; start: string; end: string; tz: string; revisit_hours: number; parallel: number }; tasks?: { id: number; kind: string; started_at: string | null }[];
@@ -14,8 +13,8 @@ const ago = (iso: string) => { const s = Math.max(0, Math.round((Date.now() - ne
 const eta = (m: number | null) => (m == null ? "–" : m < 60 ? `${m} min` : `${(m / 60).toFixed(1)} h`);
 
 /** Live view of the crawler worker: status, throughput chart, backlog progress and the latest scans. Refreshes every 5 s. */
+export type WorkerInfo = Worker;
 export function WorkerPanel() {
-  const isAdmin = useAuth().user?.role === "admin";
   const q = useQuery({ queryKey: ["admin-worker"], refetchInterval: 5000, queryFn: () => api.get<Worker>("/admin/worker") });
   const w = q.data;
   if (q.isError || (w && !Array.isArray(w.per_min))) return <div className="card muted">Worker status is unavailable. Restart the API (<code>./run.sh api</code>) so it picks up the new <code>/admin/worker</code> endpoint.</div>;
@@ -27,9 +26,8 @@ export function WorkerPanel() {
   return (
     <div className="card stack">
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <h2 style={{ margin: 0 }}>The crawler, right now</h2>
+        <h2 style={{ margin: 0 }}>Live activity</h2><span className="small muted">refreshes every 5 seconds</span>
       </div>
-      <StatusBanner s={w.status} rate={w.rate_per_min} control={<PauseButton schedule={w.schedule} isAdmin={isAdmin} />} />
       <div className="statrow">
         <div><b>{w.rate_per_min}</b><span>companies read per minute</span></div>
         <div><b>{w.due.toLocaleString()}</b><span>still waiting for a visit</span></div>

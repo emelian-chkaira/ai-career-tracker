@@ -26,7 +26,7 @@ In Google Cloud Console (same project) -> **APIs & Services -> Credentials -> We
 (`https://careers.duckdns.org`, plus `http://localhost:8787` for local testing).
 
 ## 4. E-mail templates
-**Authentication -> Templates**: for *Email address verification* and *Password reset* set the sender name to "CareerNL" and
+**Authentication -> Templates**: for *Email address verification* and *Password reset* set the sender name to "AI Career Tracker" and
 **customize action URL** to `https://<your-domain>/action`. The web app handles both links there. Until you deploy, leave the default
 (Firebase's own hosted page works too).
 

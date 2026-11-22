@@ -1,0 +1,39 @@
+/* Full-height layouts: jobs, pipeline and inbox scroll inside their panes. */
+/* Jobs & Internships: fixed-height master-detail, list and detail scroll inside their own panes */
+@media(min-width:1101px){
+  .jfull{height:calc(100dvh - 20px);display:flex;flex-direction:column;min-height:560px}
+  .main:has(.jfull){padding-bottom:22px}
+  .jfull .layout{flex:1;min-height:0;grid-template-columns:minmax(380px,440px) minmax(0,1fr);align-items:stretch;margin-top:10px}
+  .jfull .list{overflow-y:auto;min-height:0}
+  .jfull .detail{position:static;max-height:none;height:100%;overflow-y:auto;min-height:0}
+  .jfull .pager{position:sticky;bottom:0;background:var(--panel);border-top:1px solid var(--line)}
+  .jfull .jhead .jsub{display:none}
+  .jfull .detail .hd{position:static}
+  .jfull .chips-row{margin-top:6px}
+}
+
+/* Pipeline: slim stats strip, board fills the screen, each column scrolls inside */
+.pstats{display:flex;align-items:center;gap:20px;padding:10px 16px;flex-wrap:wrap}
+.pstats .kpi b{font-size:21px}.spark-w{display:flex;flex-direction:column;gap:2px;min-width:140px;flex:0 1 220px}.spark{height:34px!important;width:100%}
+.fchips{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:200px}.fchip{font-size:12px;background:var(--chip);color:var(--chip-ink);border-radius:999px;padding:2px 9px}.fchip b{margin-left:3px}
+.pscroll{flex:1;min-height:0;overflow-y:auto}
+@media(min-width:901px){
+  .pfull{height:calc(100dvh - 20px);display:flex;flex-direction:column;gap:10px;min-height:520px}
+  .main:has(.pfull){padding-bottom:22px}
+  .pfull .board{flex:1;min-height:0;align-items:stretch;padding-bottom:4px}
+  .pfull .kcol{min-height:0;max-height:100%}.pfull .kcol-bd{overflow-y:auto;min-height:0}
+  .pfull .kcol.min{align-self:start}
+}
+@media(max-width:900px){.pfull{display:flex;flex-direction:column;gap:10px}}
+
+/* Inbox: header and connection stay put, the e-mail list scrolls inside */
+@media(min-width:901px){
+  .ifull{height:calc(100dvh - 20px);display:flex;flex-direction:column;gap:12px;min-height:520px}
+  .main:has(.ifull){padding-bottom:22px}
+  .ifull .inbox-banner p{display:none}
+  .ifull .itop{max-height:38%;overflow-y:auto;flex:0 1 auto}
+  .ifull .ireview{flex:1;min-height:0}
+  .ifull .ilist{flex:1;min-height:0;overflow-y:auto;padding-right:4px}
+}
+@media(max-width:900px){.ifull{display:flex;flex-direction:column;gap:12px}}
+

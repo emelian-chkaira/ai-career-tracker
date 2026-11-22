@@ -2,8 +2,11 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/shared/api/client";
 import { ActionButton, Modal, ListFoot, useAdminList, download, ago, num, useDebounced, useNotify } from "./ui";
+import { PlaceFilters, type PlaceF } from "./PlaceFilters";
+import { flag } from "@/shared/lib/geo";
+import { BoardIcon, boardName } from "@/shared/ui/BoardIcon";
 
-type Company = { id: number; name: string; website?: string | null; careers_url?: string | null; ats?: string | null; city?: string | null; source?: string | null;
+type Company = { id: number; name: string; website?: string | null; careers_url?: string | null; ats?: string | null; city?: string | null; country?: string | null; source?: string | null;
   last_scan?: string | null; next_scan?: string | null; scan_note?: string | null; fail_count: number; notes?: string | null; open_jobs: number };
 
 const FILTERS: [string, string][] = [["all", "All"], ["has_jobs", "Has open jobs"], ["no_jobs", "Scanned, no jobs"], ["failing", "Failing"], ["never", "Never scanned"], ["due", "Due for scan"], ["no_site", "No website"]];
@@ -18,9 +21,9 @@ function health(c: Company) {
 
 export function CompaniesTab({ isAdmin }: { isAdmin: boolean }) {
   const qc = useQueryClient(); const notify = useNotify();
-  const [q, setQ] = useState(""); const [status, setStatus] = useState("all"); const [sort, setSort] = useState("name");
-  const dq = useDebounced(q);
-  const list = useAdminList<Company>("co", "/admin/companies", { q: dq, status, sort });
+  const [q, setQ] = useState(""); const [status, setStatus] = useState("all"); const [sort, setSort] = useState("name"); const [pf, setPf] = useState<PlaceF>({});
+  const dq = useDebounced(q); const dcity = useDebounced(pf.city ?? "");
+  const list = useAdminList<Company>("co", "/admin/companies", { q: dq, status, sort, country: pf.country, city: dcity || undefined, source: pf.source });
   const [edit, setEdit] = useState<Company | null>(null); const [add, setAdd] = useState(false); const [del, setDel] = useState<Company | null>(null);
   const refresh = () => { qc.invalidateQueries({ queryKey: ["co"] }); qc.invalidateQueries({ queryKey: ["admin-policy"] }); qc.invalidateQueries({ queryKey: ["admin-worker"] }); };
   const rescan = async (c: Company) => { await api.post(`/admin/companies/${c.id}/scan`); notify(`Queued a re-scan of ${c.name}. The worker picks it up in a few seconds.`, "ok"); };
@@ -33,11 +36,12 @@ export function CompaniesTab({ isAdmin }: { isAdmin: boolean }) {
         <button className="btn small" onClick={() => setAdd(true)}>＋ Add companies</button>
         <ActionButton className="btn ghost small" run={async () => { await download("/admin/export/companies.csv", "companies.csv"); notify("Downloaded companies.csv", "ok"); }}>⬇ CSV</ActionButton>
       </div>
+      <PlaceFilters kind="companies" value={pf} onChange={setPf} />
       <div className="row" style={{ gap: 6 }}>{FILTERS.map(([v, l]) => <button key={v} className={`chip ${status === v ? "ok" : "plain"}`} style={{ cursor: "pointer", border: 0, margin: 0 }} onClick={() => { setStatus(v); }}>{l}</button>)}</div>
       <div className="tablewrap"><table className="dtable">
         <thead><tr><th>Company</th><th>Status</th><th>Careers page</th><th>Via</th><th>Last scan</th><th>Result</th><th /></tr></thead>
         <tbody>{items.map((c) => <tr key={c.id}>
-          <td><b>{c.name}</b>{c.city && <div className="muted small">{c.city}</div>}</td>
+          <td><b>{c.name}</b><div className="muted small">{flag(c.country)} {[c.city, c.country].filter(Boolean).join(", ")}{c.source?.startsWith("board:") && <span title={`Found on ${boardName(c.source)}`}> · <BoardIcon board={c.source} size={14} /> {boardName(c.source)}</span>}</div></td>
           <td>{health(c)}</td>
           <td className="clip">{c.careers_url ? <a href={c.careers_url} target="_blank" rel="noreferrer">{c.careers_url.replace(/^https?:\/\//, "")}</a> : c.website ? <span className="muted">{c.website.replace(/^https?:\/\//, "")}</span> : <span className="muted">—</span>}</td>
           <td><span className="badge">{c.ats ?? "—"}</span></td>

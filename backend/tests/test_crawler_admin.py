@@ -77,7 +77,7 @@ def test_export_csv(client, make_user, db):
 def test_task_cancel_and_clear(client, make_user, db):
     ha = admin(make_user); q = Task(kind="scan_all", status="queued"); r = Task(kind="scan_all", status="running"); d = Task(kind="embed", status="done"); db.add_all([q, r, d]); db.commit()
     assert client.post(f"{A}/tasks/{q.id}/cancel", headers=ha).status_code == 200 and client.post(f"{A}/tasks/{r.id}/cancel", headers=ha).status_code == 200
-    db.expire_all(); assert db.get(Task, q.id).status == "failed" and db.get(Task, r.id).error == "cancelled by operator"
+    db.expire_all(); assert db.get(Task, q.id).status == "failed" and db.get(Task, r.id).error == "stopped by operator"
     assert client.delete(f"{A}/tasks", headers=ha).json()["removed"] == 3
 
 

@@ -1,0 +1,91 @@
+/* Dense mode: less chrome, more content; inbox master-detail. */
+/* ---------- Dense mode: less chrome, more content ---------- */
+.bar{height:48px}
+.main{padding:14px 20px 40px}
+.main:has(.cvfull,.jfull,.pfull,.ifull){padding-top:10px;padding-bottom:10px}
+.main>.notice{padding:6px 12px;margin:0 0 8px!important;font-size:12.5px;border-radius:10px}
+.main>.notice .btn{padding:3px 10px;font-size:12px}
+.logo{width:38px;height:38px}
+.job{padding:9px 12px;gap:10px}.job .t{font-size:14.5px;line-height:1.25}.job .meta{font-size:12.5px}
+.jchips{margin-top:3px;display:flex;flex-wrap:wrap;gap:4px}.jchips .chip{margin:0;padding:1px 8px;font-size:11.5px}
+.job .small.muted[style*="-webkit-box"]{-webkit-line-clamp:1!important;margin:2px 0!important}
+@media(min-width:1101px){
+  .jfull .jtop{display:flex;align-items:center;gap:10px}
+  .jfull .jtop .jhead{margin:0;flex:none}.jfull .jtop .jstats{display:none}
+  .jfull .jtop .sbar{flex:1;padding:3px 4px 3px 12px;border-radius:12px;box-shadow:none;flex-wrap:nowrap}
+  .jfull .jtop .sbar input[type=search]{padding:6px 4px;font-size:14px;min-width:120px}
+  .jfull .jtop .sbar .btn,.jfull .jtop .sbar select{padding:6px 10px;font-size:13px}
+  .jfull .jrow2{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .jfull .jrow2>*{margin:0!important}.jfull .jrow2 .chips-row{min-height:0;flex:1}
+  .jfull .jrow2 .qchip{display:none}
+  .jfull .jrow2 .jtabs button{padding:3px 10px;font-size:12.5px}
+  .jfull .layout{margin-top:8px}
+  .jfull .onboard{padding:6px 12px;margin-top:8px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}.jfull .onboard>.row{flex:none}.jfull .onboard ol{display:flex;gap:14px;margin:0;padding:0;list-style:none;flex-wrap:wrap}.jfull .onboard .small.muted{display:none}
+}
+@media(min-width:1101px){.jfull .job .small.muted[style*="-webkit-box"]{display:none!important}}
+
+/* ---------- Every pixel: no top bar on desktop, slimmer sidebar, tight page margins ---------- */
+@media(min-width:901px){
+  .bar{display:none}
+  .app{grid-template-columns:196px minmax(0,1fr)}.app.collapsed{grid-template-columns:60px minmax(0,1fr)}
+  .side{padding:10px 8px;gap:4px}.side .brand{margin:0 4px 8px}
+  .snav{gap:10px}.sitem{padding:7px 9px;font-size:13.5px;gap:10px}
+  .side-ft{display:flex;flex-direction:column;gap:2px;padding-top:6px}
+  .side-ft kbd{margin-left:6px;font-size:10.5px;opacity:.6}
+  .ticon{width:18px;text-align:center;flex:none}
+  .main:has(.cvfull,.jfull,.pfull,.ifull){padding:8px 10px}
+  .main{padding:16px 18px 40px}
+  .ws,.jfull .layout{gap:8px}
+  .jfull .layout{grid-template-columns:minmax(360px,420px) minmax(0,1fr)}
+  .ws{grid-template-columns:minmax(420px,500px) minmax(0,1fr) 260px}
+  .detail .hd{padding:14px 18px 10px}.detail .bd{padding:12px 18px 20px}
+  .rpane{padding:12px}
+}
+
+/* active-filter chips: one tidy scrollable line under the tabs, never a squeezed column */
+@media(min-width:1101px){
+  .jfull .jrow2 .jtabs{order:1}
+  .jfull .jrow2>.row{order:2;margin-left:auto!important;flex-wrap:nowrap;gap:8px}
+  .jfull .jrow2 .chips-row{order:3;flex:1 1 100%;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+  .jfull .jrow2 .chips-row:not(:has(.achip)){display:none}
+  .jfull .jrow2 .achip{flex:none;white-space:nowrap;padding:3px 10px;font-size:12.5px}
+  .jfull .jrow2 .linkbtn{flex:none;white-space:nowrap}
+}
+
+/* Inbox + Pipeline: slimmer headers */
+@media(min-width:901px){
+  .ifull .inbox-banner{padding:0;display:flex;flex-wrap:nowrap;gap:8px;align-items:center}
+  .ifull .inbox-banner>div:first-child{flex:1}.ifull .inbox-banner h1{margin:0;font-size:22px}
+  .ifull .inbox-banner-n{padding:4px 14px;border-radius:10px;display:flex;align-items:baseline;gap:6px}.ifull .inbox-banner-n b{font-size:18px;display:inline}.ifull .inbox-banner-n span{font-size:12px}
+  .ifull .itop .card{padding:10px 14px;gap:6px}
+  .ifull .itop .card h2{font-size:15px;margin:0}
+  .ifull .itop ul{display:flex;flex-wrap:wrap;gap:2px 18px;padding:0;margin:4px 0 0;list-style:none;font-size:12.5px}
+  .ifull .inbox-bar{gap:6px}.ifull .inbox-bar select,.ifull .inbox-bar input{padding:6px 10px}
+  .ifull .inbox-ev{padding:8px 12px;gap:10px;border-radius:12px}
+  .ifull .inbox-ev .logo{width:30px;height:30px;font-size:14px}
+  .ifull .inbox-ev .sub{display:none}
+  .ifull .inbox-ev .link{padding:3px 8px;font-size:12.5px}
+  .ifull .inbox-ev .foot{margin-top:2px}
+  .pfull>.row h1{font-size:20px}
+  .pstats{padding:6px 14px;gap:16px;flex-wrap:nowrap}
+  .pstats .fchips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}.pstats .fchip{flex:none}
+  .pstats .spark-w{flex:0 0 150px;min-width:0}
+}
+@media(min-width:901px){.ifull .inbox-ev .body{gap:2px}.ifull .inbox-ev .sum{margin:0}.pstats .spark-w span{white-space:nowrap;font-size:11.5px}.pstats .spark-w{flex-basis:170px}}
+
+/* Inbox master-detail: one-line rows + a detail pane */
+.isplit{display:grid;grid-template-columns:minmax(300px,460px) minmax(0,1fr);gap:8px;flex:1;min-height:0}
+.ilist{overflow-y:auto;min-height:0;display:flex;flex-direction:column;gap:2px;padding-right:2px}
+.idetail{overflow-y:auto;min-height:0;padding:14px 16px}
+.idetail .inbox-ev{border:0;padding:0;background:none;box-shadow:none;animation:none}
+.idetail .inbox-ev .sub{display:block!important}
+.irow1{--c:var(--brand);display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid transparent;border-radius:9px;background:transparent;padding:6px 10px;cursor:pointer;color:var(--text);font:inherit;font-size:13px;flex:none}
+.irow1:hover{background:var(--panel2)}.irow1.sel{background:var(--chip);border-color:var(--line)}
+.idot{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
+.irow1 .ico{flex:0 1 38%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650}
+.irow1 .irole{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.irow1 .pill{flex:none;font-size:11px;color:var(--c);font-weight:650}.irow1 .meta{flex:none;color:var(--muted);font-size:12px;min-width:38px;text-align:right}
+@media(max-width:900px){.isplit{grid-template-columns:1fr}.idetail{order:2}}
+@media(min-width:901px){.ifull .ilist{padding:0}.ifull .inbox-ev .logo{width:36px;height:36px}.ifull .inbox-ev .sub{display:block}}
+.irow1 .pill{width:92px;text-align:right}
+

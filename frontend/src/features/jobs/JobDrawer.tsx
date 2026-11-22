@@ -10,6 +10,9 @@ import { FitPanel } from "@/features/fit/FitPanel";
 import { TrackPanel } from "@/features/track/TrackPanel";
 import { AssistantPanel } from "@/features/assistant/AssistantPanel";
 import { TailorPanel } from "@/features/cv/TailorPanel";
+import { BoardIcon, boardName } from "@/shared/ui/BoardIcon";
+import { flag } from "@/shared/lib/geo";
+import type { Job } from "@/shared/api/types";
 
 const STAGES = ["shortlisted", "applied", "screening", "assessment", "team_match", "interview", "final_round", "offer", "accepted", "rejected", "withdrawn", "skipped"];
 
@@ -37,7 +40,7 @@ export function JobDetail({ id, onClose }: { id: number; onClose?: () => void })
         <Logo c={j.company} big />
         <div className="grow" style={{ minWidth: 0 }}>
           <h1 style={{ fontSize: 22 }}>{j.title}</h1>
-          <div className="muted">{j.company.name} · {j.location ?? "Netherlands"} · {ago(j.posted_at ?? j.first_seen)}</div>
+          <div className="muted">{[j.company.name, j.location || (j.work_mode === "remote" ? "Remote" : ""), ago(j.posted_at ?? j.first_seen)].filter(Boolean).join(" · ")}</div>
         </div>
         {onClose && <><Link className="btn ghost small" to={`/jobs/${j.id}`} title="Open the full job page">Open full page ↗</Link><button className="btn ghost small" onClick={onClose}>✕</button></>}
       </div>
@@ -57,6 +60,7 @@ export function JobDetail({ id, onClose }: { id: number; onClose?: () => void })
       {user && <Panel id="job-tailor" title="Tailored CV & cover letter" defaultOpen={false}><TailorPanel jobId={j.id} title={j.title} /></Panel>}
       {user && <div><button className="btn ghost" onClick={() => setChat(true)}>💬 Ask the assistant about this job</button></div>}
       {chat && <Dock id="assistant" title={`Assistant · ${j.title}`} onClose={() => setChat(false)} width={400}><AssistantPanel jobId={j.id} embedded /></Dock>}
+      {!!j.alternates?.length && <AlsoListed job={j} />}
       {j.skills.length > 0 && <div><h3>Skills mentioned</h3>{j.skills.map((s) => <span className="chip" key={s}>{s}</span>)}</div>}
       <div><h3>About the role</h3>{j.description ? <Description text={j.description} /> : <p className="muted">No description captured — open the posting on the company site.</p>}</div>
       {j.company.sponsor_match && <div className="small muted">IND register match: {j.company.sponsor_match}. A flag only; confirm with the employer.</div>}
@@ -66,4 +70,16 @@ export function JobDetail({ id, onClose }: { id: number; onClose?: () => void })
 
 export function JobDrawer({ id, onClose }: { id: number; onClose(): void }) {
   return (<Drawer open onOpenChange={(o) => !o && onClose()} title="Job details" size={680}><div className="jd"><JobDetail id={id} /></div></Drawer>);
+}
+
+
+/** Every other place and site this role is listed on: one role, one job, all its links. */
+function AlsoListed({ job }: { job: Job }) {
+  const [open, setOpen] = useState(false);
+  const alts = job.alternates ?? []; const shown = open ? alts : alts.slice(0, 6);
+  return (<div className="alsolisted"><h3>Also listed <span className="muted small">· the same role in {alts.length} more {alts.length === 1 ? "place" : "places"}, shown once</span></h3>
+    <ul>{shown.map((a) => <li key={a.url}><BoardIcon board={a.source?.startsWith("board:") ? a.source : "site"} size={15} />
+      <a href={a.url} target="_blank" rel="noreferrer">{a.city || a.location || (a.source?.startsWith("board:") ? boardName(a.source) : "Employer site")}</a>
+      {a.countries?.[0] && <span className="muted small">{flag(a.countries[0])}</span>}{a.source?.startsWith("board:") && <span className="muted small">on {boardName(a.source)}</span>}</li>)}</ul>
+    {alts.length > 6 && <button className="linkbtn small" onClick={() => setOpen(!open)}>{open ? "Show fewer" : `Show all ${alts.length}`}</button>}</div>);
 }

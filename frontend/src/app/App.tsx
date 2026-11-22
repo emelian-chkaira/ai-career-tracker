@@ -16,6 +16,7 @@ import { Drawer, Menu, Splitter, Tip, TipProvider, usePane, usePersisted } from 
 import { Icon } from "@/shared/ui/Icon";
 import { CommandBar } from "@/shared/ui/CommandBar";
 import { WatchlistPage } from "@/features/companies/WatchlistPage";
+import { Logo } from "@/shared/ui";
 import { InboxPage } from "@/features/inbox/InboxPage";
 import { SetupWizard } from "@/features/onboarding/SetupWizard";
 
@@ -38,7 +39,7 @@ function Layout() {
   const { user, logout } = useAuth(); const { theme, next } = useTheme(); const loc = useLocation(); const go = useNavigate();
   const side = usePane("sidebar", 196, 150, 320); const [collapsed, setCollapsed] = usePersisted("sidebar:collapsed", false); const [mobile, setMobile] = useState(false);
   const title = TITLES[loc.pathname] ?? NAV.flatMap((g) => g.items).find((i) => i.to !== "/" && loc.pathname.startsWith(i.to))?.text ?? "";
-  const brand = <Link to="/" className="brand"><i>NL</i><span className="sl">Career Tracker</span></Link>;
+  const brand = <Logo compact={collapsed} />;
   return (<div className={`app${collapsed ? " collapsed" : ""}`} style={{ "--sw": `${side.width}px` } as React.CSSProperties}>
     <aside className="side">{!collapsed && <Splitter props={side.props} label="Resize sidebar" />}{brand}<SideNav collapsed={collapsed} />
       <div className="side-ft">

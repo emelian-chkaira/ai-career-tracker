@@ -5,7 +5,7 @@ from sqlalchemy import select, update, func, delete
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 from app.core.config import settings
-from app.crawler import discovery, nl, scoring, dates, domains, sectors, places
+from app.crawler import discovery, nl, scoring, dates, domains, sectors, places, dedupe
 from app.cvtools import cv as cvmod
 from app.models import Company, Job, JobSkill
 from app.services import sponsor_service, policy_service
@@ -30,17 +30,42 @@ def money(text):
     f = lambda s: float(re.sub(r"[.,]", "", s)) if s else None
     lo, hi = f(m.group(1)), f(m.group(2))
     return lo, hi, ("year" if (lo or 0) > 15000 else "month")
-def dedupe_key(cid, title, location):
-    n = lambda t: re.sub(r"[^a-z0-9]+", " ", (t or "").lower()).strip()
-    return hashlib.sha1(f"{cid}|{n(title)}|{n((location or '').split(',')[0])}".encode()).hexdigest()[:16]
+def dedupe_key(cid, title, location=None):
+    """The identity of a role at an employer (crawler/dedupe.py). Location is NOT part of it: the same role in three cities is one job."""
+    return dedupe.role_key(cid, title)
+
+
 def skills_of(title: str, desc: str) -> list[str]:
     return list(dict.fromkeys(cvmod.find_terms((title or "") + " \n " + (desc or "")[:8000])))[:25]
+
+
+_LEGAL = re.compile(r"\b(b\.?\s?v\.?|n\.?\s?v\.?|v\.?\s?o\.?\s?f\.?|gmbh(\s*&\s*co\.?\s*kg)?|ag|kg|se|ltd\.?|limited|llc|l\.?l\.?c\.?|inc\.?|incorporated|corp\.?|corporation|co\.?|plc|s\.?\s?a\.?|s\.?p\.?a\.?|s\.?r\.?l\.?|sarl|sas|sp\.?\s?z\s?o\.?\s?o\.?|a/s|ab|oy|as|bvba|nl|nederland|netherlands|europe|international|holding|holdings)\s*$", re.I)
+
+
+def norm_name(name: str | None) -> str:
+    """Employer name for matching: no legal form (B.V., GmbH, Ltd, Inc ...), no 'Part of X' / '| tagline', no punctuation or case.
+    'Prodrive Technologies B.V.' and 'Prodrive Technologies' match; so do 'Awin AG' and 'Awin'."""
+    n = re.split(r"\s+[|–—]\s+|\s+-\s+part of\b|\s*\(", (name or "").strip(), maxsplit=1, flags=re.I)[0]
+    for _ in range(3): n = _LEGAL.sub("", n.strip(" ,.-"))
+    return re.sub(r"[^a-z0-9]+", "", n.lower().replace("&", "and"))
+
+
+def find_company(db: Session, name: str) -> Company | None:
+    """Exact name first, then the same name without legal form / punctuation / case."""
+    c = db.scalar(select(Company).where(Company.name == name))
+    if c: return c
+    key = norm_name(name)
+    if len(key) < 3: return None
+    first = re.split(r"[^\w]+", name.strip(), maxsplit=1)[0]
+    for cand in db.scalars(select(Company).where(Company.name.ilike(f"{first[:40]}%")).limit(50)):
+        if norm_name(cand.name) == key: return cand
+    return None
 
 
 def add_company(db: Session, name, website=None, careers_url=None, kvk=None, city=None, address=None, source=None) -> Company:
     import html as _h
     name = _h.unescape(name).strip()
-    c = db.scalar(select(Company).where(Company.name == name))
+    c = find_company(db, name)
     if not c:
         st, match = sponsor_service.check(db, name, kvk)
         c = Company(name=name, website=website, careers_url=careers_url, kvk=kvk, sponsor_status=st, sponsor_match=match, city=city, address=address, source=source)
@@ -66,10 +91,46 @@ def place_of(location: str | None, url: str = "", source: str = "", company: Com
     return p
 
 
+BOARD = lambda src: (src or "").startswith("board:")
+
+
+def _alt(url, loc, pl, source) -> dict:
+    loc = dedupe.sane_location(loc)
+    return {"url": url, "location": loc[:200], "city": city_of(loc), "countries": pl.countries, "work_mode": pl.work_mode, "source": source, "seen": now().date().isoformat()}
+
+
+def fold(job: Job, url: str, loc: str, pl, source: str, desc: str = "") -> None:
+    """Add another posting of the same role to `job`: an extra location / link instead of a duplicate row.
+    The employer's own page wins over a job board as the main link; countries are merged so country filters still find it."""
+    alts = [dict(a) for a in (job.alternates or [])]
+    if BOARD(job.source) and not BOARD(source):                                    # promote the employer's own posting to the main link
+        alts.append(_alt(job.url, job.location, places.Place(list(job.countries or []), job.work_mode or "onsite", job.remote_scope), job.source))
+        job.url, job.location, job.city, job.source = url, loc, city_of(loc), source
+    elif url != job.url:
+        hit = next((a for a in alts if a["url"] == url), None)
+        if hit: hit["seen"] = now().date().isoformat()
+        else: alts.append(_alt(url, loc, pl, source))
+    job.alternates = alts[:60]
+    job.countries = list(dict.fromkeys([*(job.countries or []), *pl.countries]))
+    if len(desc) > len(job.description or ""): job.description = desc
+    job.last_seen = now(); job.status = "open"
+
+
+def clean_title(title: str, url: str) -> str | None:
+    """The posting's real title: link labels such as 'Skip to main content' or 'mehr Informationen' are replaced by the title in the
+    link ('/jobs/bauleiter-hochbau' -> 'Bauleiter Hochbau'), or the posting is dropped when the link names no job either."""
+    t = dedupe.clean(title)
+    if dedupe.nav_label(t): return dedupe.title_from_url(url)
+    return t
+
+
 def store_jobs(db: Session, company: Company, jobs: list[dict], source="company-site", expire=True) -> int:
+    """Store what one source lists for one employer. Returns the number of NEW roles.
+    One role = one job: the same role from another city, link or source is folded into the existing job (see fold)."""
     seen, new = set(), 0
     for j in jobs:
-        url, title = j.get("url"), (j.get("title") or "").strip()
+        url = j.get("url")
+        title = clean_title(j.get("title") or "", url or "")
         if not url or not title or not looks_like_job(title, url): continue
         seen.add(url)
         pol = policy_service.current()
@@ -86,24 +147,41 @@ def store_jobs(db: Session, company: Company, jobs: list[dict], source="company-
         posted = dates.norm_date(j.get("posted_at"))
         posted = dt.date.fromisoformat(posted) if posted else None
         if pol["max_job_age_days"] and posted and (dt.date.today() - posted).days > pol["max_job_age_days"]: continue   # storage policy: no old postings
-        loc = j.get("location") or ""
-        dk = dedupe_key(company.id, title, loc)
+        loc = dedupe.sane_location(j.get("location") or "")
+        dk = dedupe_key(company.id, title)
         ex = db.scalar(select(Job).where(Job.url == url))
         if ex:
             ex.last_seen = now(); ex.status = "open"; ex.posted_at = ex.posted_at or posted
             if len(desc) > len(ex.description or ""): ex.description = desc
             continue
-        if db.scalar(select(Job.id).where(Job.dedupe_key == dk, Job.status == "open")):
-            continue                                                        # same posting under another URL
+        same = db.scalar(select(Job).where(Job.company_id == company.id, Job.dedupe_key == dk, Job.status == "open").order_by(Job.id).limit(1))
+        if same:                                                            # the same role: another location, link or source
+            fold(same, url, loc, pl, source, desc); continue
         job = Job(company_id=company.id, title=title, location=loc, city=city_of(loc), url=url, source=source, description=desc, category=sectors.category_of(sec := sectors.classify(title)), sector=sec, country=pl.country or "NL", countries=pl.countries, work_mode=pl.work_mode, remote_scope=pl.remote_scope, domain=domain,
                   job_type=jt, language=lang, remote=pl.work_mode != "onsite", salary_min=lo, salary_max=hi, salary_period=per,
-                  posted_at=posted, dedupe_key=dk)
+                  posted_at=posted, dedupe_key=dk, alternates=[])
         job.skills = [JobSkill(skill=s) for s in sk]
-        db.add(job); new += 1
-    if seen and expire:
-        db.execute(update(Job).where(Job.company_id == company.id, Job.status == "open", Job.url.notin_(seen)).values(status="expired"))
+        db.add(job); db.flush(); new += 1
+    if seen and expire: _expire_missing(db, company.id, seen)
     db.flush()
     return new
+
+
+def _expire_missing(db: Session, company_id: int, seen: set[str]):
+    """After a full read of an employer's site: a role whose main link vanished but that is still listed elsewhere keeps living
+    (one of its other links becomes the main one); links that vanished are dropped; a role listed nowhere any more expires."""
+    for jb in db.scalars(select(Job).where(Job.company_id == company_id, Job.status == "open")):
+        if BOARD(jb.source) and not jb.alternates: continue                       # job-board postings are not part of the employer's own list
+        alts = [a for a in (jb.alternates or []) if a["url"] in seen or BOARD(a.get("source"))]
+        if jb.url in seen or BOARD(jb.source):
+            if len(alts) != len(jb.alternates or []): jb.alternates = alts
+            continue
+        live = [a for a in alts if a["url"] in seen]
+        if live:
+            top = live[0]; jb.url, jb.location, jb.city, jb.source = top["url"], top["location"], top.get("city"), top.get("source") or jb.source
+            jb.alternates = [a for a in alts if a["url"] != top["url"]]
+        else:
+            jb.status = "expired"
 
 
 def ensure_logo(db: Session, c: Company):

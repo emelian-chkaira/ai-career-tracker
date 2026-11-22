@@ -1,7 +1,9 @@
 export interface Company { id: number; name: string; logo?: string | null; website?: string | null; sponsor_status: string; sponsor_match?: string | null; careers_url?: string | null; city?: string | null; description?: string | null; ats?: string | null; last_scan?: string | null; open_jobs?: number }
 export interface AiFit { score: number; verdict: "strong" | "good" | "stretch" | "weak"; reason: string; strengths: string[]; gaps: string[]; flags: string[]; summary?: string | null; model: string; at: string }
+/** The same role elsewhere: another city, another link, another site (see backend crawler/dedupe.py). */
+export interface JobAlt { url: string; location?: string | null; city?: string | null; countries?: string[]; source?: string | null; work_mode?: string | null }
 export interface Job {
-  id: number; title: string; company: Company; location?: string | null; city?: string | null; url: string; job_type: string; category: string; sector?: string | null; country?: string | null; countries?: string[]; work_mode?: string; remote_scope?: string | null; domain?: string | null; language: string; remote: boolean;
+  id: number; title: string; company: Company; location?: string | null; city?: string | null; url: string; job_type: string; category: string; sector?: string | null; country?: string | null; countries?: string[]; work_mode?: string; remote_scope?: string | null; source?: string | null; alternates?: JobAlt[]; domain?: string | null; language: string; remote: boolean;
   salary?: { min?: number; max?: number; period?: string; verdict?: string } | null; posted_at?: string | null; first_seen?: string | null; status: string; skills: string[];
   snippet?: string | null; relevance?: number | null; matched: string[]; fit?: number | null; fit_reason?: string | null; ai?: AiFit | null; applied_at?: string | null; follow_up_at?: string | null; follow_up_note?: string | null; contact?: string | null; offer_details?: string | null; stage?: string | null; description?: string | null; notes?: string | null;
 }

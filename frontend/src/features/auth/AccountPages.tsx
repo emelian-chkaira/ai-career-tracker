@@ -1,3 +1,4 @@
+import { Logo } from "@/shared/ui";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/shared/api/client";
@@ -5,7 +6,7 @@ import { useAuth } from "./AuthContext";
 
 function Shell({ title, sub, children }: { title: string; sub?: string; children: ReactNode }) {
   return (<div className="authwrap" style={{ gridTemplateColumns: "1fr" }}><main className="authmain"><div className="authform stack">
-    <Link to="/" className="brand"><i>NL</i><span>Career Tracker</span></Link>
+    <Logo />
     <div><h1>{title}</h1>{sub && <div className="muted">{sub}</div>}</div>{children}</div></main></div>);
 }
 

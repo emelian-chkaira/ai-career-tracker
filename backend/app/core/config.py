@@ -30,7 +30,12 @@ class Settings(BaseSettings):
     reset_ttl_min: int = 60
     # --- what to store (apply on ingest, and via the Prune action to existing data) ---
     crawl_countries: str = "NL"                   # comma list of ISO codes to store jobs for (NL, BE, DE, AE ...), or region keys (benelux, dach, europe, gcc, emea). Empty = everywhere
-    keep_remote: bool = True                      # also store remote jobs that are open to those countries ("Remote - Europe", "Anywhere")
+    keep_remote: bool = True
+    # EXPERIMENTAL job boards through JobSpy (crawler/boards.py). Off unless sites are listed. Against those sites' terms: personal use only.
+    board_sites: str = ""                         # comma list of: linkedin, indeed, glassdoor, google, bayt
+    board_every_hours: int = 12                   # automatic board search interval (inside the crawl schedule); 0 = only when started by hand
+    board_results: int = 30                       # postings per site per search
+    board_max_searches: int = 24                  # term x country searches per run (keeps the volume low)                      # also store remote jobs that are open to those countries ("Remote - Europe", "Anywhere")
     keep_domains: str = ""                        # comma list of: mobile, frontend, backend, fullstack, software, data, devops, security, qa, embedded, design, product, other. Empty = store every domain
     max_job_age_days: int = 0                     # 0 = no limit. Otherwise skip jobs posted longer ago than this, and delete stored ones that got older
     delete_expired_after_days: int = 60           # jobs no longer on the employer's page are deleted after this many days (0 = keep forever). Saved/pipeline jobs are never deleted
@@ -41,7 +46,7 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
     trust_proxy: bool = False
     # --- crawler identity
-    contact: str = "https://github.com/your-org/nl-career-tracker"
+    contact: str = "https://github.com/your-org/ai-career-tracker"
     brave_api_key: str | None = None
     browser_slots: int = 3
     scan_threads: int = 10
@@ -55,7 +60,7 @@ class Settings(BaseSettings):
     smtp_user: str | None = None
     smtp_password: str | None = None
     smtp_security: str = "starttls"                # starttls (587) | ssl (465) | none (local test servers such as Mailpit)
-    mail_from: str = "CareerNL <no-reply@localhost>"
+    mail_from: str = "AI Career Tracker <no-reply@localhost>"
     public_url: str = "http://localhost:5173"        # used in email links
     # --- optional
     anthropic_api_key: str | None = None
@@ -70,7 +75,7 @@ class Settings(BaseSettings):
         return v
 
     @property
-    def user_agent(self) -> str: return f"nl-career-tracker/0.3 (+{self.contact})"
+    def user_agent(self) -> str: return f"ai-career-tracker/0.4 (+{self.contact})"
     @property
     def firebase_on(self) -> bool: return bool(self.firebase_api_key)
     @property

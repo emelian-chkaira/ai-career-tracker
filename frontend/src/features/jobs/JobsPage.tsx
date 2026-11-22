@@ -19,8 +19,10 @@ import { JobDetail, JobDrawer } from "./JobDrawer";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/shared/api/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { openSetup, useSectors } from "@/features/onboarding/SetupWizard";
+import { openSetup } from "@/features/onboarding/SetupWizard";
+import { useSectors } from "@/shared/api/meta";
 import { flag, modeLabel } from "@/shared/lib/geo";
+import { CountUp, EmptyState } from "@/shared/ui";
 import { CrawlNotice } from "./CrawlNotice";
 
 const ARR = ["job_type", "domain", "language", "city", "skills", "sector", "country", "region", "work_mode"] as const;
@@ -113,7 +115,7 @@ export function JobsPage({ internships = false }: { internships?: boolean }) {
     <div className="jhead">
       <div className="seg"><Link to="/" className={internships ? "" : "on"}>Jobs</Link><Link to="/internships" className={internships ? "on" : ""}>Internships</Link></div>
       <div className="jsub"><span className="greet">{greeting(user?.name)}.</span> {internships ? "Internships and traineeships straight from employers' career pages." : "Roles straight from employers' career pages: no middlemen, no duplicates, visa sponsors flagged."}</div>
-      {k && <div className="jstats"><span><b>{k.open_jobs.toLocaleString()}</b> open roles</span><span><b>{k.hiring_companies.toLocaleString()}</b> companies</span><span><b>{k.new_7d.toLocaleString()}</b> new this week</span></div>}
+      {k && <div className="jstats"><span><b><CountUp value={k.open_jobs} /></b> open roles</span><span><b><CountUp value={k.hiring_companies} /></b> companies</span><span><b><CountUp value={k.new_7d} /></b> new this week</span></div>}
     </div>
     <form className="sbar" onSubmit={(e) => { e.preventDefault(); update({ q }); }}>
       <Icon name="search" size={18} />
@@ -150,8 +152,8 @@ export function JobsPage({ internships = false }: { internships?: boolean }) {
         {!data && !error && Array.from({ length: 6 }, (_, i) => <div key={i} className="job"><div className="skel logo" /><div className="grow stack" style={{ gap: 8 }}><div className="skel" style={{ height: 16, width: "70%" }} /><div className="skel" style={{ height: 12, width: "45%" }} /></div></div>)}
         {error && <div className="empty err">{(error as Error).message}</div>}
         {data && !data.items.length && (mine && Object.keys(prof).length
-          ? <div className="empty stack" style={{ alignItems: "center" }}><div>No jobs match your profile yet. Fields outside tech are still small: more employers are added as they are crawled.</div><div className="row"><button className="btn small" onClick={() => update({ scope: "all" })}>Show all jobs</button><button className="btn ghost small" onClick={openSetup}>Edit preferences</button></div></div>
-          : <div className="empty">Nothing matches just yet. Try fewer filters, or ask us to re-read the employers live.</div>)}
+          ? <EmptyState icon={<Icon name="filter" size={20} />} title="No jobs match your profile yet" action={<div className="row"><button className="btn small" onClick={() => update({ scope: "all" })}>Show all jobs</button><button className="btn ghost small" onClick={openSetup}>Edit preferences</button></div>}>Fields outside tech are still small: more employers are added as they are crawled.</EmptyState>
+          : <EmptyState icon={<Icon name="search" size={20} />} title="Nothing matches just yet">Try fewer filters, or ask us to re-read the employers live.</EmptyState>)}
         {data?.items.map((j) => <JobCard key={j.id} job={j} selected={wide && open === j.id} onOpen={setOpen} picked={picked.has(j.id)} onPick={user ? pick : undefined} />)}
         {picked.size > 0 && <div className="bulkbar"><b>{picked.size} selected</b><button className="btn small" onClick={() => bulk("shortlisted")}>Shortlist</button><button className="btn ghost small" onClick={() => bulk("applied")}>Mark applied</button><button className="btn ghost small" onClick={() => bulk("skipped")}>Skip</button><button className="btn ghost small right" onClick={() => setPicked(new Set())}>Clear</button></div>}
         {data && <ListEnd sentinel={sentinel} more={more} loading={loadingMore} count={data.items.length} total={data.total} />}

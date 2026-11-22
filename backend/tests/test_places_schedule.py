@@ -36,33 +36,33 @@ def test_regions_and_storage_rule():
 def test_crawler_keeps_the_configured_countries(db):
     from app.models import Job
     c = ing.add_company(db, "Acme")
-    ing.store_jobs(db, c, [J("Dev Amsterdam", "Amsterdam"), J("Dev Berlin", "Berlin, Germany"), J("Dev Dubai", "Dubai, UAE"), J("Dev EU", "Remote - Europe")]); db.commit()
-    assert {j.title for j in db.query(Job)} == {"Dev Amsterdam", "Dev EU"}                                              # default: NL + remote open to it
+    ing.store_jobs(db, c, [J("Python Developer", "Amsterdam"), J("Go Developer", "Berlin, Germany"), J("Java Developer", "Dubai, UAE"), J("Rust Developer", "Remote - Europe")]); db.commit()
+    assert {j.title for j in db.query(Job)} == {"Python Developer", "Rust Developer"}                                              # default: NL + remote open to it
     policy_service.save(db, [], 0, 0, countries=["NL", "DE", "AE"])
-    ing.store_jobs(db, c, [J("Dev Berlin 2", "Berlin, Germany"), J("Dev Dubai 2", "Dubai, UAE"), J("Dev Paris", "Paris")]); db.commit()
+    ing.store_jobs(db, c, [J("Kotlin Developer", "Berlin, Germany"), J("Swift Developer", "Dubai, UAE"), J("Scala Developer", "Paris")]); db.commit()
     rows = {j.title: (j.countries, j.work_mode, j.city) for j in db.query(Job)}
-    assert rows["Dev Berlin 2"] == (["DE"], "onsite", "Berlin") and rows["Dev Dubai 2"] == (["AE"], "onsite", "Dubai") and "Dev Paris" not in rows
-    assert rows["Dev EU"][1] == "remote"
+    assert rows["Kotlin Developer"] == (["DE"], "onsite", "Berlin") and rows["Swift Developer"] == (["AE"], "onsite", "Dubai") and "Scala Developer" not in rows
+    assert rows["Rust Developer"][1] == "remote"
     policy_service.reset(db)
 
 
 def test_search_by_country_region_and_work_mode(client, make_user, db):
     policy_service.save(db, [], 0, 0, countries=[])                                                                   # store everything for this test
     c = ing.add_company(db, "Acme")
-    ing.store_jobs(db, c, [J("Python Developer", "Amsterdam"), J("Python Developer DE", "Munich, Germany (Hybrid)"), J("Python Developer Gulf", "Riyadh, Saudi Arabia"),
-                           J("Python Developer Remote", "Remote - Europe"), J("Python Developer US", "Austin, TX, USA")]); db.commit()
+    ing.store_jobs(db, c, [J("Python Developer", "Amsterdam"), J("Go Developer", "Munich, Germany (Hybrid)"), J("Java Developer", "Riyadh, Saudi Arabia"),
+                           J("Rust Developer", "Remote - Europe"), J("Ruby Developer", "Austin, TX, USA")]); db.commit()
     g = lambda **kw: {j["title"] for j in client.get(f"{H}/jobs", params={"sector": "tech", **kw}).json()["items"]}
-    assert g(country="DE") == {"Python Developer DE", "Python Developer Remote"}                                     # remote open to Europe counts
-    assert g(country="DE", remote_open="false") == {"Python Developer DE"}
-    assert g(region="gcc") == {"Python Developer Gulf"}
-    assert g(region="dach", work_mode="hybrid") == {"Python Developer DE"}
-    assert g(work_mode="remote") == {"Python Developer Remote"}
+    assert g(country="DE") == {"Go Developer", "Rust Developer"}                                     # remote open to Europe counts
+    assert g(country="DE", remote_open="false") == {"Go Developer"}
+    assert g(region="gcc") == {"Java Developer"}
+    assert g(region="dach", work_mode="hybrid") == {"Go Developer"}
+    assert g(work_mode="remote") == {"Rust Developer"}
     r = client.get(f"{H}/jobs/sectors").json()
     assert any(x["key"] == "gcc" and x["jobs"] == 1 for x in r["regions"]) and any(x["key"] == "remote" and x["jobs"] == 1 for x in r["work_modes"])
     h, _ = make_user(); client.put(f"{H}/auth/profile", headers=h, json={"sectors": ["tech"], "countries": ["SA", "XX"], "regions": ["dach", "mars"], "work_modes": ["onsite", "hybrid"]})
     me = client.get(f"{H}/auth/me", headers=h).json()["profile"]
     assert me["countries"] == ["SA"] and me["regions"] == ["dach"] and me["country"] == "SA"
-    assert {j["title"] for j in client.get(f"{H}/jobs", headers=h, params={"scope": "mine"}).json()["items"]} == {"Python Developer DE", "Python Developer Gulf"}
+    assert {j["title"] for j in client.get(f"{H}/jobs", headers=h, params={"scope": "mine"}).json()["items"]} == {"Go Developer", "Java Developer"}
     policy_service.reset(db)
 
 

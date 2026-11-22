@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/shared/api/client";
 import { useAuth } from "@/features/auth/AuthContext";
 import { Modal, Switch } from "@/shared/ui/kit";
-import type { Profile, SectorsOut } from "@/shared/api/types";
+import { useSectors } from "@/shared/api/meta";
+import type { Profile } from "@/shared/api/types";
 import { flag, modeLabel, WORK_MODES } from "@/shared/lib/geo";
 import { announceCrawl } from "@/features/jobs/CrawlNotice";
 
-export const useSectors = () => useQuery({ queryKey: ["sectors"], staleTime: 600_000, queryFn: () => api.get<SectorsOut>("/jobs/sectors") });
+export { useSectors } from "@/shared/api/meta";
 export const openSetup = () => window.dispatchEvent(new Event("open-setup"));
 
 const CITIES = ["Amsterdam", "Rotterdam", "Utrecht", "Eindhoven", "Den Haag", "Delft", "Leiden", "Groningen", "Nijmegen", "Arnhem", "Tilburg", "Breda", "Haarlem", "Amersfoort", "Enschede", "Zwolle", "Maastricht"];

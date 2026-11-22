@@ -1,0 +1,21 @@
+/* AI Career Tracker styles, in cascade order. Each file is one topic; later files refine earlier ones.
+   Tokens first, then primitives and shell, then pages and features, then motion and the theme layer. */
+@import "./01-tokens.css";
+@import "./02-shell-legacy.css";
+@import "./03-primitives.css";
+@import "./04-pages.css";
+@import "./05-flat.css";
+@import "./06-ai-panels.css";
+@import "./07-ui-kit.css";
+@import "./08-pipeline.css";
+@import "./09-shell.css";
+@import "./10-pages.css";
+@import "./11-cv-studio.css";
+@import "./12-full-height.css";
+@import "./13-dense.css";
+@import "./14-panes-settings.css";
+@import "./15-onboarding-places.css";
+@import "./16-crawler.css";
+@import "./17-crawler-boards.css";
+@import "./18-motion.css";
+@import "./19-theme.css";

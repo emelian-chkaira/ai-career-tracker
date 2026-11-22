@@ -4,7 +4,7 @@
  - Wikipedia search (keyword -> related company pages -> Wikidata official website)
 Wikimedia blocks python HTTP client fingerprints, so these calls go through curl."""
 import json, re, subprocess, tempfile
-UA = "nl-career-tracker/0.1"
+UA = "ai-career-tracker/0.4"
 def _curl(url, params=None, data=None, timeout=120):
     cmd = ["curl", "-s", "-m", str(timeout), "-A", UA, "-H", "Accept: application/json"]
     if data is not None:

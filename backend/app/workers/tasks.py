@@ -19,18 +19,36 @@ def _scan_one(cid: int) -> int:
         return ing.scan_company(db, cid)     # headless-browser concurrency is already capped inside discovery.render_scan
 
 
+_halt: set[int] = set()
+
+
+def _halted(t) -> bool:
+    """Threaded tasks: True once the task was stopped (then every remaining item is skipped); waits while it is paused."""
+    if t.id in _halt: return True
+    try: task_service.gate(t.id); return False
+    except task_service.TaskStopped: _halt.add(t.id); return True
+
+
+def _after_threads(t):
+    if t.id in _halt: _halt.discard(t.id); raise task_service.TaskStopped(task_service.STOPPED)
+
+
 def scan_ids(t: Task, db, ids: list[int]):
     state = {"done": 0, "new_jobs": 0}
     task_service.progress(db, t, total=len(ids), done=0, new_jobs=0)
     def one(cid):
+        if state.get("stop"): return
+        try: task_service.gate(t.id)                                            # paused: wait here; stopped: skip the rest
+        except task_service.TaskStopped: state["stop"] = True; return
         try: state["new_jobs"] += _scan_one(cid)
         except Exception as e: log.warning("scan %s failed: %s", cid, e)
         state["done"] += 1
         if state["done"] % 10 == 0:
             with SessionLocal() as d2:
-                tt = d2.get(Task, t.id); task_service.progress(d2, tt, **state)
+                tt = d2.get(Task, t.id); tt.progress = {**(tt.progress or {}), **{k: v for k, v in state.items() if k != "stop"}}; d2.commit()
     with ThreadPoolExecutor(settings.scan_threads) as ex: list(ex.map(one, ids))
-    task_service.progress(db, t, **state)
+    if state.get("stop"): raise task_service.TaskStopped(task_service.STOPPED)
+    task_service.progress(db, t, **{k: v for k, v in state.items() if k != "stop"})
 
 
 def scan_all(t, db, unscanned=False):
@@ -94,12 +112,35 @@ def discover_country(t, db):
         except Exception as e: logs.append(f"{src}: failed ({e})"); task_service.progress(db, t, country=code, log=logs)
 
 
+def board_search(t, db):
+    """EXPERIMENTAL: search LinkedIn / Indeed / Glassdoor / Google Jobs / Bayt (services/boards_service.py).
+    Payload (all optional): {"sites": [...], "terms": [...], "countries": [...]}; empty parts come from settings, users' preferences and the crawl countries."""
+    from app.crawler import boards
+    from app.services import boards_service as bs
+    pl = t.payload or {}
+    p = bs.plan(db, pl.get("sites"), pl.get("terms"), pl.get("countries"))
+    if not p["sites"]: raise ValueError("no job boards switched on (set CAREERS_BOARD_SITES, e.g. linkedin,indeed)")
+    if not boards.available(): raise ValueError("JobSpy is not installed: pip install -r requirements-boards.txt")
+    task_service.progress(db, t, done=0, total=len(p["searches"]), plan={"terms": [x["term"] for x in p["terms"]], "countries": p["countries"], "sites": p["sites"]})
+    report = lambda **kw: task_service.progress(db, t, plan={"terms": [x["term"] for x in p["terms"]], "countries": p["countries"], "sites": p["sites"]}, **kw)
+    bs.run(db, p, progress=report, on_step=report)                            # on_step: what it is asking which board right now (and where pause/stop apply)
+
+
+def dedupe_jobs(t, db):
+    """Merge duplicate jobs (one role, one job) and fix link-label titles. Also runs by itself once a day."""
+    from app.services import maintenance_service as maint
+    r = maint.collapse_duplicates(db, progress=lambda **kw: task_service.progress(db, t, **kw))
+    task_service.progress(db, t, **r)
+
+
 def logos(t, db):
     ids = list(db.scalars(select(Company.id).where(Company.website.is_not(None), (Company.logo.is_(None)) | (Company.description.is_(None)))))
     task_service.progress(db, t, total=len(ids), done=0)
     def one(i):
+        if _halted(t): return
         with SessionLocal() as d: ing.ensure_logo(d, d.get(Company, i)); d.commit()
     with ThreadPoolExecutor(6) as ex: list(ex.map(one, ids))
+    _after_threads(t)
     task_service.progress(db, t, done=len(ids))
 
 
@@ -131,11 +172,13 @@ def live_search(t, db, budget=90):
     task_service.progress(db, t, stage="reading company career sites", total=len(todo))
     state = {"done": 0, "new_jobs": 0}
     def one(cid):
+        if _halted(t): return
         if time.time() - t0 > budget: return
         try: state["new_jobs"] += _scan_one(cid)
         except Exception: pass
         state["done"] += 1
     with ThreadPoolExecutor(8) as ex: list(ex.map(one, todo))
+    _after_threads(t)
     task_service.progress(db, t, stage="done", **state)
 
 
@@ -155,6 +198,7 @@ def census(t, db, ats_list=None):
     state = {"total": len(work), "done": 0, "kept": 0, "new_jobs": 0}
     task_service.progress(db, t, **state)
     def one(item):
+        if _halted(t): return
         ats, slug = item
         try:
             jobs = discovery.ADAPTERS[ats](slug)
@@ -178,6 +222,7 @@ def census(t, db, ats_list=None):
         if state["done"] % 25 == 0:
             with SessionLocal() as d3: task_service.progress(d3, d3.get(Task, t.id), **state)
     with ThreadPoolExecutor(12) as ex: list(ex.map(one, work))
+    _after_threads(t)
     task_service.progress(db, t, **state)
 
 
@@ -204,6 +249,7 @@ def internships(t, db):
     state = {"total": len(ids), "done": 0, "new_jobs": 0, "companies_with_new": 0}
     task_service.progress(db, t, **state)
     def one(cid):
+        if _halted(t): return
         try:
             with SessionLocal() as d2:
                 c = d2.get(Company, cid)
@@ -217,6 +263,7 @@ def internships(t, db):
         if state["done"] % 20 == 0:
             with SessionLocal() as d3: task_service.progress(d3, d3.get(Task, t.id), **state)
     with ThreadPoolExecutor(10) as ex: list(ex.map(one, ids))
+    _after_threads(t)
     task_service.progress(db, t, **state)
 
 

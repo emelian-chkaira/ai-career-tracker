@@ -10,7 +10,7 @@ def fetch() -> list[tuple[str, str]]:
     for qy in WD_QUERIES:
         try:   # Wikimedia blocks Python HTTP client fingerprints; curl is accepted
             with tempfile.NamedTemporaryFile("w", suffix=".rq", delete=False) as f: f.write(qy)
-            raw = subprocess.run(["curl", "-s", "-m", "110", "-G", "https://query.wikidata.org/sparql", "-H", "Accept: application/json", "-A", "nl-career-tracker/0.3",
+            raw = subprocess.run(["curl", "-s", "-m", "110", "-G", "https://query.wikidata.org/sparql", "-H", "Accept: application/json", "-A", "ai-career-tracker/0.4",
                                   "--data-urlencode", f"query@{f.name}"], capture_output=True, text=True, timeout=120).stdout
             d = json.loads(raw)
         except Exception: continue

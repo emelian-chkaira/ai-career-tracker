@@ -1,3 +1,5 @@
+import { Icon } from "@/shared/ui/Icon";
+import { PageHeader } from "@/shared/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -9,7 +11,7 @@ interface F { company_id: number; name: string; alert_frequency: string }
 export function WatchlistPage() {
   const qc = useQueryClient(); const q = useQuery({ queryKey: ["following"], queryFn: () => api.get<F[]>("/me/following") });
   const un = useMutation({ mutationFn: (id: number) => api.del(`/me/following/${id}`), onSuccess: () => { qc.invalidateQueries({ queryKey: ["following"] }); toast.success("Unfollowed"); } });
-  return (<div className="stack"><div><h1>Watchlist</h1><div className="muted">Employers you follow. New jobs from them reach you as an alert, so you can apply before the crowd.</div></div>
+  return (<div className="stack"><PageHeader eyebrow="Following" icon={<Icon name="bell" size={17} />} title="Watchlist" subtitle="Employers you follow. New jobs from them reach you as an alert, so you can apply before the crowd." />
     {q.isLoading && <div className="skel" style={{ height: 80 }} />}
     {q.data && !q.data.length && <div className="card empty">You are not following any employer yet. Open a company or a job and press “Follow company”, or <Link to="/companies">browse companies</Link>.</div>}
     <ul className="plain stack" style={{ gap: 8 }}>{q.data?.map((f) => <li key={f.company_id} className="irow"><div className="irow-main"><b>{f.name}</b><div className="small muted">Alerts: {f.alert_frequency}</div></div>

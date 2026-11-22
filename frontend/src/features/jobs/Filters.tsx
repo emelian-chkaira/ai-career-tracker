@@ -2,7 +2,7 @@ import type { Facet, SearchParams } from "@/shared/api/types";
 import { useState } from "react";
 import { label } from "@/shared/lib/format";
 import { flag, modeLabel, WORK_MODES } from "@/shared/lib/geo";
-import { useSectors } from "@/features/onboarding/SetupWizard";
+import { useSectors } from "@/shared/api/meta";
 
 function Group({ title, facets, selected, onToggle, fmt = (v: string) => v, max = 8 }: { title: string; facets?: Facet[]; selected: string[]; onToggle(v: string): void; fmt?: (v: string) => string; max?: number }) {
   if (!facets?.length) return null;

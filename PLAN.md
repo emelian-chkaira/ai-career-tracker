@@ -1,4 +1,4 @@
-# NL Career Tracker: project plan
+# AI Career Tracker: project plan
 
 A tracker for **jobs, internships and traineeships in the Netherlands**. It knows Dutch companies, checks each one against the **IND list of recognised sponsors**, compares each salary with the **IND salary thresholds**, analyses **your CV**, finds matching vacancies, and has a **Flutter mobile app (separate repo)**.
 

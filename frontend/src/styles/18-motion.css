@@ -1,0 +1,17 @@
+/* Motion: calm and short; off for people who ask for less. */
+/* ---------- motion: calm, short, and off for people who ask for less ---------- */
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.fadein,.main>*{animation:rise .28s ease both}
+.card{transition:border-color .15s,box-shadow .2s,transform .2s}
+.statrow>div{transition:transform .15s,border-color .15s}.statrow>div:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--brand) 40%,var(--line))}
+.list .job{animation:rise .25s ease both}
+.list .job:nth-child(2){animation-delay:20ms}.list .job:nth-child(3){animation-delay:40ms}.list .job:nth-child(4){animation-delay:60ms}.list .job:nth-child(5){animation-delay:80ms}.list .job:nth-child(6){animation-delay:100ms}.list .job:nth-child(n+7){animation-delay:120ms}
+.job{transition:background .12s,box-shadow .15s}
+.btn{transition:transform .08s,filter .15s,background .15s,box-shadow .15s}.btn:not(:disabled):hover{box-shadow:0 2px 10px color-mix(in srgb,var(--brand) 25%,transparent)}
+.btn.ghost:not(:disabled):hover{box-shadow:none}
+.cchip,.seccard{transition:background .12s,border-color .12s,color .12s,transform .12s}.cchip:active,.seccard:active{transform:scale(.97)}
+.achip{animation:fadein .2s ease}
+.detail{animation:fadein .2s ease}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
+
