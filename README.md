@@ -96,32 +96,7 @@
 
 ## 🎯 Jobs customized to your spec and your CV
 
-You tell it what you want once: **field, countries or regions, cities, job titles, level, work mode, language, visa needs**, and upload your **CV**. From then on every job, from an employer's career page or from a job board, is filtered and ranked for you.
-
-```mermaid
-flowchart LR
-  P["👤 Your spec<br/>field · countries · cities<br/>titles · level · work mode"]:::you
-  CV["📄 Your CV<br/>skills · experience"]:::you
-  subgraph SRC["Job sources"]
-    E["🏢 Career pages<br/>Greenhouse · Lever · Workday<br/>Personio · Ashby · Recruitee…"]:::src
-    JB["🌐 Job boards<br/>LinkedIn · Indeed · Glassdoor<br/>Google Jobs · Bayt"]:::src
-  end
-  N["🧩 Normalize<br/>places · field · level<br/>one role, one card"]:::core
-  F["🔍 Filter<br/>country · city · remote<br/>level · language · sponsor"]:::core
-  R["📊 Rank<br/>title 30 · skills 35 · field 15<br/>place 10 · keywords 10"]:::core
-  AI["🤖 AI fit score<br/>strengths · gaps · deal-breakers"]:::ai
-  OUT["🎯 Your feed<br/>+ daily alerts"]:::out
-  E & JB --> N --> F --> R --> OUT
-  P --> F
-  P & CV --> R
-  CV --> AI --> OUT
-  P -. "new country picked" .-> E
-  classDef you fill:#fde68a,stroke:#b45309,color:#1f2937
-  classDef src fill:#bfdbfe,stroke:#1d4ed8,color:#0b1220
-  classDef core fill:#bbf7d0,stroke:#15803d,color:#0b1220
-  classDef ai fill:#fbcfe8,stroke:#be185d,color:#0b1220
-  classDef out fill:#fed7aa,stroke:#c2410c,color:#0b1220
-```
+You tell it what you want once: **field, countries or regions, cities, job titles, level, work mode, language, visa needs**, and upload your **CV**. From then on every job, from an employer's career page or from a job board, is filtered and ranked for you (flow ② in [How it works](#️-architecture)).
 
 - **Employer-direct first, boards on top.** Career pages are crawled continuously. LinkedIn, Indeed, Glassdoor, Google Jobs and Bayt are searched with *your* job titles in *your* countries (via [JobSpy](https://github.com/speedyapply/JobSpy), opt-in), and the Crawler page shows the exact keywords before it runs.
 - **Your countries drive the crawler.** Pick the UAE or Germany in your profile and the crawler starts finding employers there; the job list tells you while it fills.
@@ -139,124 +114,19 @@ flowchart LR
 
 ## 📬 AI that reads your mail and moves your pipeline
 
-```mermaid
-sequenceDiagram
-  autonumber
-  participant G as 📬 Gmail API
-  participant W as ⚙️ Worker
-  participant L as 🤖 Your LLM
-  participant DB as 🐘 Postgres
-  participant U as 👤 You
-  W->>G: read-only OAuth, new messages since last sync
-  G-->>W: headers + text
-  W->>W: keyword pre-filter (skip newsletters, marketing)
-  W->>L: classify one e-mail → JSON
-  L-->>W: category · company · role · date · confidence
-  W->>DB: link to employer and to your tracked job
-  alt very confident and auto-apply on
-    W->>DB: move stage (applied → interview → offer / rejected), log timeline
-  else otherwise
-    W-->>U: suggestion in the Inbox
-    U->>DB: accept, correct or undo
-  end
-```
-
-Interview invites, assessments, offers, rejections and recruiter messages are recognised in English, Dutch and German. Only the extracted facts are stored, never the e-mail text, and the Gmail token is encrypted.
+Interview invites, assessments, offers, rejections and recruiter messages are recognised in English, Dutch and German. Only the extracted facts are stored, never the e-mail text, and the Gmail token is encrypted (flow ④ in [How it works](#️-architecture)).
 
 ## 🏗️ Architecture
 
+**System design:** every part of the system and how they talk.
+
 <p align="center"><img src="docs/media/system-design.png" width="100%" alt="AI Career Tracker system design: clients, Caddy, FastAPI, hybrid search, PostgreSQL, AI layer, task and notification queues, worker, outside world"></p>
 
-<sub>Vector version: <a href="docs/media/system-design.svg">system-design.svg</a> · regenerate with <code>python3 docs/media/system_design.py</code></sub>
+**How it works:** the life of one posting, how jobs are matched to your spec and CV, CV tailoring, and the AI inbox.
 
-<details>
-<summary><b>Layered view</b> (clients → API → AI and database → worker → outside world)</summary>
+<p align="center"><img src="docs/media/how-it-works.png" width="100%" alt="How AI Career Tracker works: life of a posting, matching to your spec and CV, CV Studio with fact guard, AI inbox"></p>
 
-```mermaid
-flowchart TB
-  subgraph CLIENT["Clients"]
-    direction LR
-    WEB["💻 React 18 + TypeScript<br/>Vite · TanStack Query · Radix"]:::fe
-    MOB["📱 Flutter app"]:::fe
-    WEB ~~~ MOB
-  end
-  subgraph API["FastAPI · /api/v1"]
-    direction LR
-    A1["auth<br/>JWT · Firebase · Google"]:::api
-    A2["jobs<br/>hybrid search: tsvector + pgvector, RRF"]:::api
-    A3["me<br/>feed · pipeline · alerts"]:::api
-    A4["cv · tailor · rr<br/>LaTeX · Reactive Resume"]:::api
-    A5["mail · fit · assistant"]:::api
-    A6["admin<br/>crawler · schedule · boards"]:::api
-    A1 ~~~ A2 ~~~ A3 ~~~ A4 ~~~ A5 ~~~ A6
-  end
-  subgraph AI["LLM gateway"]
-    direction LR
-    LLM["Ollama · Claude · OpenAI · Groq · OpenRouter<br/>DeepSeek · Qwen · Kimi · GLM · Grok · custom"]:::ai
-  end
-  subgraph DB["PostgreSQL 16"]
-    direction LR
-    T1[("companies · jobs<br/>tsvector · vector(384) · alternates")]:::db
-    T2[("users · profiles · CVs (encrypted)<br/>pipeline · alerts · mail events")]:::db
-    T3[("kv: schedule · policy<br/>board health · heartbeat")]:::db
-    T1 ~~~ T2 ~~~ T3
-  end
-  subgraph WK["Worker · app.workers.run"]
-    direction LR
-    S["⏱️ scheduler<br/>window · heartbeat thread"]:::wk
-    D["🔎 discover<br/>maps · Wikipedia · ATS census"]:::wk
-    SC["🕷️ scan pool (up to 40)<br/>httpx · Playwright · robots.txt"]:::wk
-    B["🌐 board_search<br/>JobSpy · back-off"]:::wk
-    I["🧩 ingest<br/>places · sectors · dedupe"]:::wk
-    X["🧠 embed · alerts<br/>fastembed ONNX · SMTP"]:::wk
-    S --> D --> SC --> I --> X
-    B --> I
-  end
-  subgraph EXT["Outside world"]
-    direction LR
-    O1["Career pages<br/>11 ATS APIs + HTML"]:::ext
-    O2["LinkedIn · Indeed · Glassdoor<br/>Google Jobs · Bayt"]:::ext
-    O3["Gmail API"]:::ext
-    O1 ~~~ O2 ~~~ O3
-  end
-  CLIENT -- "HTTPS · JWT" --> API
-  API -- "prompts · JSON" --> AI
-  API -- "SQL" --> DB
-  DB <-- "SQL" --> WK
-  WK -- "crawl · search · mail" --> EXT
-  classDef fe fill:#bfdbfe,stroke:#1d4ed8,color:#0b1220
-  classDef api fill:#a7f3d0,stroke:#047857,color:#0b1220
-  classDef ai fill:#fbcfe8,stroke:#be185d,color:#0b1220
-  classDef db fill:#c7d2fe,stroke:#4338ca,color:#0b1220
-  classDef wk fill:#fde68a,stroke:#b45309,color:#1f2937
-  classDef ext fill:#e5e7eb,stroke:#4b5563,color:#111827
-```
-</details>
-
-<details>
-<summary><b>The life of one posting</b> (read → clean → place → classify → fold → index)</summary>
-
-```mermaid
-flowchart LR
-  R["📥 Read<br/>ATS JSON · JSON-LD · HTML · JobSpy"]:::a --> T{"Link label<br/>as title?"}:::q
-  T -- yes --> U["✂️ Title from URL<br/>or drop"]:::b
-  T -- no --> P
-  U --> P["🌍 places.parse<br/>countries · city · work mode"]:::b
-  P --> K{"Country<br/>collected?"}:::q
-  K -- no --> X["⛔ skip"]:::x
-  K -- yes --> C["🏷️ classify<br/>field · level · language<br/>salary · skills"]:::b
-  C --> F{"role_key exists<br/>at employer?"}:::q
-  F -- yes --> M["🧩 fold<br/>extra place / link"]:::c
-  F -- no --> N["🆕 insert job"]:::c
-  M & N --> E["🧠 tsvector + embedding<br/>feeds · alerts"]:::d
-  classDef a fill:#bfdbfe,stroke:#1d4ed8,color:#0b1220
-  classDef b fill:#bbf7d0,stroke:#15803d,color:#0b1220
-  classDef c fill:#fed7aa,stroke:#c2410c,color:#0b1220
-  classDef d fill:#fbcfe8,stroke:#be185d,color:#0b1220
-  classDef q fill:#fde68a,stroke:#b45309,color:#1f2937
-  classDef x fill:#e5e7eb,stroke:#6b7280,color:#111827
-```
-</details>
+<sub>Vector versions: <a href="docs/media/system-design.svg">system-design.svg</a> · <a href="docs/media/how-it-works.svg">how-it-works.svg</a> · regenerate with <code>python3 docs/media/system_design.py</code> and <code>python3 docs/media/how_it_works.py</code></sub>
 
 <table>
 <tr>
