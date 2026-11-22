@@ -1,9 +1,20 @@
-import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "@/shared/api/client";
 import type { Job, SearchParams, SearchResult } from "@/shared/api/types";
 
 export const useJobSearch = (p: SearchParams) =>
   useQuery({ queryKey: ["jobs", p], queryFn: () => api.get<SearchResult>("/jobs", p as Record<string, unknown>), placeholderData: keepPreviousData });
+/** All pages so far, one after the other. Changing the search starts again at page 1. */
+export function useJobFeed(p: SearchParams) {
+  const { page: _drop, ...base } = p; void _drop;
+  const q = useInfiniteQuery({
+    queryKey: ["jobs", base], initialPageParam: 1, placeholderData: keepPreviousData,
+    queryFn: ({ pageParam }) => api.get<SearchResult>("/jobs", { ...base, page: pageParam } as Record<string, unknown>),
+    getNextPageParam: (last) => (last.page * last.limit < last.total ? last.page + 1 : undefined) });
+  const first = q.data?.pages[0];
+  const data: SearchResult | undefined = first && { ...first, items: q.data!.pages.flatMap((x) => x.items) };
+  return { data, isFetching: q.isFetching, loadingMore: q.isFetchingNextPage, error: q.error, more: !!q.hasNextPage, next: () => { if (q.hasNextPage && !q.isFetching) q.fetchNextPage(); } };
+}
 export const useJob = (id: number | null) => useQuery({ queryKey: ["job", id], enabled: id != null, queryFn: () => api.get<Job>(`/jobs/${id}`) });
 export const useSuggest = (q: string) =>
   useQuery({ queryKey: ["suggest", q], enabled: q.trim().length >= 2, queryFn: () => api.get<{ skills: string[]; companies: string[]; titles: string[] }>("/jobs/suggest", { q }), staleTime: 60_000 });
@@ -12,7 +23,7 @@ export function useSetStage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, stage, notes }: { id: number; stage?: string; notes?: string }) => api.put(`/me/jobs/${id}`, { stage, notes }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["jobs"] }); qc.invalidateQueries({ queryKey: ["job"] }); qc.invalidateQueries({ queryKey: ["pipeline"] }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["jobs"] }); qc.invalidateQueries({ queryKey: ["job"] }); qc.invalidateQueries({ queryKey: ["pipeline"] }); qc.invalidateQueries({ queryKey: ["track"] }); qc.invalidateQueries({ queryKey: ["stats"] }); },
   });
 }
 export const liveSearch = (q: string) => api.post<{ task_id: number }>("/jobs/live-search", {}, { q });

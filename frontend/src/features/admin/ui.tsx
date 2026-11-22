@@ -1,3 +1,6 @@
+import { useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
+import { api } from "@/shared/api/client";
+import { useSentinel } from "@/shared/lib/useSentinel";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 /* ---------- toasts: every action says what happened, in a place you can't miss ---------- */
@@ -37,12 +40,18 @@ export function ActionButton({ run, children, className = "btn small", disabled,
   return <button className={className} title={title} disabled={disabled || busy} onClick={async () => { setBusy(true); try { await run(); } finally { setBusy(false); } }}>{busy ? <Spinner /> : null} {children}</button>;
 }
 
-export function Pager({ page, limit, total, onPage }: { page: number; limit: number; total: number; onPage(p: number): void }) {
-  const pages = Math.max(1, Math.ceil(total / limit));
-  return <div className="row small muted" style={{ justifyContent: "space-between" }}>
-    <span>{total ? `${num((page - 1) * limit + 1)}–${num(Math.min(page * limit, total))} of ${num(total)}` : "0 results"}</span>
-    <span className="row" style={{ gap: 6 }}><button className="iconbtn" disabled={page <= 1} onClick={() => onPage(page - 1)}>‹ Prev</button><span>page {page} / {pages}</span><button className="iconbtn" disabled={page >= pages} onClick={() => onPage(page + 1)}>Next ›</button></span>
-  </div>;
+/** Endless admin list: loads the next 25 rows as you scroll. Any change to `params` starts again at the top. */
+export function useAdminList<T>(key: string, path: string, params: Record<string, unknown>) {
+  const q = useInfiniteQuery({ queryKey: [key, params], initialPageParam: 1, placeholderData: keepPreviousData,
+    queryFn: ({ pageParam }) => api.get<{ items: T[]; total: number }>(path, { ...params, page: pageParam, limit: 25 }),
+    getNextPageParam: (_l, pages) => (pages.flatMap((p) => p.items).length < pages[0].total ? pages.length + 1 : undefined) });
+  const items = q.data?.pages.flatMap((p) => p.items) ?? []; const total = q.data?.pages[0]?.total ?? 0;
+  const sentinel = useSentinel(() => { if (q.hasNextPage && !q.isFetching) q.fetchNextPage(); }, !!q.hasNextPage);
+  return { items, total, isLoading: q.isLoading, more: !!q.hasNextPage, loadingMore: q.isFetchingNextPage, sentinel };
+}
+
+export function ListFoot({ shown, total, more, loading, sentinel }: { shown: number; total: number; more: boolean; loading: boolean; sentinel: React.RefObject<HTMLDivElement> }) {
+  return <div ref={sentinel} className="row small muted" style={{ justifyContent: "space-between" }}><span>{total ? `Showing ${num(shown)} of ${num(total)}` : "0 results"}</span><span>{loading ? "Loading more…" : more ? "Scroll for more" : total ? "That's all." : ""}</span></div>;
 }
 
 /** Debounced value, so typing in a search box doesn't fire a request per keystroke. */

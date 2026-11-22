@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
+import { Icon } from "@/shared/ui/Icon";
 import { GoogleButton } from "./GoogleButton";
 
 /** 0-4: length, mixed case, digit, symbol. Display only; the server enforces the real rule. */
@@ -33,15 +34,16 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
         <div>
           <h2>Your job search in the Netherlands, in one place.</h2>
           <ul>
-            <li><b>Straight from employers</b> — every role comes from the company's own career page.</li>
-            <li><b>Alerts that matter</b> — save a search and get new matches the day they appear.</li>
-            <li><b>A CV that fits the job</b> — import once, tailor and export a clean PDF.</li>
+            <li><span className="fi"><Icon name="company" /></span><div><b>Straight from employers</b><span>Every role comes from the company's own career page.</span></div></li>
+            <li><span className="fi"><Icon name="bell" /></span><div><b>Alerts that matter</b><span>Save a search or follow a company and hear about new roles the day they appear.</span></div></li>
+            <li><span className="fi"><Icon name="cv" /></span><div><b>A CV that fits the job</b><span>Import once, edit live, tailor with AI and export a clean PDF.</span></div></li>
+            <li><span className="fi"><Icon name="inbox" /></span><div><b>Your inbox, sorted</b><span>Interviews, tests, offers and rejections tracked from Gmail.</span></div></li>
           </ul>
         </div>
         <div className="small" style={{ opacity: .75 }}>IND sponsor status is shown as a flag, never as advice.</div>
       </aside>
       <main className="authmain">
-        <form className="authform stack" onSubmit={submit} noValidate>
+        <form className="authform authcard stack" onSubmit={submit} noValidate>
           <div><h1>{reg ? "Create your account" : "Welcome back"}</h1>
             <div className="muted">{reg ? "Free. Takes less than a minute." : "Sign in to your saved searches, alerts and pipeline."}</div></div>
           <GoogleButton onError={setErr} onCredential={async (c) => { setErr(""); try { await google(c); nav(from, { replace: true }); } catch (x) { setErr((x as Error).message); } }} />
@@ -56,7 +58,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
             {!reg && <Link to="/forgot" className="small" style={{ alignSelf: "flex-end" }}>Forgot password?</Link>}
             {touched && !pwOk && <span className="small err">{reg ? "Use at least 8 characters." : "Enter your password."}</span>}</div>
           {reg && <label className="small row" style={{ alignItems: "flex-start", flexWrap: "nowrap", gap: 8 }}><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} style={{ marginTop: 3 }} />
-            <span>I understand my saved searches and tracked jobs are stored on this server, and that my CV is never stored.</span></label>}
+            <span>I understand my saved searches and tracked jobs are stored on this server, and that my CV is stored (encrypted) only if I choose to save it for AI features.</span></label>}
           {touched && reg && !agree && <span className="small err">Please confirm to continue.</span>}
           {err && <div className="notice err" role="alert">{err}</div>}
           <button className="btn lg" style={{ justifyContent: "center" }} disabled={busy}>{busy ? "Please wait…" : reg ? "Create account" : "Sign in"}</button>

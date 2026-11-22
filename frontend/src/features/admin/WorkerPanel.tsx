@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/shared/api/client";
+import { StatusBanner, type WorkerStatus } from "./CrawlerSetup";
 
 type Worker = {
+  status?: WorkerStatus; tasks?: { id: number; kind: string; started_at: string | null }[];
   running: boolean; idle_seconds: number | null; total: number; due: number; rate_per_min: number; eta_minutes: number | null;
   open_jobs: number; new_jobs_hour: number; saved_careers_pages: number;
   per_min: { t: string; n: number }[]; recent: { name: string; ats: string | null; note: string | null; at: string }[];
@@ -24,8 +26,8 @@ export function WorkerPanel() {
     <div className="card stack">
       <div className="row" style={{ justifyContent: "space-between" }}>
         <h2 style={{ margin: 0 }}>The crawler, right now</h2>
-        <span className={`chip ${w.running ? "ok" : "warn"}`}>{w.running ? "Running" : `Idle${w.idle_seconds != null ? ` (${Math.round(w.idle_seconds / 60)} min since last scan)` : ""}`}</span>
       </div>
+      <StatusBanner s={w.status} rate={w.rate_per_min} />
       <div className="statrow">
         <div><b>{w.rate_per_min}</b><span>companies read per minute</span></div>
         <div><b>{w.due.toLocaleString()}</b><span>still waiting for a visit</span></div>

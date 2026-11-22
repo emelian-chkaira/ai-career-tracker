@@ -1,43 +1,65 @@
-import { NavLink, Navigate, Outlet, Route, Routes, useLocation, Link } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes, useLocation, useNavigate, Link } from "react-router-dom";
 import { useTheme } from "@/shared/lib/theme";
 import { useAuth } from "@/features/auth/AuthContext";
 import { AuthPage } from "@/features/auth/AuthPage";
 import { ForgotPage, ResetPage, VerifyPage, VerifyBanner, ActionPage } from "@/features/auth/AccountPages";
 import { JobsPage } from "@/features/jobs/JobsPage";
+import { JobPage } from "@/features/jobs/JobPage";
 import { CompaniesPage } from "@/features/companies/CompaniesPage";
-import { DashboardPage } from "@/features/dashboard/DashboardPage";
-import { AlertsPage } from "@/features/alerts/AlertsPage";
 import { useNotifications } from "@/features/alerts/api";
 import { PipelinePage } from "@/features/pipeline/PipelinePage";
 import { CvPage } from "@/features/cv/CvPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
 import { CrawlerPage } from "@/features/admin/CrawlerPage";
+import { useState } from "react";
+import { Drawer, Menu, Splitter, Tip, TipProvider, usePane, usePersisted } from "@/shared/ui/kit";
+import { Icon } from "@/shared/ui/Icon";
+import { CommandBar } from "@/shared/ui/CommandBar";
+import { WatchlistPage } from "@/features/companies/WatchlistPage";
 import { InboxPage } from "@/features/inbox/InboxPage";
+import { SetupWizard } from "@/features/onboarding/SetupWizard";
 
-const MY = ["/pipeline", "/alerts", "/inbox"];
-/** "My search": the personal tools (pipeline, alerts, inbox) share one page with sub-tabs instead of three top-bar entries. */
-function MySearch() {
-  const n = useNotifications(true);
-  return (<div className="stack">
-    <div className="tabs" role="tablist">
-      <NavLink role="tab" className={({ isActive }) => `tab${isActive ? " on" : ""}`} to="/pipeline">Pipeline</NavLink>
-      <NavLink role="tab" className={({ isActive }) => `tab${isActive ? " on" : ""}`} to="/alerts">Alerts{!!n.data?.unread && <span className="chip warn" style={{ margin: 0 }}>{n.data.unread}</span>}</NavLink>
-      <NavLink role="tab" className={({ isActive }) => `tab${isActive ? " on" : ""}`} to="/inbox">Inbox</NavLink>
-    </div>
-    <Outlet />
-  </div>);
+const NAV: { group: string; items: { to: string; text: string; icon: string; auth?: boolean; match?: string[] }[] }[] = [
+  { group: "Discover", items: [{ to: "/", text: "Jobs", icon: "jobs", match: ["/internships"] }, { to: "/internships", text: "Internships", icon: "intern" }, { to: "/companies", text: "Companies", icon: "company" }, { to: "/sponsors", text: "Visa sponsors", icon: "company" }] },
+  { group: "My search", items: [{ to: "/pipeline", text: "Pipeline", icon: "pipeline", auth: true }, { to: "/inbox", text: "Inbox", icon: "inbox", auth: true }, { to: "/watchlist", text: "Watchlist", icon: "bell", auth: true }, { to: "/cv", text: "CV Studio", icon: "cv" }] },
+  { group: "System", items: [{ to: "/crawler", text: "Crawler", icon: "crawler", auth: true }, { to: "/profile", text: "Settings", icon: "profile", auth: true }] }];
+const TITLES: Record<string, string> = { "/": "Jobs", "/internships": "Internships", "/companies": "Companies", "/pipeline": "Pipeline", "/inbox": "Inbox", "/cv": "CV Studio", "/crawler": "Crawler", "/profile": "Settings", "/sponsors": "Visa sponsors", "/watchlist": "Watchlist" };
+
+function SideNav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
+  const { user } = useAuth(); const n = useNotifications(!!user); const loc = useLocation();
+  return (<nav className="snav" aria-label="Main">{NAV.map((g) => { const items = g.items.filter((i) => !i.auth || user); if (!items.length) return null; return (
+    <div key={g.group} className="sgroup">{!collapsed && <div className="sgroup-t">{g.group}</div>}
+      {items.map((i) => { const active = i.to === "/" ? loc.pathname === "/" : loc.pathname.startsWith(i.to); return (
+        <Link key={i.to} to={i.to} onClick={onNavigate} className={`sitem${active ? " active" : ""}`} title={collapsed ? i.text : undefined} aria-current={active ? "page" : undefined}>
+          <Icon name={i.icon} /><span className="sl">{i.text}</span>{i.to === "/pipeline" && !!n.data?.unread && <span className="sbadge">{n.data.unread}</span>}</Link>); })}</div>); })}</nav>);
 }
 
 function Layout() {
-  const { user, logout } = useAuth(); const n = useNotifications(!!user); const { theme, next } = useTheme(); const loc = useLocation();
-  const nav = (to: string, text: string, end = false) => <NavLink className="nav" to={to} end={end}>{text}</NavLink>;
-  return (<div className="shell"><header className="top"><div className="in">
-    <Link to="/" className="brand"><i>NL</i><span>Career Tracker</span></Link>
-    <nav className="navs"><NavLink className={({ isActive }) => `nav${isActive || loc.pathname === "/internships" ? " active" : ""}`} to="/" end>Jobs</NavLink>{nav("/companies", "Companies")}{nav("/dashboard", "Market")}{nav("/cv", "CV Studio")}
-      {user && <><NavLink className={`nav${MY.some((p) => loc.pathname.startsWith(p)) ? " active" : ""}`} to="/pipeline">My search{!!n.data?.unread && <span className="chip warn" style={{ margin: 0 }}>{n.data.unread}</span>}</NavLink>{nav("/crawler", "Crawler")}</>}</nav>
-    <div className="user"><button className="themebtn" onClick={next} title={`Theme: ${theme} (click to change)`} aria-label="Change theme">{theme === "light" ? "☀️" : theme === "dark" ? "🌙" : "🖥️"}</button>{user ? <><Link to="/profile" className="row" style={{ gap: 8, color: "inherit" }}><span className="avatar">{(user.name || user.email)[0].toUpperCase()}</span><span className="small email">{user.email}</span></Link><button className="btn ghost small" onClick={logout}>Sign out</button></>
-      : <><Link className="btn ghost small" to="/login">Sign in</Link><Link className="btn small" to="/register">Sign up</Link></>}</div></div></header>
-    <main className="main"><VerifyBanner /><Outlet /></main></div>);
+  const { user, logout } = useAuth(); const { theme, next } = useTheme(); const loc = useLocation(); const go = useNavigate();
+  const side = usePane("sidebar", 196, 150, 320); const [collapsed, setCollapsed] = usePersisted("sidebar:collapsed", false); const [mobile, setMobile] = useState(false);
+  const title = TITLES[loc.pathname] ?? NAV.flatMap((g) => g.items).find((i) => i.to !== "/" && loc.pathname.startsWith(i.to))?.text ?? "";
+  const brand = <Link to="/" className="brand"><i>NL</i><span className="sl">Career Tracker</span></Link>;
+  return (<div className={`app${collapsed ? " collapsed" : ""}`} style={{ "--sw": `${side.width}px` } as React.CSSProperties}>
+    <aside className="side">{!collapsed && <Splitter props={side.props} label="Resize sidebar" />}{brand}<SideNav collapsed={collapsed} />
+      <div className="side-ft">
+        <button className="sitem" onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }))} aria-label="Search and jump anywhere" title="Search (⌘K)"><Icon name="search" /><span className="sl">Search <kbd>⌘K</kbd></span></button>
+        <button className="sitem" onClick={next} aria-label="Change theme" title={`Theme: ${theme}`}><span className="ticon">{theme === "light" ? "☀️" : theme === "dark" ? "🌙" : "🖥️"}</span><span className="sl">Theme: {theme}</span></button>
+        {user ? <Menu label="Account menu" trigger={<span className="row" style={{ gap: 8, flexWrap: "nowrap" }}><span className="avatar">{(user.name || user.email)[0].toUpperCase()}</span><span className="small email sl">{user.name || user.email}</span></span>}
+          items={[{ label: user.email, onSelect: () => go("/profile") }, { label: "Settings", onSelect: () => go("/profile") }, { label: "CV Studio", onSelect: () => go("/cv") }, { label: "Sign out", onSelect: logout, danger: true }]} />
+          : <><Link className="sitem" to="/login"><Icon name="profile" /><span className="sl">Sign in</span></Link><Link className="sitem" to="/register"><Icon name="bell" /><span className="sl">Sign up</span></Link></>}
+        <button className="sitem" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}><Icon name={collapsed ? "expand" : "collapse"} /><span className="sl">Collapse</span></button></div></aside>
+    <Drawer open={mobile} onOpenChange={setMobile} title="Menu" side="left" size={280}><SideNav collapsed={false} onNavigate={() => setMobile(false)} /></Drawer>
+    <div className="body"><header className="bar">
+      <button className="kicon only-mobile" onClick={() => setMobile(true)} aria-label="Open menu"><Icon name="menu" /></button>
+      <h1 className="bar-title">{title}</h1>
+      <div className="bar-r">
+        <Tip text="Search and jump anywhere (⌘K)"><button className="cmdbtn" onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }))} aria-label="Open command bar"><Icon name="search" size={15} /><span>Search…</span><kbd>⌘K</kbd></button></Tip>
+        <Tip text={`Theme: ${theme} (click to change)`}><button className="themebtn" onClick={next} aria-label="Change theme">{theme === "light" ? "☀️" : theme === "dark" ? "🌙" : "🖥️"}</button></Tip>
+        {user ? <Menu label="Account menu" trigger={<span className="row" style={{ gap: 8, flexWrap: "nowrap" }}><span className="avatar">{(user.name || user.email)[0].toUpperCase()}</span><span className="small email">{user.name || user.email}</span></span>}
+          items={[{ label: user.email, onSelect: () => go("/profile") }, { label: "Settings", onSelect: () => go("/profile") }, { label: "CV Studio", onSelect: () => go("/cv") }, { label: "Sign out", onSelect: logout, danger: true }]} />
+          : <><Link className="btn ghost small" to="/login">Sign in</Link><Link className="btn small" to="/register">Sign up</Link></>}</div></header>
+      <main className="main"><VerifyBanner /><Outlet /></main></div>
+    <CommandBar /><SetupWizard /></div>);
 }
 function Protected({ admin = false }: { admin?: boolean }) {
   const { user, ready } = useAuth(); const loc = useLocation();
@@ -47,17 +69,17 @@ function Protected({ admin = false }: { admin?: boolean }) {
   return <Outlet />;
 }
 export default function App() {
-  return (<Routes>
+  return (<TipProvider><Routes>
     <Route path="/login" element={<AuthPage mode="login" />} /><Route path="/register" element={<AuthPage mode="register" />} />
     <Route path="/forgot" element={<ForgotPage />} /><Route path="/reset" element={<ResetPage />} /><Route path="/verify" element={<VerifyPage />} /><Route path="/action" element={<ActionPage />} />
     <Route element={<Layout />}>
-      <Route index element={<JobsPage />} /><Route path="internships" element={<JobsPage internships />} /><Route path="companies" element={<CompaniesPage />} />
-      <Route path="dashboard" element={<DashboardPage />} /><Route path="cv" element={<CvPage />} />
+      <Route index element={<JobsPage />} /><Route path="internships" element={<JobsPage internships />} /><Route path="jobs/:id" element={<JobPage />} /><Route path="companies" element={<CompaniesPage />} /><Route path="sponsors" element={<CompaniesPage sponsors />} />
+      <Route path="dashboard" element={<Navigate to="/" replace />} /><Route path="cv" element={<CvPage />} />
       <Route element={<Protected />}>
-        <Route element={<MySearch />}><Route path="pipeline" element={<PipelinePage />} /><Route path="alerts" element={<AlertsPage />} /><Route path="inbox" element={<InboxPage />} /></Route>
+        <Route path="pipeline" element={<PipelinePage />} /><Route path="alerts" element={<Navigate to="/pipeline" replace />} /><Route path="inbox" element={<InboxPage />} /><Route path="watchlist" element={<WatchlistPage />} />
         <Route path="my" element={<Navigate to="/pipeline" replace />} /><Route path="profile" element={<ProfilePage />} /><Route path="crawler" element={<CrawlerPage />} />
       </Route>
       <Route path="admin" element={<Navigate to="/crawler" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Route></Routes>);
+    </Route></Routes></TipProvider>);
 }

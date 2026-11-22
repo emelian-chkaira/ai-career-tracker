@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/shared/api/client";
-import { ActionButton, Modal, Pager, download, ago, num, useDebounced, useNotify } from "./ui";
+import { ActionButton, Modal, ListFoot, useAdminList, download, ago, num, useDebounced, useNotify } from "./ui";
 
 type Company = { id: number; name: string; website?: string | null; careers_url?: string | null; ats?: string | null; city?: string | null; source?: string | null;
   last_scan?: string | null; next_scan?: string | null; scan_note?: string | null; fail_count: number; notes?: string | null; open_jobs: number };
-type Page = { items: Company[]; total: number };
 
 const FILTERS: [string, string][] = [["all", "All"], ["has_jobs", "Has open jobs"], ["no_jobs", "Scanned, no jobs"], ["failing", "Failing"], ["never", "Never scanned"], ["due", "Due for scan"], ["no_site", "No website"]];
 const SORTS: [string, string][] = [["name", "Name"], ["jobs", "Most jobs"], ["last_scan", "Recently scanned"], ["failing", "Most failures"], ["newest", "Newest added"]];
@@ -19,22 +18,22 @@ function health(c: Company) {
 
 export function CompaniesTab({ isAdmin }: { isAdmin: boolean }) {
   const qc = useQueryClient(); const notify = useNotify();
-  const [q, setQ] = useState(""); const [status, setStatus] = useState("all"); const [sort, setSort] = useState("name"); const [page, setPage] = useState(1);
+  const [q, setQ] = useState(""); const [status, setStatus] = useState("all"); const [sort, setSort] = useState("name");
   const dq = useDebounced(q);
-  const list = useQuery({ queryKey: ["co", dq, status, sort, page], queryFn: () => api.get<Page>("/admin/companies", { q: dq, status, sort, page, limit: 25 }), placeholderData: (p) => p });
+  const list = useAdminList<Company>("co", "/admin/companies", { q: dq, status, sort });
   const [edit, setEdit] = useState<Company | null>(null); const [add, setAdd] = useState(false); const [del, setDel] = useState<Company | null>(null);
   const refresh = () => { qc.invalidateQueries({ queryKey: ["co"] }); qc.invalidateQueries({ queryKey: ["admin-policy"] }); qc.invalidateQueries({ queryKey: ["admin-worker"] }); };
   const rescan = async (c: Company) => { await api.post(`/admin/companies/${c.id}/scan`); notify(`Queued a re-scan of ${c.name}. The worker picks it up in a few seconds.`, "ok"); };
-  const items = list.data?.items ?? [];
+  const items = list.items;
   return (
     <div className="stack">
       <div className="toolbar">
-        <input type="search" placeholder="Search name or website" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
-        <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }} aria-label="Sort">{SORTS.map(([v, l]) => <option key={v} value={v}>Sort: {l}</option>)}</select>
+        <input type="search" placeholder="Search name or website" value={q} onChange={(e) => { setQ(e.target.value); }} />
+        <select value={sort} onChange={(e) => { setSort(e.target.value); }} aria-label="Sort">{SORTS.map(([v, l]) => <option key={v} value={v}>Sort: {l}</option>)}</select>
         <button className="btn small" onClick={() => setAdd(true)}>＋ Add companies</button>
         <ActionButton className="btn ghost small" run={async () => { await download("/admin/export/companies.csv", "companies.csv"); notify("Downloaded companies.csv", "ok"); }}>⬇ CSV</ActionButton>
       </div>
-      <div className="row" style={{ gap: 6 }}>{FILTERS.map(([v, l]) => <button key={v} className={`chip ${status === v ? "ok" : "plain"}`} style={{ cursor: "pointer", border: 0, margin: 0 }} onClick={() => { setStatus(v); setPage(1); }}>{l}</button>)}</div>
+      <div className="row" style={{ gap: 6 }}>{FILTERS.map(([v, l]) => <button key={v} className={`chip ${status === v ? "ok" : "plain"}`} style={{ cursor: "pointer", border: 0, margin: 0 }} onClick={() => { setStatus(v); }}>{l}</button>)}</div>
       <div className="tablewrap"><table className="dtable">
         <thead><tr><th>Company</th><th>Status</th><th>Careers page</th><th>Via</th><th>Last scan</th><th>Result</th><th /></tr></thead>
         <tbody>{items.map((c) => <tr key={c.id}>
@@ -48,7 +47,7 @@ export function CompaniesTab({ isAdmin }: { isAdmin: boolean }) {
         </tr>)}
           {!items.length && <tr><td colSpan={7} className="empty">{list.isLoading ? "Loading…" : "No companies match. Add some with “＋ Add companies”."}</td></tr>}</tbody>
       </table></div>
-      <Pager page={page} limit={25} total={list.data?.total ?? 0} onPage={setPage} />
+      <ListFoot shown={items.length} total={list.total} more={list.more} loading={list.loadingMore} sentinel={list.sentinel} />
       {edit && <EditCompany c={edit} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); refresh(); notify("Company saved.", "ok"); }} />}
       {add && <AddCompanies onClose={() => setAdd(false)} onDone={(m) => { setAdd(false); refresh(); notify(m, "ok"); }} />}
       {del && <Modal title={`Delete ${del.name}?`} onClose={() => setDel(null)}>

@@ -1,21 +1,25 @@
 import { useState } from "react";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "@/shared/api/client";
 import type { Company } from "@/shared/api/types";
+import { useSentinel, ListEnd } from "@/shared/lib/useSentinel";
 import { sponsorChip } from "@/features/jobs/JobCard";
 
-export function CompaniesPage() {
-  const [q, setQ] = useState(""); const [hiring, setHiring] = useState(true); const [page, setPage] = useState(1);
-  const { data } = useQuery({ queryKey: ["companies", q, hiring, page], placeholderData: keepPreviousData, queryFn: () => api.get<{ items: Company[]; total: number; limit: number }>("/companies", { q, hiring, page }) });
-  return (<div className="stack"><div><h1>Companies</h1><div className="muted">{data ? `${data.total.toLocaleString()} ${hiring ? "companies hiring right now" : "tech companies"}, each one read from its own careers page.` : "Loading…"}</div></div>
-    <div className="row"><input type="search" className="grow" placeholder="Search by company name" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
-      <label className="row small"><input type="checkbox" checked={hiring} onChange={(e) => { setHiring(e.target.checked); setPage(1); }} />Only companies hiring now</label></div>
-    <div className="clist">{data?.items.map((c) => <div key={c.id} className="row">
+export function CompaniesPage({ sponsors = false }: { sponsors?: boolean }) {
+  const [q, setQ] = useState(""); const [hiring, setHiring] = useState(true);
+  const cq = useInfiniteQuery({ queryKey: ["companies", q, hiring, sponsors], initialPageParam: 1, placeholderData: keepPreviousData,
+    queryFn: ({ pageParam }) => api.get<{ items: Company[]; total: number; limit: number; page: number }>("/companies", { q, hiring, page: pageParam, ...(sponsors ? { sponsor: true } : {}) }),
+    getNextPageParam: (l) => (l.page * l.limit < l.total ? l.page + 1 : undefined) });
+  const data = cq.data && { ...cq.data.pages[0], items: cq.data.pages.flatMap((p) => p.items) };
+  const sentinel = useSentinel(() => { if (cq.hasNextPage && !cq.isFetching) cq.fetchNextPage(); }, !!cq.hasNextPage);
+  return (<div className="stack"><div><h1>{sponsors ? "Visa sponsor lookup" : "Companies"}</h1><div className="muted">{data ? `${data.total.toLocaleString()} ${hiring ? "companies hiring right now" : "tech companies"}, each one read from its own careers page.${sponsors ? " Sponsor status comes from the public IND register of recognised sponsors; always confirm with the employer." : ""}` : "Loading…"}</div></div>
+    <div className="row"><input type="search" className="grow tool" placeholder="Search by company name" value={q} onChange={(e) => { setQ(e.target.value); }} />
+      <label className="row small"><input type="checkbox" checked={hiring} onChange={(e) => { setHiring(e.target.checked); }} />Only companies hiring now</label></div>
+    <div className="cgrid">{data?.items.map((c) => <div key={c.id} className="ccard">
       {c.logo ? <img className="logo" src={c.logo.startsWith("/") || c.logo.startsWith("http") ? c.logo : `/logos/${c.logo}`} alt="" /> : <div className="logo">{c.name[0]}</div>}
-      <div className="grow" style={{ minWidth: 0 }}><strong>{c.name}</strong> {sponsorChip(c.sponsor_status)}<div className="small muted">{[c.city, `${c.open_jobs ?? 0} open ${c.open_jobs === 1 ? "role" : "roles"}`].filter(Boolean).join(" · ")}</div>
+      <div className="grow" style={{ minWidth: 0 }}><strong>{c.name}</strong><div>{sponsorChip(c.sponsor_status)}</div><div className="small muted">{[c.city, `${c.open_jobs ?? 0} open ${c.open_jobs === 1 ? "role" : "roles"}`].filter(Boolean).join(" · ")}</div>
         <div className="small"><Link to={`/?company_id=${c.id}`}>View jobs</Link>{c.careers_url && <> · <a href={c.careers_url} target="_blank" rel="noreferrer noopener">Careers page ↗</a></>}</div></div></div>)}</div>
-    {data && data.total > data.limit && <div className="row"><button className="btn ghost small" disabled={page <= 1} onClick={() => setPage(page - 1)}>← Prev</button><span className="muted small">Page {page}</span>
-      <button className="btn ghost small" disabled={page * data.limit >= data.total} onClick={() => setPage(page + 1)}>Next →</button></div>}
+    {data && <ListEnd sentinel={sentinel} more={!!cq.hasNextPage} loading={cq.isFetchingNextPage} count={data.items.length} total={data.total} />}
   </div>);
 }
