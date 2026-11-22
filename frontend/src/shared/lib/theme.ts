@@ -11,5 +11,5 @@ export function useTheme() {
   const [theme, setTheme] = useState<Theme>(read);
   useEffect(() => { apply(theme); try { theme === "system" ? localStorage.removeItem(KEY) : localStorage.setItem(KEY, theme); } catch { /* private mode */ } }, [theme]);
   const next = () => setTheme((t) => (t === "system" ? "light" : t === "light" ? "dark" : "system"));
-  return { theme, next };
+  return { theme, next, setTheme };
 }
