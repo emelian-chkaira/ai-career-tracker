@@ -1,3 +1,4 @@
+import { Icon } from "@/shared/ui/Icon";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/shared/api/client";
@@ -26,7 +27,7 @@ export function InboxPage() {
   return (
     <div className="ifull">
       <div className="inbox-banner">
-        <div><h1>Inbox assistant</h1>
+        <div><h1 className="ph-title"><span className="ph-icon" aria-hidden><Icon name="inbox" size={17} /></span>Inbox assistant</h1>
           <p>Your job-search mail, sorted for you. We read your Gmail <b>read-only</b> and pick out the replies that matter: interviews, tests, offers and, yes, the rejections too.</p></div>
         <div className="inbox-banner-n"><b>{c?.status.new ?? 0}</b><span>to review</span></div><div className="inbox-banner-n"><b>{tracked}</b><span>tracked</span></div>
       </div>

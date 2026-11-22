@@ -1,3 +1,5 @@
+import { Icon } from "@/shared/ui/Icon";
+import { PageHeader } from "@/shared/ui";
 import { useState } from "react";
 import { api } from "@/shared/api/client";
 import { myCountries, openSetup, PlaceStep, RoleStep, SectorStep, SkillsStep } from "@/features/onboarding/SetupWizard";
@@ -14,10 +16,10 @@ import { RrPanel } from "@/features/cv/RrPanel";
 import { useTheme } from "@/shared/lib/theme";
 
 export function ProfilePage() {
-  const { user, saveProfile } = useAuth(); const p = user!.profile;
+  const { user } = useAuth();
   const [cur, setCur] = useState(""); const [next, setNext] = useState(""); const [pmsg, setPmsg] = useState("");
   const { theme, setTheme } = useTheme(); const cvq = useStoredCv(); const qc = useQueryClient();
-  return (<div className="stack"><div><h1>Settings</h1><div className="muted">{user!.email} · {user!.role}. Your field, places, titles and skills shape “My feed”, the match score and your alerts.</div></div>
+  return (<div className="stack"><PageHeader eyebrow="Your account" icon={<Icon name="profile" size={17} />} title="Settings" subtitle={<>{user!.email} · {user!.role}. Your field, places, titles and skills shape “My feed”, the match score and your alerts.</>} />
     <Tabs vertical tabs={[
       { value: "prefs", label: "Preferences", content: <PrefsForm /> },
       { value: "ai", label: "AI model & CV", content: (<div className="stack">

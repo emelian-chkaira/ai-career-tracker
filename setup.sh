@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-click setup for NL Career Tracker.  Run:  ./setup.sh
+# One-click setup for AI Career Tracker.  Run:  ./setup.sh
 #
 #   ./setup.sh               everything, then start the app on http://localhost:8787
 #   ./setup.sh --docker      run the whole stack in Docker (no Python or Node needed)

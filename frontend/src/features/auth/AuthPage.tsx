@@ -1,3 +1,4 @@
+import { Logo } from "@/shared/ui";
 import { useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
@@ -30,15 +31,20 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
   return (
     <div className="authwrap">
       <aside className="authside">
-        <Link to="/" className="brand" style={{ color: "#fff" }}><i style={{ background: "#ffffff30" }}>NL</i><span>Career Tracker</span></Link>
+        <Logo light />
         <div>
-          <h2>Your job search in the Netherlands, in one place.</h2>
+          <h2>Your job hunt, guided by AI.</h2>
           <ul>
-            <li><span className="fi"><Icon name="company" /></span><div><b>Straight from employers</b><span>Every role comes from the company's own career page.</span></div></li>
-            <li><span className="fi"><Icon name="bell" /></span><div><b>Alerts that matter</b><span>Save a search or follow a company and hear about new roles the day they appear.</span></div></li>
-            <li><span className="fi"><Icon name="cv" /></span><div><b>A CV that fits the job</b><span>Import once, edit live, tailor with AI and export a clean PDF.</span></div></li>
-            <li><span className="fi"><Icon name="inbox" /></span><div><b>Your inbox, sorted</b><span>Interviews, tests, offers and rejections tracked from Gmail.</span></div></li>
+            <li><span className="fi"><Icon name="company" /></span><div><b>Straight from employers</b><span>Roles read from companies' own career pages across Europe and the Middle East. One role, one card.</span></div></li>
+            <li><span className="fi"><Icon name="bell" /></span><div><b>A feed that knows you</b><span>Your field, countries and skills rank every job; alerts tell you the day a match appears.</span></div></li>
+            <li><span className="fi"><Icon name="cv" /></span><div><b>A CV that fits the job</b><span>Import once, edit live, let AI tailor it per role without inventing facts, export a clean PDF.</span></div></li>
+            <li><span className="fi"><Icon name="inbox" /></span><div><b>A pipeline that updates itself</b><span>Interviews, tests, offers and rejections picked up from your Gmail.</span></div></li>
           </ul>
+        </div>
+        <div className="auth-float" aria-hidden>
+          <div><b>Senior Data Engineer</b><i>Adyen · Amsterdam · 92% match</i></div>
+          <div><b>Interview invite detected</b><i>moved to Interview · just now</i></div>
+          <div><b>CV tailored for Backend Developer</b><i>3 bullets rewritten · 0 facts invented</i></div>
         </div>
         <div className="small" style={{ opacity: .75 }}>IND sponsor status is shown as a flag, never as advice.</div>
       </aside>

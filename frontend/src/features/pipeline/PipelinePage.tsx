@@ -1,3 +1,4 @@
+import { Icon } from "@/shared/ui/Icon";
 import { Menu, usePersisted } from "@/shared/ui/kit";
 import { Logo } from "@/features/jobs/JobCard";
 import { useQuery } from "@tanstack/react-query";
@@ -40,7 +41,7 @@ export function PipelinePage() {
   if (!data) return <p className="muted">Loading…</p>;
   const stages = data.stages.filter((s) => s !== "skipped");
   const drop = (s: string, e: React.DragEvent) => { e.preventDefault(); setOver(null); const id = Number(e.dataTransfer.getData("text/plain")); const j = data.items.find((x) => x.id === id); if (j && j.stage !== s) set.mutate({ id, stage: s }); };
-  return (<div className="pfull"><div className="row" style={{ alignItems: "center" }}><h1 style={{ margin: 0 }}>Pipeline</h1><span className="muted small">Drag a card to move it. Every change is kept in that job's timeline.</span>
+  return (<div className="pfull"><div className="row" style={{ alignItems: "center" }}><h1 style={{ margin: 0 }} className="ph-title"><span className="ph-icon" aria-hidden><Icon name="pipeline" size={17} /></span>Pipeline</h1><span className="muted small">Drag a card to move it. Every change is kept in that job's timeline.</span>
       <div className="seg right" role="tablist" aria-label="Pipeline view"><button role="tab" aria-selected={view === "board"} className={view === "board" ? "on" : ""} onClick={() => setView("board")}>Board</button><button role="tab" aria-selected={view === "alerts"} className={view === "alerts" ? "on" : ""} onClick={() => setView("alerts")}>Saved searches & alerts</button></div></div>
     {view === "alerts" ? <div className="pscroll"><AlertsPage /></div> : <>
     <Stats />

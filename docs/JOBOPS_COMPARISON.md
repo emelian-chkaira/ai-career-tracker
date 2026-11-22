@@ -1,4 +1,4 @@
-# NL Career Tracker vs JobOps: a deep comparison and how to close the gap
+# AI Career Tracker vs JobOps: a deep comparison and how to close the gap
 
 *Written 21 Nov 2026. JobOps = `DaKheera47/job-ops` (the copy you cloned and the prebuilt image you ran at http://localhost:3005).*
 
@@ -23,7 +23,7 @@ They are a **mature, general-purpose, multi-country job-hunting workstation** (a
 
 ## 2. What each product is
 
-| | **JobOps** | **NL Career Tracker** |
+| | **JobOps** | **AI Career Tracker** |
 |---|---|---|
 | Goal | Find jobs anywhere, auto-rank, tailor, apply, track | Find jobs in the Netherlands straight from employers, track, tailor |
 | Stack | Node 22, Express, **SQLite** (Drizzle), React 18 + Tailwind 4 + Radix, Vitest, Biome | Python, FastAPI, **Postgres 16 + pgvector**, React 18 + TanStack Query, plain CSS, pytest, **Flutter mobile app** |

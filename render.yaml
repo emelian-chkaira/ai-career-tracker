@@ -2,7 +2,7 @@
 # Guide: docs/DEPLOY_RENDER.md. No crawler worker runs here: the demo shows the ready-made starter data.
 services:
   - type: web
-    name: nl-career-tracker
+    name: ai-career-tracker
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile

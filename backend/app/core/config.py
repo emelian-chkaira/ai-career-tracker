@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
     trust_proxy: bool = False
     # --- crawler identity
-    contact: str = "https://github.com/your-org/nl-career-tracker"
+    contact: str = "https://github.com/your-org/ai-career-tracker"
     brave_api_key: str | None = None
     browser_slots: int = 3
     scan_threads: int = 10
@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     smtp_user: str | None = None
     smtp_password: str | None = None
     smtp_security: str = "starttls"                # starttls (587) | ssl (465) | none (local test servers such as Mailpit)
-    mail_from: str = "CareerNL <no-reply@localhost>"
+    mail_from: str = "AI Career Tracker <no-reply@localhost>"
     public_url: str = "http://localhost:5173"        # used in email links
     # --- optional
     anthropic_api_key: str | None = None
@@ -75,7 +75,7 @@ class Settings(BaseSettings):
         return v
 
     @property
-    def user_agent(self) -> str: return f"nl-career-tracker/0.3 (+{self.contact})"
+    def user_agent(self) -> str: return f"ai-career-tracker/0.4 (+{self.contact})"
     @property
     def firebase_on(self) -> bool: return bool(self.firebase_api_key)
     @property
