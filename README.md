@@ -17,7 +17,7 @@
 ![Gmail](https://img.shields.io/badge/Gmail_API-read--only-EA4335?logo=gmail&logoColor=white)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth-FFCA28?logo=firebase&logoColor=black)
 ![Docker](https://img.shields.io/badge/Docker-one_click-2496ED?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/backend_tests-90_passing-brightgreen)
+![Tests](https://img.shields.io/badge/backend_tests-147_passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 **[One-click setup](#-one-click-setup)** · **[Why use it](#-why-youll-like-it)** · **[Screenshots](#-see-it)** · **[Features](#-what-it-does)** · **[Tech stack](#-tech-stack)** · **[Architecture](#-architecture)** · **[Deploy](#-deploy-it-for-free)**
@@ -65,7 +65,8 @@ Safe to run again: it never overwrites your data or your `.env`.
 | | For job seekers | For people who run it | For developers |
 |---|---|---|---|
 | **The point** | Every role comes from the company's own careers page, so nothing is stale, copied or behind a recruiter | Your own private copy, in one command, no cloud account | A real, readable full-stack codebase |
-| **Saves you time** | Hybrid keyword + semantic search, filters by domain and visa sponsor, alerts for saved searches | The crawler keeps itself fresh; the Crawler page shows what it is doing | Typed everywhere, 90 backend tests against a real Postgres |
+| **Saves you time** | A setup dialog after sign-up (field, country and cities, titles, level, skills or your CV) builds **your own feed** on the shared catalogue; hybrid keyword + semantic search, filters by field, country, tech specialty and visa sponsor, alerts for saved searches | The crawler keeps itself fresh; the Crawler page shows what it is doing | Typed everywhere, 131 backend tests against a real Postgres |
+| **Europe, Middle East & Africa** | Collect any of 60+ countries or whole regions (Benelux, DACH, Nordics, GCC, MENA, EMEA); every posting gets its countries, city, on-site / hybrid / remote and who a remote job is open to; filter and set your feed by country, region and work mode | The Crawler page shows whether the worker is running, paused by its schedule or stopped, lets you set days, hours, revisit interval and parallelism, and finds employers per country |
 | **Netherlands-aware** | IND sponsor badge, salary vs the highly-skilled-migrant threshold, "English OK / Dutch required" | Choose what to store: only mobile jobs, only backend, only the last 30 days… | Clean boundaries: routers, services, crawler, CV tools, workers |
 | **Keeps you organised** | Pipeline (saved → applied → interview → offer) and a **Gmail inbox that sorts replies for you** | Open source (MIT), self-hosted, your data stays on your machine | Web, mobile and API share one contract |
 | **Respects you** | Read-only Gmail via Google sign-in, no password shared, e-mail text never stored | Polite crawler: robots.txt, rate limits, your own contact in the User-Agent | Secrets encrypted, SSRF guard, refresh-token rotation |
@@ -79,7 +80,6 @@ Safe to run again: it never overwrites your data or your `.env`.
   </tr>
   <tr>
     <td width="50%"><img src="docs/screenshots/web-storage.png" alt="Storage policy"><br><sub><b>Choose what to store</b>: domains, age limits, one-click cleanup with previews</sub></td>
-    <td width="50%"><img src="docs/screenshots/web-market.png" alt="Market dashboard"><br><sub><b>Market dashboard</b>: postings per day, cities, contract types, skills</sub></td>
   </tr>
   <tr>
     <td width="50%"><img src="docs/screenshots/web-companies.png" alt="Companies"><br><sub><b>Companies</b>: every employer with its IND sponsor badge</sub></td>
@@ -111,12 +111,19 @@ Then it adds what a job seeker in the Netherlands actually needs: **is this comp
 | 🏢 **Employer-direct crawler** | Public ATS APIs → career-page crawl (+ sitemap) → schema.org JSON-LD → headless Chromium. NL-only, de-duplicated, vanished postings marked expired, dead ends backed off exponentially. |
 | 🎓 **Internships & traineeships** | Student and early-career pages are crawled and **classified** (internship / junior / senior / traineeship). |
 | 🛂 **IND sponsor + salary check** | Each employer is matched against the IND list of recognised sponsors; stated salaries are compared with the IND thresholds. A **badge**, never a filter. |
-| 📬 **Inbox assistant** | Connect Gmail (read-only Google sign-in). It finds **applications, interview invites, tests, offers and rejections**, extracts company and role, links them to your pipeline and lets you accept or dismiss each one. Choose the AI: built-in rules, local Ollama, Claude, or free Chinese models. |
-| 🗂 **My search** | Pipeline (saved → applied → interview → offer), alerts and inbox in one place. |
+| 💬 **Per-job assistant** | Ask about one posting: it knows the job, your CV, your notes and the e-mails linked to it. Draft answers, prepare interviews. History is kept per job; external models need your consent. |
+| ⌨️ **Fast UI** | ⌘K command bar, `j`/`k`/`/`/`s`/`x` shortcuts, bulk shortlist/apply/skip, toasts, first-run checklist, per-job to-dos, applications-per-day chart. |
+| 🔐 **Your data** | One-click JSON export, account deletion, list and end signed-in devices. |
+| 📍 **Radius & follow** | Search within 10-100 km of a city; follow a company to be alerted about its new jobs; crawler page shows source health. |
+| 📬 **Inbox assistant** | Connect Gmail (read-only Google sign-in). It finds **applications, interview invites, tests, offers and rejections**, extracts company and role, links them to your pipeline and lets you accept or dismiss each one. You choose the AI model that reads it: local Ollama, Groq's free tier, Claude, Grok, or Chinese models. |
+| 🎯 **AI fit score** | Save your CV once (encrypted). Any job can then be scored 0-100 against it by the AI model you chose: why it fits, what your CV does not show, real deal-breakers (Dutch required, no visa sponsorship). Server-side checks cap the score when a hard fact contradicts the model; results are cached; sort by AI fit or score a whole page in one click. |
+| 🗓 **Application tracking** | Every stage change is written to a per-job **timeline** (also e-mails you accept from the inbox). Notes, contact, applied date, offer details, **follow-up reminders** (a notification when one is due), a drag-and-drop board and funnel stats: heard-back rate, average reply time. |
+| ✍️ **Tailored CV and letter** | The AI model rewrites your saved CV for one job and keeps it per job. It may only reword: edits that add a number or skill your CV does not contain are rejected and listed. Keyword coverage before/after, a change-by-change diff, two layouts, a cover letter and **PDF** export (local LaTeX, or a public compiler only with your consent). |
+| 🗂 **My search** | Two tabs: **Pipeline** (saved → applied → interview → offer, with your saved searches and alerts below it) and the **Inbox**. |
 | 🔔 **Job alerts** | Save any search → instant / daily / weekly, in-app and (optionally) by e-mail. |
 | 🕷 **Crawler page** | Live worker status, full create/edit/delete for companies and jobs, CSV export, and an editable **storage policy** (keep only some domains, max age, one-click cleanup with previews). |
-| 📊 **Market dashboard** | Open roles, hiring companies, postings per day, top cities and companies, contract types, 30-day skill demand, salary statistics. |
-| 📄 **CV Studio** | Import **PDF, DOCX, text or LaTeX** keeping links and layout; fix the parse; tailor the CV to a job; export a **LaTeX PDF** that looks like your original; draft a cover letter. |
+| 📄 **CV Studio** | Resume-Studio-style editor: an icon rail of sections, one at a time, with an item list (drag, show/hide, duplicate, delete) and an edit dialog with **rich text** (bold, links) and a per-field **AI assist** that is checked so it cannot invent numbers or skills. Import **PDF, DOCX, text, LaTeX or Reactive Resume JSON**; live local PDF preview in 3 layouts and A4/Letter; tailor to a job; cover letter. **Reactive Resume**: connect an instance with an API key to import a resume or send your CV there (written from its public docs, not yet run against a live instance). |
+| 🗂 **Job page, finer stages, Settings** | A full page per job with tabs (Overview, Notes & to-dos, Documents, Timeline, Emails, Assistant); 8 pipeline stages from recruiter screen to final round; quick-view tabs on Jobs; 7/14/30/90-day analytics; visa sponsor lookup; watchlist; Settings with AI, integrations, display and data. |
 | 👤 **Accounts** | E-mail or **Google** sign-in (Firebase Authentication), e-mail verification, password reset. |
 | 🌗 **Light & dark** | A plain, warm design system on web and mobile. |
 
@@ -170,13 +177,13 @@ The API is stateless and the worker coordinates through Postgres, so both scale 
 | **Search** | `tsvector`, `fastembed` (BAAI/bge-small-en-v1.5, local ONNX), reciprocal-rank fusion | Keyword + semantic + hybrid ranking with no API key and no per-query cost |
 | **Crawling** | `httpx`, BeautifulSoup + lxml, **Playwright** (Chromium) | Fast for APIs and plain HTML, a real browser only when a site needs it |
 | **Task queue** | Postgres `FOR UPDATE SKIP LOCKED` | Reliable background jobs without Redis or Celery |
-| **Mail + AI** | **Gmail API** (OAuth, read-only), Ollama, Anthropic, OpenAI-compatible, Zhipu / Qwen / DeepSeek / Kimi | Your choice of model, from fully local and free to paid; keys encrypted at rest |
+| **Mail + AI** | **Gmail API** (OAuth, read-only), Ollama, Anthropic, OpenAI-compatible, Groq (free tier), Grok (xAI), Zhipu / Qwen / DeepSeek / Kimi | Your choice of model, from fully local and free to paid; keys encrypted at rest |
 | **CV tools** | `pdfminer.six`, `pypdf`, **LaTeX** (tectonic), Anthropic API (opt-in) | Layout-aware PDF reading, LaTeX output, consent-gated AI tailoring |
 | **Auth** | **Firebase Authentication** (REST), JWT, **argon2id**, rotating refresh tokens | E-mail + Google sign-in without running your own mail or identity system |
 | **Web** | **React 18**, **TypeScript**, Vite, TanStack Query, Recharts | Strictly typed client, cached server state, small bundle |
 | **Mobile** | **Flutter**, Cubit (flutter_bloc), Dio, get_it | One codebase for iOS and Android, same API as the web |
 | **Infra** | **Docker** (multi-stage), Docker Compose, **Caddy** (auto-HTTPS), GitHub Actions | One-command local stack, production stack with HTTPS, CI per part |
-| **Quality** | pytest on a real Postgres (90 tests), `tsc`, `flutter analyze` | Regression safety where it matters |
+| **Quality** | pytest on a real Postgres (147 tests), `tsc`, `flutter analyze` | Regression safety where it matters |
 
 ## 🏆 What this project achieves
 
@@ -194,7 +201,7 @@ The API is stateless and the worker coordinates through Postgres, so both scale 
 
 **Engineering**
 - 🔐 Production-grade auth: Firebase as identity provider, argon2id for legacy accounts with **lazy migration** on first sign-in, short-lived JWTs, **refresh-token rotation with reuse detection**, verified-email enforcement, timing-equalised login checks, no user enumeration on password reset, per-IP rate limiting.
-- 🧪 **90 backend tests** against a real Postgres (including a fake Firebase), CI per part (path-filtered GitHub Actions), strict typing on the web client.
+- 🧪 **147 backend tests** against a real Postgres (including a fake Firebase), CI per part (path-filtered GitHub Actions), strict typing on the web client.
 - 📦 Reproducible deployment: a multi-stage Docker image, a production compose file with automatic HTTPS, backup and update scripts and a step-by-step free-tier guide.
 
 ## ⚡ Manual setup (if you prefer to do it by hand)
@@ -230,19 +237,20 @@ This project is **MIT licensed** — download it, run it on your own machine, ch
 
 Open **Inbox** in the web app. It reads your job-search e-mail (read-only), finds **applications, interview invites, tests, offers and rejections**, extracts the company, role and dates, links them to your pipeline, and lets you **review, correct and accept** each one — accepting moves the job in your pipeline (applied → interview → offer / rejected, never backwards).
 
-1. **Connect Gmail** with Google sign-in (read-only OAuth, no password shared; one-time setup in [docs/GMAIL_OAUTH.md](docs/GMAIL_OAUTH.md)), or paste an e-mail / upload `.eml` files for any other provider. While your Google project is in *Testing* mode only the test users you list can connect (up to 100) and the login expires after 7 days; opening it to everyone requires Google's app verification.
-2. **Choose the AI** — your pick, per user:
+1. **Connect Gmail** with Google sign-in (read-only OAuth, no password shared; one-time setup in [docs/GMAIL_OAUTH.md](docs/GMAIL_OAUTH.md)). While your Google project is in *Testing* mode only the test users you list can connect (up to 100) and the login expires after 7 days; opening it to everyone requires Google's app verification.
+2. **Choose the AI model** (required, your pick, per user). Without one the app does not guess: there is no keyword fallback.
 
 | Choice | Notes |
 |---|---|
-| **Built-in rules** | Free, offline, nothing leaves your server (English / Dutch / German keywords) |
 | **Ollama** | Run Qwen, DeepSeek, Llama… on your own computer: free and private |
+| **Groq** | Free API key from `console.groq.com/keys` (rate-limited); try `openai/gpt-oss-20b` or `openai/gpt-oss-120b` |
+| **Grok (xAI)** | Your own xAI API key (`console.x.ai`); OpenAI-compatible, pay-as-you-go |
 | **GLM (Zhipu), Qwen (Alibaba), DeepSeek, Kimi (Moonshot)** | Chinese models over their OpenAI-compatible APIs; some have free tiers or free quota, others are very cheap |
 | **OpenRouter** | One key, many models, including `:free` ones |
 | **Claude (Anthropic)** | Bring your own key: Haiku 5.5 is enough for classification, Sonnet 5.5 for better writing |
 | **OpenAI / any OpenAI-compatible endpoint** | vLLM, LM Studio, LiteLLM, a company gateway… |
 
-Model names, prices and free tiers change, so every preset is an editable default. API keys and the Google refresh token are **encrypted** before they are stored and are never sent back to the browser. Only the extracted facts are saved (company, role, category, a one-line summary), **not the e-mail body**, and you can delete everything with one click. If the AI call fails, the built-in rules are used for that e-mail, and when an external AI is chosen the app asks for your consent before sending any text.
+Model names, prices and free tiers change, so every preset is an editable default. API keys and the Google refresh token are **encrypted** before they are stored and are never sent back to the browser. Only the extracted facts are saved (company, role, category, a one-line summary), **not the e-mail body**, and you can delete everything with one click. If the AI call fails (for example a free-tier rate limit) the app waits and retries, and e-mails it could not read stay unread so the next sync tries them again. When an external AI is chosen, the app asks for your consent before sending any text.
 
 On a public server set `CAREERS_ALLOW_PRIVATE_HOSTS=false`, so users cannot point the AI connection at internal addresses.
 

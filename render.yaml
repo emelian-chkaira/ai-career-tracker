@@ -1,0 +1,41 @@
+# Free live demo on Render (API + website in one service) with a free Neon Postgres.
+# Guide: docs/DEPLOY_RENDER.md. No crawler worker runs here: the demo shows the ready-made starter data.
+services:
+  - type: web
+    name: nl-career-tracker
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    envVars:
+      - key: WITH_BROWSER        # build arg: skip the 400 MB Chromium download, nothing is crawled in the demo
+        value: "0"
+      - key: DATABASE_URL        # paste the Neon connection string (direct, not "pooled") in the Render dashboard
+        sync: false
+      - key: CAREERS_JWT_SECRET
+        generateValue: true
+      - key: CAREERS_ENV
+        value: prod
+      - key: CAREERS_TRUST_PROXY
+        value: "true"
+      - key: CAREERS_COOKIE_SECURE
+        value: "true"
+      - key: CAREERS_DB_POOL_SIZE
+        value: "5"
+      - key: CAREERS_OPEN_CRAWLER        # visitors are plain users: they cannot edit companies or jobs
+        value: "false"
+      - key: CAREERS_FIRST_USER_ADMIN
+        value: "false"
+      - key: CAREERS_ALLOW_PRIVATE_HOSTS # SSRF protection on a public server
+        value: "false"
+      - key: CAREERS_SEMANTIC_ENABLED    # keyword search only: no 100 MB model on a 512 MB machine
+        value: "false"
+      - key: CAREERS_LATEX_COMPILE
+        value: "false"
+      - key: CAREERS_PUBLIC_URL          # set both to your https://<name>.onrender.com address after the first deploy
+        sync: false
+      - key: CAREERS_API_URL
+        sync: false
+      - key: CAREERS_CORS_ORIGINS
+        sync: false

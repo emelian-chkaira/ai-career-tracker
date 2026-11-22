@@ -11,3 +11,6 @@ __pycache__/
 .pytest_cache/
 *.pyc
 backend/.env.local
+
+frontend/test-results/
+frontend/playwright-report/
