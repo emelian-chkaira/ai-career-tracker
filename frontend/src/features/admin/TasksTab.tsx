@@ -11,6 +11,7 @@ export const TASKS: { kind: string; title: string; what: string }[] = [
   { kind: "census", title: "Find ATS boards", what: "Look for companies on public job-board providers." },
   { kind: "internships", title: "Find internships", what: "Look for internship and graduate programmes." },
   { kind: "sponsors_refresh", title: "Refresh sponsor list", what: "Download the IND recognised-sponsor register and re-check companies." },
+  { kind: "dedupe_jobs", title: "Merge duplicate jobs", what: "One role, one job: fold the same role from other cities, links or boards into one, and fix link-label titles. Also runs daily." },
   { kind: "logos", title: "Fetch logos", what: "Download company logos for the job cards." },
   { kind: "embed", title: "Build search embeddings", what: "Add semantic-search vectors for new jobs." },
 ];
@@ -31,7 +32,7 @@ export function TasksPanel({ compact = false }: { compact?: boolean }) {
   return (
     <div className="stack">
       <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(250px,1fr))" }}>
-        {TASKS.slice(0, compact ? 4 : 9).map((t) => <div key={t.kind} className="opt" style={{ flexDirection: "column" }}><div><b>{t.title}</b><div className="small muted">{t.what}</div></div><ActionButton className="btn ghost small" run={() => run(t)}>Run</ActionButton></div>)}
+        {TASKS.slice(0, compact ? 4 : 10).map((t) => <div key={t.kind} className="opt" style={{ flexDirection: "column" }}><div><b>{t.title}</b><div className="small muted">{t.what}</div></div><ActionButton className="btn ghost small" run={() => run(t)}>Run</ActionButton></div>)}
       </div>
       {!compact && <><div className="row" style={{ justifyContent: "space-between" }}><h3 style={{ margin: 0 }}>Task history {active > 0 && <span className="badge ok">{active} active</span>}</h3>
         <ActionButton className="btn ghost small" run={async () => { const r = await api.del<{ removed: number }>("/admin/tasks"); notify(`Removed ${r.removed} finished task(s).`, "ok"); qc.invalidateQueries({ queryKey: ["admin-tasks"] }); }}>Clear finished</ActionButton></div>

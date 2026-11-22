@@ -1,4 +1,5 @@
 import { flag, SCOPE } from "@/shared/lib/geo";
+import { BoardIcon, boardName } from "@/shared/ui/BoardIcon";
 import type { Job } from "@/shared/api/types";
 import { ago, label, money } from "@/shared/lib/format";
 import { FitBadge } from "@/features/fit/FitPanel";
@@ -23,7 +24,8 @@ export function JobCard({ job, selected, onOpen, picked, onPick }: { job: Job; s
         <div className="jchips">
           {isNew(when) && <span className="chip ok">New</span>}
           <span className="chip">{label(job.job_type)}</span>
-          {job.source?.startsWith("board:") && <span className="chip plain" title="Found on a job board, not on the employer's own careers page">via {job.source.slice(6).replace(/^./, (c) => c.toUpperCase())}</span>}
+          {job.source?.startsWith("board:") && <span className="chip plain" title="Found on a job board, not on the employer's own careers page"><BoardIcon board={job.source} size={13} /> via {boardName(job.source)}</span>}
+          {!!job.alternates?.length && <AltChip job={job} />}
           {job.work_mode && job.work_mode !== "onsite" && <span className="chip plain" title={job.remote_scope ? `Remote, open to ${SCOPE[job.remote_scope] ?? job.remote_scope}` : undefined}>{job.work_mode === "remote" ? "🏠 Remote" : "🔀 Hybrid"}{job.remote_scope && job.remote_scope !== "world" ? ` · ${SCOPE[job.remote_scope] ?? job.remote_scope}` : job.remote_scope === "world" ? " · anywhere" : ""}</span>}
           {sponsorChip(job.company.sponsor_status)}
           <FitBadge ai={job.ai} />
@@ -39,3 +41,13 @@ export function JobCard({ job, selected, onOpen, picked, onPick }: { job: Job; s
 }
 /** Snippets come from ts_headline and may only contain <mark>; strip everything else. */
 function sanitize(html: string) { return html.replace(/<(?!\/?mark>)[^>]*>/gi, ""); }
+
+
+/** "4 locations" / "also on Indeed": the same role folded from several cities, links or sites (one role, one card). */
+export function AltChip({ job }: { job: Job }) {
+  const alts = job.alternates ?? [];
+  const cities = [...new Set([job.city, ...alts.map((a) => a.city)].filter(Boolean))] as string[];
+  const boards = [...new Set(alts.map((a) => a.source).filter((s) => s?.startsWith("board:")))] as string[];
+  const tip = [cities.length > 1 ? `In ${cities.join(", ")}` : "", boards.length ? `Also on ${boards.map(boardName).join(", ")}` : "", `${alts.length + 1} links to this role`].filter(Boolean).join(" · ");
+  return (<span className="chip plain altchip" title={tip}>{cities.length > 1 ? <>📍 {cities.length} locations</> : <>🔗 {alts.length + 1} listings</>}{boards.map((b) => <BoardIcon key={b} board={b} size={12} />)}</span>);
+}
