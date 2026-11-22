@@ -1,0 +1,55 @@
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, ApiError } from "@/shared/api/client";
+import { useAuth } from "@/features/auth/AuthContext";
+import { isExternalAi, useAiSettings } from "@/features/ai/AiPanel";
+import { getConsent, setConsentStored, useStoredCv } from "@/features/fit/api";
+
+type Cov = { matched: string[]; missing: string[]; percent: number };
+type Tailored = { latex: string; template: string; cover_letter: string | null; model: string; cv: Record<string, unknown>;
+  report: { before: Cov; after: Cov; changes: { section: string; title: string; before: string; after: string }[]; rejected: { section: string; title?: string; why: string }[]; gaps: string[]; notes: string } };
+
+const download = (name: string, data: BlobPart, type: string) => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([data], { type })); a.download = name; a.click(); };
+
+/** A CV rewritten for this one job by the user's AI model. Reworded only: invented numbers and skills are rejected and listed. */
+export function TailorPanel({ jobId, title }: { jobId: number; title: string }) {
+  const { user } = useAuth(); const qc = useQueryClient(); const cv = useStoredCv(!!user); const ai = useAiSettings();
+  const saved = useQuery({ queryKey: ["tailor", jobId], enabled: !!user, retry: false, queryFn: async () => { try { return await api.get<Tailored>(`/me/tailor/${jobId}`); } catch (e) { if (e instanceof ApiError && e.status === 404) return null; throw e; } } });
+  const [busy, setBusy] = useState(""); const [err, setErr] = useState(""); const [consent, setConsent] = useState(getConsent()); const [pubOk, setPubOk] = useState(false); const [letter, setLetter] = useState<string | null>(null); const [show, setShow] = useState(false);
+  if (!user) return null;
+  const t = saved.data; const external = isExternalAi(ai.data); const ready = !!cv.data && !!ai.data?.provider && (!external || consent);
+  const call = async (key: string, fn: () => Promise<unknown>) => { setBusy(key); setErr(""); try { await fn(); await qc.invalidateQueries({ queryKey: ["tailor", jobId] }); } catch (e) { setErr(e instanceof ApiError ? e.message : (e as Error).message); } finally { setBusy(""); } };
+  const run = () => call("tailor", () => api.post(`/me/tailor/${jobId}`, { consent }));
+  const writeLetter = () => call("letter", async () => { await api.post(`/me/tailor/${jobId}/cover-letter`, { consent }); setLetter(null); });
+  const pdf = () => call("pdf", async () => { const r = await api.post<{ pdf_b64: string }>(`/me/tailor/${jobId}/pdf`, { mode: pubOk ? "auto" : "local", allow_public: pubOk }); const b = atob(r.pdf_b64); download(`cv-${jobId}.pdf`, Uint8Array.from(b, (c) => c.charCodeAt(0)), "application/pdf"); });
+  const saveLetter = () => call("saveletter", () => api.put(`/me/tailor/${jobId}`, { cover_letter: letter }));
+  const setTemplate = (template: string) => call("tpl", () => api.put(`/me/tailor/${jobId}`, { template }));
+  return (<div className="tailor stack"><h3>Tailored CV</h3>
+    {!t ? <>
+      <div className="small muted">Rewrites your saved CV for “{title}” using the same keywords as the posting. It only rewords what is already there.</div>
+      {!cv.data && <div className="small">First <Link to="/cv">save your CV for AI</Link>.</div>}
+      {ai.data && !ai.data.provider && <div className="small">Then <Link to="/profile">choose an AI model</Link>.</div>}
+      {external && <label className="small"><input type="checkbox" checked={consent} onChange={(e) => { setConsent(e.target.checked); setConsentStored(e.target.checked); }} /> I agree that my CV and this posting are sent to <b>{ai.data?.provider}</b>.</label>}
+      <div className="row"><button className="btn" disabled={!ready || !!busy} onClick={run}>{busy === "tailor" ? "Tailoring…" : "Tailor my CV"}</button></div>
+    </> : <>
+      <div className="cov"><div><span className="small muted">Keywords in your CV</span><div><b>{t.report.before.percent}%</b> → <b className="okc">{t.report.after.percent}%</b></div></div>
+        {!!t.report.after.missing.length && <div className="small"><span className="muted">Still missing (not in your CV, so not added): </span>{t.report.after.missing.slice(0, 8).join(", ")}</div>}</div>
+      {!!t.report.rejected.length && <div className="small muted">{t.report.rejected.length} suggested edit{t.report.rejected.length > 1 ? "s were" : " was"} dropped because {t.report.rejected.length > 1 ? "they" : "it"} added facts your CV does not contain ({t.report.rejected.map((r) => r.why).join("; ")}).</div>}
+      <button className="btn ghost small" onClick={() => setShow(!show)}>{show ? "Hide" : "Show"} {t.report.changes.length} change{t.report.changes.length === 1 ? "" : "s"}</button>
+      {show && <div className="stack">{t.report.changes.map((c, i) => <div key={i} className="diff"><div className="small muted">{c.section}{c.title ? ` · ${c.title}` : ""}</div><div className="del">{c.before}</div><div className="add">{c.after}</div></div>)}</div>}
+      <div className="row"><select value={t.template} onChange={(e) => setTemplate(e.target.value)} title="Layout"><option value="classic">Classic layout</option><option value="compact">Compact layout</option></select>
+        <button className="btn" disabled={!!busy} onClick={pdf}>{busy === "pdf" ? "Building…" : "Download PDF"}</button>
+        <button className="btn ghost small" onClick={() => download(`cv-${jobId}.tex`, t.latex, "text/x-tex")}>.tex</button>
+        <button className="btn ghost small right" disabled={!ready || !!busy} onClick={run}>{busy === "tailor" ? "Tailoring…" : "Redo"}</button></div>
+      <label className="small"><input type="checkbox" checked={pubOk} onChange={(e) => setPubOk(e.target.checked)} /> If this server has no LaTeX compiler, allow a public one (sends the CV to a third party).</label>
+      <div className="small muted">Written by {t.model}.</div>
+      <h3 style={{ marginTop: 6 }}>Cover letter</h3>
+      {t.cover_letter == null ? <div className="row"><button className="btn ghost" disabled={!ready || !!busy} onClick={writeLetter}>{busy === "letter" ? "Writing…" : "Write a cover letter"}</button></div> : <>
+        <textarea rows={11} value={letter ?? t.cover_letter} onChange={(e) => setLetter(e.target.value)} style={{ fontFamily: "inherit", fontSize: 14 }} />
+        <div className="row"><button className="btn ghost small" onClick={() => navigator.clipboard.writeText(letter ?? t.cover_letter ?? "")}>Copy</button><button className="btn ghost small" onClick={() => download("cover-letter.txt", letter ?? t.cover_letter ?? "", "text/plain")}>Download</button>
+          {letter != null && letter !== t.cover_letter && <button className="btn small" disabled={!!busy} onClick={saveLetter}>Save edits</button>}<button className="btn ghost small right" disabled={!ready || !!busy} onClick={writeLetter}>Rewrite</button></div></>}
+    </>}
+    {err && <div className="small err">{err}</div>}
+  </div>);
+}
