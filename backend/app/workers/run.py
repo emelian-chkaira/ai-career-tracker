@@ -2,7 +2,7 @@
  - executes queued tasks (scan, discovery, live search, embeddings…)
  - scheduler: refreshes stale companies, embeds new jobs, runs job alerts and sends the e-mail outbox.
 Scale out by running more worker containers (tasks are claimed with SKIP LOCKED)."""
-import logging, time, traceback, signal
+import logging, os, threading, time, traceback, signal
 from concurrent.futures import ThreadPoolExecutor
 from sqlalchemy import select, exists
 from app.core.db import SessionLocal
@@ -17,7 +17,7 @@ log = logging.getLogger("worker")
 STOP = False
 HANDLERS = {
     "scan_all": lambda t, db: tasks.scan_all(t, db), "scan_unscanned": lambda t, db: tasks.scan_all(t, db, unscanned=True), "scan_company": tasks.scan_company,
-    "discover": tasks.discover, "discover_country": tasks.discover_country, "board_search": tasks.board_search, "census": tasks.census, "internships": tasks.internships, "broad_sources": tasks.broad_sources, "logos": tasks.logos, "live_search": tasks.live_search,
+    "discover": tasks.discover, "discover_country": tasks.discover_country, "board_search": tasks.board_search, "dedupe_jobs": tasks.dedupe_jobs, "census": tasks.census, "internships": tasks.internships, "broad_sources": tasks.broad_sources, "logos": tasks.logos, "live_search": tasks.live_search,
     "sponsors_refresh": lambda t, db: (sponsor_service.refresh(db), sponsor_service.recheck_all(db)),
     "mail_sync": tasks.mail_sync,
     "embed": lambda t, db: task_service.progress(db, t, embedded=embeddings.backfill()),
@@ -36,6 +36,38 @@ def _heartbeat():
         time.sleep(10)
 
 
+GRACE = 30                                             # seconds a stopping worker may take to finish what it started
+
+
+def _stop(*_):
+    """Ctrl+C / kill: finish the current step, drop queued scans, and exit within GRACE seconds even if a page read hangs
+    (a worker that lingers keeps its database connections and can starve the next one)."""
+    global STOP
+    if STOP: os._exit(1)                                                           # second Ctrl+C: leave now
+    STOP = True
+    log.info("stopping: finishing current work, exiting within %ss", GRACE)
+    _pool.shutdown(wait=False, cancel_futures=True)
+    t = threading.Timer(GRACE, lambda: (log.warning("still busy after %ss; exiting anyway", GRACE), engine_dispose(), os._exit(0)))
+    t.daemon = True; t.start()
+
+
+def engine_dispose():
+    try:
+        from app.core.db import engine
+        engine.dispose()
+    except Exception: pass
+
+
+def _boards_due(db) -> bool:
+    """Automatic board search is due when the last one (any, also started by hand) began more than CAREERS_BOARD_EVERY_HOURS ago.
+    Read from the tasks table, so restarting the worker does not start a new search."""
+    import datetime as dt
+    from app.models import Task
+    from sqlalchemy import func
+    last_at = db.scalar(select(func.max(Task.created_at)).where(Task.kind == "board_search"))
+    return last_at is None or dt.datetime.now(dt.timezone.utc) - last_at > dt.timedelta(hours=settings.board_every_hours)
+
+
 def _every(last: dict, key: str, seconds: float) -> bool:
     if time.time() - last.get(key, 0) >= seconds: last[key] = time.time(); return True
     return False
@@ -43,7 +75,7 @@ def _every(last: dict, key: str, seconds: float) -> bool:
 
 def main():
     global STOP
-    signal.signal(signal.SIGTERM, lambda *_: globals().__setitem__("STOP", True)); signal.signal(signal.SIGINT, lambda *_: globals().__setitem__("STOP", True))
+    signal.signal(signal.SIGTERM, _stop); signal.signal(signal.SIGINT, _stop)
     last: dict = {}
     log.info("worker started")
     import threading
@@ -66,16 +98,19 @@ def main():
                     if _every(last, "alerts", 300): n = alert_service.run_due(db); alert_service.send_outbox(db); n and log.info("alerts created: %s", n); m = tracking_service.notify_due(db); m and log.info("follow-up reminders: %s", m)
                     if _every(last, "embed", 120): embeddings.backfill(limit=500)
                     if _every(last, "purge", 86400): r = maintenance_service.purge_old(db); any(r.values()) and log.info("retention purge: %s", r)      # daily retention
+                    if _every(last, "dedupe", 86400): r = maintenance_service.collapse_duplicates(db); r["jobs_merged"] and log.info("duplicates merged: %s", r)      # daily: one role, one job
                     if _every(last, "refresh", 5):                  # keep jobs fresh: top up the scan pool with the next due companies, inside the schedule
                         ok, why, nxt = schedule_service.window()
-                        if ok: _refresh(db)
-                        if ok and settings.board_sites.strip() and settings.board_every_hours and _every(last, "boards", settings.board_every_hours * 3600):
-                            task_service.enqueue(db, "board_search")                  # EXPERIMENTAL job boards, only when switched on
+                        if ok:
+                            _refresh(db)
+                            if settings.board_sites.strip() and settings.board_every_hours and _every(last, "boards-check", 300) and _boards_due(db):
+                                task_service.enqueue(db, "board_search")              # EXPERIMENTAL job boards, only when switched on
                         elif _every(last, "paused-log", 600): log.info("automatic crawling paused: %s%s", why, f" (next start {nxt})" if nxt else "")
                         last["state"] = ("running" if _inflight else "idle") if ok else "paused"; last["why"] = why
                     _now.update(state=last.get("state", "idle"), task=None, note=last.get("why", ""))
             except Exception: log.error("scheduler error: %s", traceback.format_exc())
             time.sleep(3)
+    log.info("worker stopped"); engine_dispose(); os._exit(0)                     # do not wait for hung scan threads
 
 
 POOL_SIZE = 40; STUCK_AFTER = 900                      # scans in flight at once; a scan older than 15 min is treated as hung and its slot is reused

@@ -9,7 +9,7 @@ from app.models import Task, Company, Job, User, Sponsor, EmailOutbox
 from app.services import task_service, maintenance_service, policy_service
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(operator_user)])
-KINDS = {"board_search", "discover_country", "scan_all", "scan_unscanned", "scan_company", "discover", "census", "internships", "broad_sources", "logos", "sponsors_refresh", "embed", "live_search"}
+KINDS = {"dedupe_jobs", "board_search", "discover_country", "scan_all", "scan_unscanned", "scan_company", "discover", "census", "internships", "broad_sources", "logos", "sponsors_refresh", "embed", "live_search"}
 
 
 class TaskIn(BaseModel):
@@ -37,6 +37,36 @@ def stats(db: Session = Depends(get_db)):
             "embedded_jobs": one("SELECT count(*) FROM jobs WHERE embedding IS NOT NULL"), "sponsors": one("SELECT count(*) FROM sponsors"),
             "saved_searches": one("SELECT count(*) FROM saved_searches"), "emails_pending": one("SELECT count(*) FROM email_outbox WHERE status='pending'"),
             "scan_outcomes": [dict(note=r[0], n=r[1]) for r in db.execute(text("SELECT split_part(scan_note,' (',1) n, count(*) FROM companies WHERE last_scan IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 12"))]}
+
+
+@router.get("/pipeline", summary="The crawler step by step: what each step does, when it runs, and what it did lately")
+def pipeline(db: Session = Depends(get_db)):
+    from app.services import schedule_service as sch, policy_service
+    from app.core.config import settings
+    one = lambda sql, **a: db.execute(text(sql), a).scalar()
+    last = lambda kinds: (lambda r: {"kind": r[0], "status": r[1], "at": (r[2] or r[3]).isoformat() if (r[2] or r[3]) else None} if r else None)(
+        db.execute(text("SELECT kind, status, finished_at, created_at FROM tasks WHERE kind = ANY(:k) ORDER BY id DESC LIMIT 1"), {"k": kinds}).first())
+    sc = sch.current(db); pol = policy_service.current()
+    return {
+        "discover": {"companies": one("SELECT count(*) FROM companies"), "by_source": [dict(source=r[0], n=r[1]) for r in db.execute(text(
+            "SELECT coalesce(split_part(source,' (',1),'seed list'), count(*) FROM companies GROUP BY 1 ORDER BY 2 DESC LIMIT 6"))],
+            "last": last(["discover", "discover_country", "broad_sources", "census"])},
+        "locate": {"with_careers_page": one("SELECT count(*) FROM companies WHERE careers_url IS NOT NULL OR ats_slug IS NOT NULL"),
+                   "with_job_system": one("SELECT count(*) FROM companies WHERE ats IS NOT NULL AND ats NOT LIKE 'board:%'"),
+                   "not_found": one("SELECT count(*) FROM companies WHERE scan_note ILIKE '%not found%'"), "never_visited": one("SELECT count(*) FROM companies WHERE last_scan IS NULL")},
+        "read": {"visited_hour": one("SELECT count(*) FROM companies WHERE last_scan > now() - interval '1 hour'"), "visited_day": one("SELECT count(*) FROM companies WHERE last_scan > now() - interval '1 day'"),
+                 "due": one("SELECT count(*) FROM companies WHERE (website IS NOT NULL OR ats_slug IS NOT NULL) AND (next_scan IS NULL OR next_scan <= now())"),
+                 "revisit_hours": sc["revisit_hours"], "parallel": sc["parallel"]},
+        "understand": {"open_jobs": one("SELECT count(*) FROM jobs WHERE status='open'"), "embedded": one("SELECT count(*) FROM jobs WHERE status='open' AND embedding IS NOT NULL"),
+                       "by_sector": [dict(key=r[0], n=r[1]) for r in db.execute(text("SELECT sector, count(*) FROM jobs WHERE status='open' GROUP BY 1 ORDER BY 2 DESC LIMIT 6"))],
+                       "by_mode": [dict(key=r[0], n=r[1]) for r in db.execute(text("SELECT work_mode, count(*) FROM jobs WHERE status='open' GROUP BY 1 ORDER BY 2 DESC"))]},
+        "keep": {"countries": pol["countries"], "keep_remote": pol["keep_remote"], "max_job_age_days": pol["max_job_age_days"], "delete_expired_after_days": pol["delete_expired_after_days"],
+                 "new_day": one("SELECT count(*) FROM jobs WHERE first_seen > now() - interval '1 day'"), "expired_day": one("SELECT count(*) FROM jobs WHERE status='expired' AND last_seen > now() - interval '1 day'")},
+        "notify": {"saved_searches": one("SELECT count(*) FROM saved_searches"), "alerts_day": one("SELECT count(*) FROM notifications WHERE created_at > now() - interval '1 day'"),
+                   "emails_pending": one("SELECT count(*) FROM email_outbox WHERE status='pending'")},
+        "boards": {"enabled": bool(settings.board_sites.strip()), "jobs": one("SELECT count(*) FROM jobs WHERE status='open' AND source LIKE 'board:%'"),
+                   "last": last(["board_search"]), "every_hours": settings.board_every_hours},
+    }
 
 
 @router.get("/worker", summary="Live view of the crawler worker: throughput, backlog and the latest scans")
@@ -68,6 +98,27 @@ def policy(db: Session = Depends(get_db)):
     from app.crawler import places
     return {**policy_service.current(), "defaults": policy_service.defaults(), "places": places.public(),
             "by_country": dict(db.execute(text("SELECT cc, count(*) FROM jobs, unnest(countries) cc WHERE status='open' GROUP BY 1 ORDER BY 2 DESC")).all()), "by_domain": {(r[0] or "unclassified"): r[1] for r in db.execute(text("SELECT domain, count(*) FROM jobs WHERE status='open' GROUP BY 1 ORDER BY 2 DESC"))}}
+
+
+class BoardPlanIn(BaseModel):
+    sites: list[str] = []
+    terms: list[str] = []
+    countries: list[str] = []
+
+
+@router.get("/boards", summary="EXPERIMENTAL job boards: are they on, each board's health, and what the next search will look for")
+def boards_overview(db: Session = Depends(get_db)):
+    from app.crawler import boards
+    from app.services import boards_service as bs
+    from app.core.config import settings
+    return {"enabled": bool(bs.configured()), "installed": boards.available(), "every_hours": settings.board_every_hours,
+            "health": bs.health(db), "plan": bs.plan(db)}
+
+
+@router.post("/boards/plan", summary="Preview a board search with your own terms / countries / boards (nothing runs)")
+def boards_plan(body: BoardPlanIn, db: Session = Depends(get_db)):
+    from app.services import boards_service as bs
+    return bs.plan(db, body.sites or None, body.terms or None, [c.upper() for c in body.countries] or None)
 
 
 class ScheduleIn(BaseModel):
@@ -172,8 +223,13 @@ CO_FILTERS = {
 CO_SORT = {"name": "name ASC", "last_scan": "last_scan DESC NULLS LAST", "jobs": "open_jobs DESC, name ASC", "failing": "fail_count DESC, name ASC", "newest": "id DESC"}
 
 
-def _co_where(q: str | None, status: str | None) -> tuple[str, dict]:
+def _co_where(q: str | None, status: str | None, country: str | None = None, city: str | None = None, source: str | None = None) -> tuple[str, dict]:
     w, a = ["TRUE"], {}
+    if country: w.append("c.country = :ct"); a["ct"] = country.upper()
+    if city: w.append("c.city ILIKE :cy"); a["cy"] = city
+    if source == "board": w.append("c.source LIKE 'board:%'")
+    elif source and source.startswith("board:"): w.append("c.source = :src"); a["src"] = source
+    elif source == "site": w.append("(c.source IS NULL OR c.source NOT LIKE 'board:%')")
     if q: w.append("(c.name ILIKE :q OR c.website ILIKE :q OR c.careers_url ILIKE :q)"); a["q"] = f"%{q}%"
     if status and status != "all":
         if status not in CO_FILTERS: raise HTTPException(400, f"status must be one of {['all', *CO_FILTERS]}")
@@ -191,12 +247,26 @@ def source_health(db: Session = Depends(get_db)):
     return {"totals": dict(tot), "by_ats": by_ats, "failing": failing}
 
 
+@router.get("/filters", summary="Values to filter the Companies and Jobs lists by, with counts")
+def filters(db: Session = Depends(get_db)):
+    rows = lambda sql: [dict(value=r[0], n=r[1]) for r in db.execute(text(sql)) if r[0]]
+    return {"companies": {"country": rows("SELECT country, count(*) FROM companies GROUP BY 1 ORDER BY 2 DESC"),
+                          "city": rows("SELECT city, count(*) FROM companies WHERE city IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 60"),
+                          "source": rows("SELECT CASE WHEN source LIKE 'board:%' THEN source ELSE 'site' END, count(*) FROM companies GROUP BY 1 ORDER BY 2 DESC")},
+            "jobs": {"country": rows("SELECT cc, count(*) FROM jobs, unnest(countries) cc WHERE status='open' GROUP BY 1 ORDER BY 2 DESC"),
+                     "city": rows("SELECT city, count(*) FROM jobs WHERE status='open' AND city IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 60"),
+                     "sector": rows("SELECT sector, count(*) FROM jobs WHERE status='open' GROUP BY 1 ORDER BY 2 DESC"),
+                     "work_mode": rows("SELECT work_mode, count(*) FROM jobs WHERE status='open' GROUP BY 1 ORDER BY 2 DESC"),
+                     "source": rows("SELECT CASE WHEN source LIKE 'board:%' THEN source ELSE 'site' END, count(*) FROM jobs WHERE status='open' GROUP BY 1 ORDER BY 2 DESC")}}
+
+
 @router.get("/companies", summary="Browse the companies the crawler knows")
-def list_companies(q: str | None = None, status: str | None = None, sort: str = "name", page: int = 1, limit: int = 25, db: Session = Depends(get_db)):
+def list_companies(q: str | None = None, status: str | None = None, country: str | None = None, city: str | None = None, source: str | None = None,
+                   sort: str = "name", page: int = 1, limit: int = 25, db: Session = Depends(get_db)):
     if sort not in CO_SORT: raise HTTPException(400, f"sort must be one of {sorted(CO_SORT)}")
-    limit = max(1, min(limit, 100)); where, a = _co_where(q, status)
+    limit = max(1, min(limit, 100)); where, a = _co_where(q, status, country, city, source)
     total = db.execute(text(f"SELECT count(*) FROM companies c WHERE {where}"), a).scalar()
-    rows = db.execute(text(f"""SELECT * FROM (SELECT c.id, c.name, c.website, c.careers_url, c.ats, c.city, c.source, c.last_scan, c.next_scan, c.scan_note, c.fail_count, c.notes,
+    rows = db.execute(text(f"""SELECT * FROM (SELECT c.id, c.name, c.website, c.careers_url, c.ats, c.city, c.country, c.source, c.last_scan, c.next_scan, c.scan_note, c.fail_count, c.notes,
         (SELECT count(*) FROM jobs j WHERE j.company_id = c.id AND j.status = 'open') open_jobs FROM companies c WHERE {where}) t ORDER BY {CO_SORT[sort]} LIMIT :l OFFSET :o"""),
         {**a, "l": limit, "o": (max(page, 1) - 1) * limit}).mappings().all()
     return {"items": [dict(r) for r in rows], "total": total, "page": page, "limit": limit}
@@ -271,8 +341,15 @@ def bulk_companies(body: BulkCompanies, db: Session = Depends(get_db)):
 JOB_SORT = {"newest": "j.first_seen DESC, j.id DESC", "oldest": "j.first_seen ASC, j.id ASC", "company": "c.name ASC, j.title ASC", "title": "j.title ASC"}
 
 
-def _job_where(q, status, domain, company_id, older_than_days, no_domain=False) -> tuple[str, dict]:
+def _job_where(q, status, domain, company_id, older_than_days, no_domain=False, country=None, city=None, sector=None, work_mode=None, source=None) -> tuple[str, dict]:
     w, a = ["TRUE"], {}
+    if country: w.append(":ct = ANY(j.countries)"); a["ct"] = country.upper()
+    if city: w.append("j.city ILIKE :cy"); a["cy"] = city
+    if sector: w.append("j.sector = :sec"); a["sec"] = sector
+    if work_mode: w.append("j.work_mode = :wm"); a["wm"] = work_mode
+    if source == "board": w.append("j.source LIKE 'board:%'")
+    elif source and source.startswith("board:"): w.append("j.source = :src"); a["src"] = source
+    elif source == "site": w.append("(j.source IS NULL OR j.source NOT LIKE 'board:%')")
     if q: w.append("(j.title ILIKE :q OR c.name ILIKE :q)"); a["q"] = f"%{q}%"
     if status and status != "all": w.append("j.status = :st"); a["st"] = status
     if domain: w.append("j.domain = :dm"); a["dm"] = domain
@@ -283,12 +360,13 @@ def _job_where(q, status, domain, company_id, older_than_days, no_domain=False) 
 
 @router.get("/jobs", summary="Browse stored jobs")
 def list_jobs(q: str | None = None, status: str | None = "open", domain: str | None = None, company_id: int | None = None, older_than_days: int | None = None,
+              country: str | None = None, city: str | None = None, sector: str | None = None, work_mode: str | None = None, source: str | None = None,
               sort: str = "newest", page: int = 1, limit: int = 25, db: Session = Depends(get_db)):
     if sort not in JOB_SORT: raise HTTPException(400, f"sort must be one of {sorted(JOB_SORT)}")
-    limit = max(1, min(limit, 100)); where, a = _job_where(q, status, domain, company_id, older_than_days)
+    limit = max(1, min(limit, 100)); where, a = _job_where(q, status, domain, company_id, older_than_days, country=country, city=city, sector=sector, work_mode=work_mode, source=source)
     base = f"FROM jobs j JOIN companies c ON c.id = j.company_id WHERE {where}"
     total = db.execute(text(f"SELECT count(*) {base}"), a).scalar()
-    rows = db.execute(text(f"""SELECT j.id, j.title, j.url, j.location, j.city, j.status, j.domain, j.job_type, j.posted_at, j.first_seen, j.last_seen, c.id company_id, c.name company,
+    rows = db.execute(text(f"""SELECT j.id, j.title, j.url, j.location, j.city, j.country, j.countries, j.work_mode, j.sector, j.source, j.status, j.domain, j.job_type, j.posted_at, j.first_seen, j.last_seen, c.id company_id, c.name company,
         (SELECT count(*) FROM user_jobs u WHERE u.job_id = j.id) saved_by {base} ORDER BY {JOB_SORT[sort]} LIMIT :l OFFSET :o"""), {**a, "l": limit, "o": (max(page, 1) - 1) * limit}).mappings().all()
     return {"items": [dict(r) for r in rows], "total": total, "page": page, "limit": limit}
 
@@ -302,6 +380,11 @@ class JobBulk(BaseModel):
     domain: str | None = None
     company_id: int | None = None
     older_than_days: int | None = None
+    country: str | None = None
+    city: str | None = None
+    sector: str | None = None
+    work_mode: str | None = None
+    source: str | None = None
     confirm: bool = False
 
 
@@ -311,7 +394,8 @@ def jobs_bulk(body: JobBulk, user: User = Depends(operator_user), db: Session = 
     if body.action == "delete" and user.role != "admin": raise HTTPException(403, "only an admin can delete jobs")
     if body.all_matching:
         if not body.confirm: raise HTTPException(400, "this changes every matching job: send confirm=true")
-        where, a = _job_where(body.q, body.status, body.domain, body.company_id, body.older_than_days)
+        where, a = _job_where(body.q, body.status, body.domain, body.company_id, body.older_than_days,
+                              country=body.country, city=body.city, sector=body.sector, work_mode=body.work_mode, source=body.source)
         ids = [r[0] for r in db.execute(text(f"SELECT j.id FROM jobs j JOIN companies c ON c.id = j.company_id WHERE {where}"), a)]
     else: ids = body.ids[:5000]
     if not ids: return {"changed": 0}
@@ -335,14 +419,30 @@ def export(what: str, db: Session = Depends(get_db)):
 
 
 # ------------------------------------------------------------------ task queue controls
-@router.post("/tasks/{tid}/cancel", summary="Cancel a queued task, or mark a stuck 'running' task as stopped")
+@router.post("/tasks/{tid}/cancel", summary="Stop a task: a queued one never starts, a running or paused one stops at its next step")
 def cancel_task(tid: int, db: Session = Depends(get_db)):
     import datetime as dt
     t = db.get(Task, tid)
     if not t: raise HTTPException(404)
-    if t.status in ("queued", "running"):
-        t.status, t.error, t.finished_at = "failed", "cancelled by operator", dt.datetime.now(dt.timezone.utc); db.commit()
-    return {"ok": True}
+    if t.status in ("queued", "running", "paused"):
+        t.status, t.error, t.finished_at = "failed", task_service.STOPPED, dt.datetime.now(dt.timezone.utc); db.commit()
+    return {"ok": True, "status": t.status}
+
+
+@router.post("/tasks/{tid}/pause", summary="Pause a running task at its next step (it keeps what it has done)")
+def pause_task(tid: int, db: Session = Depends(get_db)):
+    t = db.get(Task, tid)
+    if not t: raise HTTPException(404)
+    if t.status == "running": t.status = "paused"; db.commit()
+    return {"ok": True, "status": t.status}
+
+
+@router.post("/tasks/{tid}/resume", summary="Carry on with a paused task")
+def resume_task(tid: int, db: Session = Depends(get_db)):
+    t = db.get(Task, tid)
+    if not t: raise HTTPException(404)
+    if t.status == "paused": t.status = "running"; db.commit()
+    return {"ok": True, "status": t.status}
 
 
 @router.delete("/tasks", summary="Remove finished and failed tasks from the history")
