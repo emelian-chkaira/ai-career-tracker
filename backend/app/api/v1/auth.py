@@ -64,7 +64,25 @@ def me(user: User = Depends(current_user)): return user
 
 @router.put("/profile", response_model=UserOut)
 def update_profile(body: ProfileIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    user.profile = body.model_dump(); db.commit(); return user
+    from app.crawler import sectors
+    d = body.model_dump(exclude_unset=True, exclude_none=True)
+    if "sectors" in d: d["sectors"] = [x for x in dict.fromkeys(d["sectors"]) if x in sectors.SECTORS]
+    from app.crawler import places
+    if "countries" in d: d["countries"] = [c for c in dict.fromkeys(x.upper() for x in d["countries"]) if c in places.COUNTRIES]
+    if "regions" in d: d["regions"] = [r for r in dict.fromkeys(d["regions"]) if r in places.REGIONS and r != "world"]
+    if "work_modes" in d: d["work_modes"] = [m for m in dict.fromkeys(d["work_modes"]) if m in ("onsite", "hybrid", "remote")]
+    if "countries" in d and d["countries"]: d["country"] = d["countries"][0]
+    for k in ("skills", "titles", "cities", "keywords"):
+        if k in d: d[k] = [x.strip()[:80] for x in dict.fromkeys(d[k]) if x and x.strip()]
+    if "prefs" in d: d["prefs"] = {**(user.profile or {}).get("prefs", {}), **{k: v for k, v in d["prefs"].items() if isinstance(k, str) and len(k) <= 40}}
+    if len(str(d.get("prefs", ""))) > 4000: raise HTTPException(400, "preferences are too large")
+    user.profile = {**(user.profile or {}), **d}; db.commit()
+    out = UserOut.model_validate(user)
+    if "countries" in d or "regions" in d:                                         # your places drive the crawler
+        from app.services import coverage_service
+        try: out.crawl = coverage_service.ensure(db, user)
+        except ValueError: out.crawl = None
+    return out
 
 
 @router.post("/password", status_code=204)
@@ -76,7 +94,8 @@ def change_password(body: PasswordChangeIn, user: User = Depends(current_user), 
 
 @router.post("/verify/send", status_code=202)
 def resend_verification(request: Request, bg: BackgroundTasks, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    _limit(request)
+    # its own limit per account (not the sign-in limit per address), so a fresh sign-up can resend straight away
+    if not ratelimit.allow("verify-mail:" + str(user.id), 3, 600): raise HTTPException(429, "we already sent a few e-mails; check your spam folder or try again in 10 minutes")
     if settings.firebase_on: fb.resend_verification(db, user)
     else: acct.send_verification(db, user); bg.add_task(_flush_mail)
     return {"sent": not user.email_verified}

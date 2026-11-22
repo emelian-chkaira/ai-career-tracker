@@ -5,7 +5,7 @@ from sqlalchemy import select, update, func, delete
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 from app.core.config import settings
-from app.crawler import discovery, nl, scoring, dates, domains
+from app.crawler import discovery, nl, scoring, dates, domains, sectors, places
 from app.cvtools import cv as cvmod
 from app.models import Company, Job, JobSkill
 from app.services import sponsor_service, policy_service
@@ -21,7 +21,7 @@ now = lambda: dt.datetime.now(dt.timezone.utc)
 def looks_like_job(title, url): return not (NOT_JOB_URL.search(url or "") or NOT_JOB_TITLE.search(title or ""))
 def city_of(location: str) -> str | None:
     m = _CITY_PAT.search(location or "")
-    if not m: return None
+    if not m: return places.city_of(location)                                   # outside the Netherlands: the big cities of every covered country
     c = m.group(1).lower()
     return {"the hague": "Den Haag", "hague": "Den Haag", "haag": "Den Haag", "gravenhage": "Den Haag", "'s-gravenhage": "Den Haag", "bosch": "Den Bosch", "s-hertogenbosch": "Den Bosch", "'s-hertogenbosch": "Den Bosch"}.get(c, c.title())
 def money(text):
@@ -50,17 +50,35 @@ def add_company(db: Session, name, website=None, careers_url=None, kvk=None, cit
     return c
 
 
+_TLD = {"nl": "NL", "be": "BE", "lu": "LU", "de": "DE", "at": "AT", "ch": "CH", "uk": "GB", "ie": "IE", "fr": "FR", "es": "ES", "pt": "PT", "it": "IT", "pl": "PL", "cz": "CZ", "sk": "SK",
+        "hu": "HU", "ro": "RO", "bg": "BG", "gr": "GR", "dk": "DK", "se": "SE", "no": "NO", "fi": "FI", "ee": "EE", "lv": "LV", "lt": "LT", "si": "SI", "hr": "HR", "rs": "RS",
+        "ae": "AE", "sa": "SA", "qa": "QA", "kw": "KW", "bh": "BH", "om": "OM", "eg": "EG", "ma": "MA", "za": "ZA", "tr": "TR"}
+
+
+def place_of(location: str | None, url: str = "", source: str = "", company: Company | None = None, title: str = "") -> places.Place:
+    """Where the posting is. When the location names no country, fall back to the site's country (.de, workable-nl ...) or the company's."""
+    from urllib.parse import urlparse
+    p = places.parse(location, title)
+    if p.countries or p.remote_scope not in (None, "world") or (p.work_mode == "remote" and p.remote_scope == "world" and (location or "").strip().lower() not in ("remote", "")): return p
+    host = urlparse(url or "").netloc.lower(); tld = host.rsplit(".", 1)[-1] if "." in host else ""
+    guess = "NL" if ("werkenbij" in host or source.endswith("-nl")) else _TLD.get(tld) or (company.country if company is not None and company.country else None)
+    if guess: p.countries = [guess]; p.remote_scope = None                       # bare "Remote" on a Dutch site: remote within the Netherlands
+    return p
+
+
 def store_jobs(db: Session, company: Company, jobs: list[dict], source="company-site", expire=True) -> int:
     seen, new = set(), 0
     for j in jobs:
         url, title = j.get("url"), (j.get("title") or "").strip()
         if not url or not title or not looks_like_job(title, url): continue
         seen.add(url)
-        if not nl.is_nl(j.get("location"), url, source): continue
+        pol = policy_service.current()
+        pl = place_of(j.get("location"), url, source, company, title)
+        if not places.wanted(pl, pol["countries"], pol["keep_remote"]): continue        # storage policy: only the countries the operator crawls for
         desc = j.get("description") or ""
         sk = skills_of(title, desc)
         domain = domains.classify(title, desc, sk)
-        pol = policy_service.current(); keep = pol["keep_domains"]
+        keep = pol["keep_domains"]
         if keep and domain not in keep: continue                            # storage policy: only the domains the operator asked for
         lang = scoring.language(title, desc)
         jt = "internship" if j.get("kind") == "internship" and scoring.job_type(title, j.get("location", "")) in ("job", "junior") else scoring.job_type(title, j.get("location", ""))
@@ -77,8 +95,8 @@ def store_jobs(db: Session, company: Company, jobs: list[dict], source="company-
             continue
         if db.scalar(select(Job.id).where(Job.dedupe_key == dk, Job.status == "open")):
             continue                                                        # same posting under another URL
-        job = Job(company_id=company.id, title=title, location=loc, city=city_of(loc), url=url, source=source, description=desc, category=nl.category(title), domain=domain,
-                  job_type=jt, language=lang, remote=bool(re.search(r"\bremote\b|\bhybrid\b", loc, re.I)), salary_min=lo, salary_max=hi, salary_period=per,
+        job = Job(company_id=company.id, title=title, location=loc, city=city_of(loc), url=url, source=source, description=desc, category=sectors.category_of(sec := sectors.classify(title)), sector=sec, country=pl.country or "NL", countries=pl.countries, work_mode=pl.work_mode, remote_scope=pl.remote_scope, domain=domain,
+                  job_type=jt, language=lang, remote=pl.work_mode != "onsite", salary_min=lo, salary_max=hi, salary_period=per,
                   posted_at=posted, dedupe_key=dk)
         job.skills = [JobSkill(skill=s) for s in sk]
         db.add(job); new += 1
@@ -115,7 +133,8 @@ def scan_company(db: Session, company_id: int) -> int:
     c.sponsor_status, c.sponsor_match = sponsor_service.check(db, c.name, c.kvk)
     failed = n == 0 and any(k in r["note"] for k in ("not found", "no careers", "error"))
     c.fail_count = 0 if n else min((c.fail_count or 0) + (1 if failed else 0), 6)
-    hours = 12 if n else 168 * (1 + c.fail_count)                                  # back off on dead ends
+    from . import schedule_service
+    hours = schedule_service.current()["revisit_hours"] if n else 168 * (1 + c.fail_count)      # back off on dead ends
     c.next_scan = now() + dt.timedelta(hours=hours)
     db.commit()
     ensure_logo(db, c); db.commit()

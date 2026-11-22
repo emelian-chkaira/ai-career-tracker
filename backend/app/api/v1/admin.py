@@ -9,7 +9,7 @@ from app.models import Task, Company, Job, User, Sponsor, EmailOutbox
 from app.services import task_service, maintenance_service, policy_service
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(operator_user)])
-KINDS = {"scan_all", "scan_unscanned", "scan_company", "discover", "census", "internships", "broad_sources", "logos", "sponsors_refresh", "embed", "live_search"}
+KINDS = {"discover_country", "scan_all", "scan_unscanned", "scan_company", "discover", "census", "internships", "broad_sources", "logos", "sponsors_refresh", "embed", "live_search"}
 
 
 class TaskIn(BaseModel):
@@ -50,7 +50,12 @@ def worker(db: Session = Depends(get_db)):
     total = one("SELECT count(*) FROM companies WHERE (website IS NOT NULL OR ats_slug IS NOT NULL) AND coalesce(ats,'') NOT LIKE 'board:%'")
     due = one("SELECT count(*) FROM companies WHERE (website IS NOT NULL OR ats_slug IS NOT NULL) AND coalesce(ats,'') NOT LIKE 'board:%' AND (next_scan IS NULL OR next_scan <= now())")
     last10 = one("SELECT count(*) FROM companies WHERE last_scan > now() - interval '10 minutes'")
-    return {"running": idle is not None and idle < 300, "idle_seconds": int(idle) if idle is not None else None,
+    from app.services import schedule_service
+    st = schedule_service.status(db)
+    running_tasks = [{"id": r[0], "kind": r[1], "started_at": r[2].isoformat() if r[2] else None, "progress": r[3]} for r in db.execute(text(
+        "SELECT id, kind, started_at, progress FROM tasks WHERE status='running' ORDER BY started_at DESC LIMIT 5"))]
+    return {"running": st["state"] in ("running", "idle") and idle is not None and idle < 300, "idle_seconds": int(idle) if idle is not None else None,
+            "status": st, "tasks": running_tasks, "schedule": schedule_service.current(db),
             "total": total, "due": due, "per_min": per_min, "recent": recent,
             "rate_per_min": round(last10 / 10, 1), "eta_minutes": round(due / (last10 / 10)) if last10 else None,
             "open_jobs": one("SELECT count(*) FROM jobs WHERE status='open'"),
@@ -60,10 +65,39 @@ def worker(db: Session = Depends(get_db)):
 
 @router.get("/policy", summary="The storage policy in effect (env defaults + overrides saved from the Crawler page)")
 def policy(db: Session = Depends(get_db)):
-    return {**policy_service.current(), "defaults": policy_service.defaults(), "by_domain": {(r[0] or "unclassified"): r[1] for r in db.execute(text("SELECT domain, count(*) FROM jobs WHERE status='open' GROUP BY 1 ORDER BY 2 DESC"))}}
+    from app.crawler import places
+    return {**policy_service.current(), "defaults": policy_service.defaults(), "places": places.public(),
+            "by_country": dict(db.execute(text("SELECT cc, count(*) FROM jobs, unnest(countries) cc WHERE status='open' GROUP BY 1 ORDER BY 2 DESC")).all()), "by_domain": {(r[0] or "unclassified"): r[1] for r in db.execute(text("SELECT domain, count(*) FROM jobs WHERE status='open' GROUP BY 1 ORDER BY 2 DESC"))}}
+
+
+class ScheduleIn(BaseModel):
+    enabled: bool = True
+    days: list[int] = [0, 1, 2, 3, 4, 5, 6]
+    start: str = "00:00"
+    end: str = "24:00"
+    tz: str = "Europe/Amsterdam"
+    revisit_hours: int = 12
+    parallel: int = 20
+
+
+@router.get("/schedule", summary="When the crawler visits career sites on its own, and whether that is now")
+def get_schedule(db: Session = Depends(get_db)):
+    from app.services import schedule_service as sch
+    v = sch.current(db); ok, why, nxt = sch.window(v)
+    return {**v, "allowed_now": ok, "why": why, "next_start": nxt}
+
+
+@router.put("/schedule", dependencies=[Depends(admin_user)], summary="Save the crawl schedule (the worker follows it within seconds)")
+def put_schedule(body: ScheduleIn, db: Session = Depends(get_db)):
+    from app.services import schedule_service as sch
+    try: v = sch.save(db, body.model_dump())
+    except ValueError as e: raise HTTPException(400, str(e))
+    ok, why, nxt = sch.window(v); return {**v, "allowed_now": ok, "why": why, "next_start": nxt}
 
 
 class PolicyIn(BaseModel):
+    countries: list[str] | None = None            # ISO codes to store jobs for; None = keep the current list
+    keep_remote: bool | None = None
     keep_domains: list[str] = []
     max_job_age_days: int = 0
     delete_expired_after_days: int = 0
@@ -71,7 +105,7 @@ class PolicyIn(BaseModel):
 
 @router.put("/policy", dependencies=[Depends(admin_user)], summary="Save the storage policy (takes effect for the API and the worker within seconds)")
 def set_policy(body: PolicyIn, db: Session = Depends(get_db)):
-    try: policy_service.save(db, body.keep_domains, body.max_job_age_days, body.delete_expired_after_days)
+    try: policy_service.save(db, body.keep_domains, body.max_job_age_days, body.delete_expired_after_days, body.countries, body.keep_remote)
     except ValueError as e: raise HTTPException(400, str(e))
     return policy(db)
 
@@ -145,6 +179,16 @@ def _co_where(q: str | None, status: str | None) -> tuple[str, dict]:
         if status not in CO_FILTERS: raise HTTPException(400, f"status must be one of {['all', *CO_FILTERS]}")
         w.append(CO_FILTERS[status])
     return " AND ".join(w), a
+
+
+@router.get("/source-health", summary="How healthy is the crawl: per-ATS coverage, failing and stale companies")
+def source_health(db: Session = Depends(get_db)):
+    by_ats = [dict(r) for r in db.execute(text("""SELECT coalesce(c.ats, 'unknown') AS ats, count(*) AS companies, count(*) FILTER (WHERE c.fail_count >= 3) AS failing,
+        coalesce(sum((SELECT count(*) FROM jobs j WHERE j.company_id = c.id AND j.status = 'open')), 0) AS open_jobs FROM companies c GROUP BY 1 ORDER BY companies DESC""")).mappings()]
+    tot = db.execute(text("""SELECT count(*) AS companies, count(*) FILTER (WHERE last_scan IS NULL) AS never_scanned, count(*) FILTER (WHERE fail_count >= 3) AS failing,
+        count(*) FILTER (WHERE last_scan < now() - interval '14 days') AS stale FROM companies""")).mappings().one()
+    failing = [dict(r) for r in db.execute(text("""SELECT id, name, ats, fail_count, last_scan, scan_note FROM companies WHERE fail_count >= 3 ORDER BY fail_count DESC, last_scan LIMIT 30""")).mappings()]
+    return {"totals": dict(tot), "by_ats": by_ats, "failing": failing}
 
 
 @router.get("/companies", summary="Browse the companies the crawler knows")

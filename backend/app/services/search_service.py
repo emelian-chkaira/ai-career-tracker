@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from app.crawler import search as onto
 from . import embedding_service
 
-Sort = Literal["relevance", "newest", "oldest", "salary", "fit"]
+Sort = Literal["relevance", "newest", "oldest", "salary", "fit", "ai_fit"]
 Mode = Literal["hybrid", "keyword", "semantic"]
 
 
@@ -27,13 +27,22 @@ class SearchParams(BaseModel):
     q: str = ""
     mode: Mode = "hybrid"
     sort: Sort | None = None                       # default: relevance when q is given, else newest
-    category: str | None = "tech"                   # tech | other | None(all)
+    category: str | None = None                     # legacy: tech | other (use `sector`)
+    scope: Literal["mine", "all"] = "all"          # mine: the signed-in user's profile fills every filter left empty (sector, country, cities, level...)
+    sector: list[str] = []                          # tech | architecture | engineering | design | finance | ... (GET /meta/sectors)
+    country: list[str] = []                         # ISO codes: NL, BE, DE, AE ... (a job in several countries matches any of them)
+    region: list[str] = []                          # benelux | dach | nordics | uk_ie | south | cee | eu | europe | gcc | middle_east | mena | africa | emea
+    work_mode: list[str] = []                       # onsite | hybrid | remote
+    remote_open: bool = True                        # with a country/region filter: also show remote jobs open to it ("Remote - Europe", "Anywhere")
     kind: Literal["job", "internship"] | None = None
     job_type: list[str] = []                        # internship | traineeship | junior | job | senior
     domain: list[str] = []                          # mobile | backend | frontend | fullstack | software | data | devops | security | qa | embedded | design | product | other
     language: list[str] = []                        # english_ok | dutch_plus | dutch_required
     city: list[str] = []
+    near_cities: list[str] = []                     # set from the profile: these cities OR remote (an explicit `city` filter wins)
     location: str | None = None
+    near: str | None = None                        # radius search: a Dutch city ...
+    radius_km: int | None = Field(None, ge=1, le=200)   # ... and how far around it
     remote: bool | None = None
     sponsor: bool | None = None                     # only companies on the IND recognised-sponsor register (flag, not a default filter)
     skills: list[str] = []
@@ -64,13 +73,26 @@ def parse_query(q: str) -> dict:
 
 def _filters(p: SearchParams) -> tuple[str, dict]:
     w, a = ["j.status = :status"], {"status": p.status}
-    if p.category: w.append("j.category = :category"); a["category"] = p.category
+    if p.category and not p.sector: w.append("j.category = :category"); a["category"] = p.category
+    if p.sector: w.append("j.sector = ANY(:sectors)"); a["sectors"] = p.sector
+    if p.country or p.region:
+        from app.crawler import places
+        cs = places.expand(p.country, p.region); a["countries"] = cs or ["--"]
+        if p.remote_open: w.append("(j.countries && CAST(:countries AS varchar[]) OR (j.work_mode = 'remote' AND j.remote_scope = ANY(:scopes)))"); a["scopes"] = places.scopes_for(cs)
+        else: w.append("j.countries && CAST(:countries AS varchar[])")
+    if p.work_mode: w.append("j.work_mode = ANY(:modes)"); a["modes"] = p.work_mode
+    if p.near_cities and not p.city and not p.near: w.append("(lower(j.city) = ANY(:mycities) OR j.remote)"); a["mycities"] = [c.lower() for c in p.near_cities]
     if p.kind == "internship": w.append("j.job_type IN ('internship','traineeship')")
     elif p.kind == "job": w.append("j.job_type NOT IN ('internship','traineeship')")
     if p.job_type: w.append("j.job_type = ANY(:job_types)"); a["job_types"] = p.job_type
     if p.domain: w.append("j.domain = ANY(:domains)"); a["domains"] = p.domain
     if p.language: w.append("j.language = ANY(:langs)"); a["langs"] = p.language
     if p.city: w.append("lower(j.city) = ANY(:cities)"); a["cities"] = [c.lower() for c in p.city]
+    if p.near and p.radius_km:
+        from . import geo
+        near = geo.within(p.near, p.radius_km)
+        if near is not None: w.append("(lower(j.city) = ANY(:near) OR j.remote)"); a["near"] = near
+        else: w.append("lower(j.city) = :nearone"); a["nearone"] = p.near.strip().lower()          # unknown city: exact match only
     if p.location: w.append("j.location ILIKE :loc"); a["loc"] = f"%{p.location}%"
     if p.remote is not None: w.append("j.remote = :remote"); a["remote"] = p.remote
     if p.sponsor: w.append("c.sponsor_status IN ('recognised','possible')")
@@ -196,11 +218,12 @@ def run(db: Session, p: SearchParams) -> dict:
 
 
 def facets(db: Session, ids: list[int]) -> dict:
-    if not ids: return {k: [] for k in ("category", "job_type", "domain", "city", "language", "skills", "companies", "sponsor", "remote")}
+    if not ids: return {k: [] for k in ("category", "sector", "country", "work_mode", "job_type", "domain", "city", "language", "skills", "companies", "sponsor", "remote")}
     a = {"ids": ids[:5000]}
     g = lambda col: [dict(value=r[0], count=r[1]) for r in db.execute(text(f"SELECT {col}, count(*) n FROM jobs j WHERE j.id = ANY(:ids) AND {col} IS NOT NULL GROUP BY {col} ORDER BY n DESC LIMIT 15"), a).all()]
     return {
-        "category": g("j.category"), "job_type": g("j.job_type"), "domain": g("j.domain"), "city": g("j.city"), "language": g("j.language"),
+        "category": g("j.category"), "sector": g("j.sector"), "work_mode": g("j.work_mode"),
+        "country": [dict(value=r[0], count=r[1]) for r in db.execute(text("SELECT c, count(*) n FROM jobs j, unnest(j.countries) c WHERE j.id = ANY(:ids) GROUP BY c ORDER BY n DESC LIMIT 40"), a).all()], "job_type": g("j.job_type"), "domain": g("j.domain"), "city": g("j.city"), "language": g("j.language"),
         "skills": [dict(value=r[0], count=r[1]) for r in db.execute(text("SELECT s.skill, count(*) n FROM job_skills s WHERE s.job_id = ANY(:ids) GROUP BY s.skill ORDER BY n DESC LIMIT 20"), a).all()],
         "companies": [dict(id=r[0], value=r[1], count=r[2]) for r in db.execute(text("SELECT c.id, c.name, count(*) n FROM jobs j JOIN companies c ON c.id=j.company_id WHERE j.id = ANY(:ids) GROUP BY c.id, c.name ORDER BY n DESC LIMIT 10"), a).all()],
         "sponsor": db.execute(text("SELECT count(*) FROM jobs j JOIN companies c ON c.id=j.company_id WHERE j.id = ANY(:ids) AND c.sponsor_status IN ('recognised','possible')"), a).scalar(),

@@ -1,11 +1,12 @@
 from typing import Annotated
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, Query, HTTPException, Request
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session, selectinload
 from app.core import ratelimit
 from app.core.config import settings
 from app.core.db import get_db
-from app.core.deps import optional_user, client_ip
+from app.core.deps import optional_user, current_user, client_ip
 from app.models import Job, User, UserJob
 from app.schemas.job import JobOut, SearchOut
 from app.services import jobs_service, search_service as ss, task_service
@@ -22,6 +23,43 @@ def list_jobs(p: Annotated[ss.SearchParams, Query()], db: Session = Depends(get_
 @router.post("/search", response_model=SearchOut, summary="Same as GET /jobs, parameters in the JSON body (used by saved searches)")
 def search_post(p: ss.SearchParams, db: Session = Depends(get_db), user: User | None = Depends(optional_user)):
     return jobs_service.search(db, p, user)
+
+
+@router.get("/sectors", summary="Sector presets (label, suggested titles and skills) and countries, with how many open jobs each has")
+def sectors_list(db: Session = Depends(get_db)):
+    from sqlalchemy import text
+    from app.crawler import sectors
+    n = dict(db.execute(text("SELECT sector, count(*) FROM jobs WHERE status='open' GROUP BY 1")).all())
+    from app.crawler import places
+    c = dict(db.execute(text("SELECT cc, count(*) FROM jobs, unnest(countries) cc WHERE status='open' GROUP BY 1")).all())
+    m = dict(db.execute(text("SELECT work_mode, count(*) FROM jobs WHERE status='open' GROUP BY 1")).all())
+    geo = places.public()
+    return {"sectors": [{**x, "jobs": n.get(x["key"], 0)} for x in sectors.public()],
+            "countries": [{**x, "jobs": c.get(x["code"], 0)} for x in geo["countries"]],
+            "regions": [{**r, "jobs": db.execute(text("SELECT count(*) FROM jobs WHERE status='open' AND countries && CAST(:cs AS varchar[])"), {"cs": r["countries"]}).scalar()} for r in geo["regions"]],
+            "work_modes": [{"key": k, "label": l, "jobs": m.get(k, 0)} for k, l in (("onsite", "On-site"), ("hybrid", "Hybrid"), ("remote", "Remote"))]}
+
+
+@router.get("/coverage", summary="How far the crawler is for these countries/regions (default: your preferences): collected, jobs, employers, still to read")
+def coverage(country: list[str] = Query([]), region: list[str] = Query([]), db: Session = Depends(get_db), user: User | None = Depends(optional_user)):
+    from app.crawler import places
+    from app.services import coverage_service
+    codes = places.expand(country, region) if (country or region) else (coverage_service.wanted_countries(user.profile or {}) if user else [])
+    return coverage_service.report(db, codes)
+
+
+class CollectIn(BaseModel):
+    country: list[str] = []
+    region: list[str] = []
+
+
+@router.post("/coverage/collect", summary="Ask the crawler to start collecting these countries (signed-in users; admins only when the crawler is closed)")
+def collect(body: CollectIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    from app.crawler import places
+    from app.services import coverage_service
+    codes = places.expand(body.country, body.region)
+    if len(codes) > 60: raise HTTPException(400, "too many countries at once")
+    return coverage_service.ensure(db, user, codes)
 
 
 @router.get("/suggest", summary="Autocomplete: skills, companies, job titles, concepts")
@@ -60,4 +98,8 @@ def job_detail(job_id: int, db: Session = Depends(get_db), user: User | None = D
             db.commit()
         except Exception: db.rollback()
     stage = db.get(UserJob, (user.id, j.id)) if user else None
-    return jobs_service.to_out(j, user, {j.id: stage.stage} if stage else {}, full=True)
+    ai = None
+    if user:
+        from app.services import fit_service
+        ai = fit_service.out(fit_service.scores_for(db, user.id, [j.id]).get(j.id))
+    return jobs_service.to_out(j, user, {j.id: stage.stage} if stage else {}, full=True, ai=ai)

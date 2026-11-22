@@ -83,14 +83,14 @@ def wikipedia_search(keyword, limit=30):
     return _titles_to_companies([r["title"] for r in d.get("query", {}).get("search", [])])
 
 
-def europeantechmap(progress=None, max_pages=40):
+def europeantechmap(progress=None, max_pages=40, country="netherlands"):
     """europeantechmap.eu (robots.txt allows crawling, /claim/ excluded): Netherlands listing pages -> company pages -> JSON-LD provider name + website.
     Polite: robots honoured and 1 request/second via discovery.get."""
     from . import discovery
     base = "https://europeantechmap.eu"
     slugs = []
     for pg in range(1, max_pages + 1):
-        html = discovery.get(f"{base}/country/netherlands?page={pg}")
+        html = discovery.get(f"{base}/country/{country}?page={pg}")
         found = [x for x in dict.fromkeys(re.findall(r'href="/company/([^"#?]+)"', html or "")) if x not in slugs]
         if not found: break
         slugs += found
@@ -105,7 +105,7 @@ def europeantechmap(progress=None, max_pages=40):
             if d.get("@type") == "SoftwareApplication":
                 pr = d.get("provider") or {}
                 name = (pr.get("name") or d.get("name") or "").strip(); site = (pr.get("url") or "").strip()
-                name = re.sub(r"\s+(B\.?V\.?|N\.?V\.?)$", "", name, flags=re.I)
+                name = re.sub(r"\s+(B\.?V\.?|N\.?V\.?|GmbH|AG|S\.?p\.?A\.?|S\.?r\.?l\.?|S\.?A\.?|Sp\. z o\.o\.|Ltd\.?|LLC|FZ-?LLC|FZE)$", "", name, flags=re.I)
                 if name and site.startswith("http"): out.append((name, site))
                 break
     return out
@@ -144,3 +144,35 @@ out tags center 3000;'''
         if progress: progress(f"OpenStreetMap by city: {i + 1}/{len(set(CITIES_NL))} cities · {len(out)} companies")
         time.sleep(2)
     return out
+
+
+def overpass_offices(cities: list[str], progress=None, per_city_pause=2.0):
+    """OpenStreetMap offices with a website in these cities (any country): IT, software, engineering, research, telecom, architecture."""
+    import time
+    out, seen = [], set()
+    for i, city in enumerate(dict.fromkeys(cities)):
+        q = f'''[out:json][timeout:90];
+area["name"="{city}"]["boundary"="administrative"]->.a;
+(nwr["office"~"^(it|software|research|telecommunication|engineering|architect|company|consulting|financial|advertising_agency)$"]["website"](area.a););
+out tags center 2000;'''
+        try: els = _curl("https://overpass-api.de/api/interpreter", data=q, timeout=100).get("elements", [])
+        except Exception: els = []
+        for e in els:
+            t = e.get("tags", {}); name, site = t.get("name:en") or t.get("name"), t.get("website") or t.get("contact:website")
+            if not name or not site: continue
+            if not site.startswith("http"): site = "https://" + site
+            key = (name.lower(), site.lower())
+            if key in seen: continue
+            seen.add(key); out.append((name, site, t.get("addr:city") or city))
+        if progress: progress(f"OpenStreetMap: {i + 1}/{len(cities)} cities · {len(out)} companies")
+        time.sleep(per_city_pause)
+    return out
+
+
+def wikipedia_country(country_name: str, limit=50):
+    """Free text search: companies headquartered in the country -> their official websites (via Wikidata)."""
+    out = []
+    for kw in ("software company", "technology company", "engineering company", "architecture firm", "bank"):
+        d = _curl("https://en.wikipedia.org/w/api.php", {"action": "query", "list": "search", "srsearch": f"{kw} headquartered in {country_name}", "srlimit": limit // 5, "format": "json"})
+        out += [r["title"] for r in d.get("query", {}).get("search", [])]
+    return _titles_to_companies(list(dict.fromkeys(out)))

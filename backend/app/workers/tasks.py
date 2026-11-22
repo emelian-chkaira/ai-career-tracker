@@ -67,6 +67,33 @@ def discover(t, db):
     task_service.progress(db, t, log=logs)
 
 
+def discover_country(t, db):
+    """Find employers in one country (payload {"country": "DE"}): European Tech Map, OpenStreetMap offices in its big cities, Wikipedia.
+    New companies get that country, so their postings are kept once the country is in the crawl list."""
+    from app.crawler import places
+    code = str((t.payload or {}).get("country", "")).upper()
+    if code not in places.COUNTRIES: raise ValueError(f"unknown country {code!r}")
+    name, _alts, cities = places.COUNTRIES[code]; logs = []
+    def add(src, items):
+        n = 0
+        for it in items:
+            nm, site, city = (it + (None,))[:3]
+            if not nm or re.fullmatch(r"Q\d+", nm): continue
+            new = not db.scalar(select(Company.id).where(Company.name == nm))
+            c = ing.add_company(db, nm, website=site, city=city, source=f"{src} ({code})"[:60])
+            if new:
+                n += 1
+                if src != "Wikipedia": c.country = code                            # located in that country (map or country listing); a text search is not proof
+        db.commit(); logs.append(f"{src}: {len(items)} found, {n} new"); task_service.progress(db, t, country=code, log=logs)
+    srcs = []
+    if code in places.REGIONS["europe"][1]: srcs.append(("European Tech Map", lambda: free_discovery.europeantechmap(None, 25, name.lower().replace(" ", "-"))))
+    srcs += [("OpenStreetMap offices", lambda: free_discovery.overpass_offices([c.title() for c in cities[:12]], lambda m: task_service.progress(db, t, country=code, log=logs + [m]))),
+             ("Wikipedia", lambda: free_discovery.wikipedia_country(name))]
+    for src, fn in srcs:
+        try: add(src, fn())
+        except Exception as e: logs.append(f"{src}: failed ({e})"); task_service.progress(db, t, country=code, log=logs)
+
+
 def logos(t, db):
     ids = list(db.scalars(select(Company.id).where(Company.website.is_not(None), (Company.logo.is_(None)) | (Company.description.is_(None)))))
     task_service.progress(db, t, total=len(ids), done=0)
@@ -208,7 +235,7 @@ def mail_sync(t: Task, db):
         from app.services import gmail_service
         mails = gmail_service.fetch(unseal(acc.secret_enc) or "", days=days)
         task_service.progress(db, t, phase="analysing", total=len(mails))
-        stats = mail_classifier.process(db, uid, cfg, mails, account_id=acc.id, progress=lambda **k: task_service.progress(db, t, **k))
+        stats = mail_classifier.process(db, uid, cfg, mails, account_id=acc.id, progress=lambda **k: task_service.progress(db, t, **k), auto_apply=(0.9 if p.get("auto_apply") else None))
         import datetime as _dt
         acc.last_sync_at, acc.last_error = _dt.datetime.now(_dt.timezone.utc), None; db.commit()
         task_service.progress(db, t, phase="done", **stats)

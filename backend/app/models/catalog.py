@@ -1,6 +1,6 @@
 import datetime as dt
 from sqlalchemy import String, Text, Integer, Float, Boolean, Date, DateTime, ForeignKey, Index, Computed, func, text
-from sqlalchemy.dialects.postgresql import TSVECTOR
+from sqlalchemy.dialects.postgresql import TSVECTOR, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from pgvector.sqlalchemy import Vector
 from app.core.db import Base
@@ -27,6 +27,7 @@ class Company(Base):
     kvk: Mapped[str | None] = mapped_column(String(16))
     logo: Mapped[str | None] = mapped_column(String(255))
     city: Mapped[str | None] = mapped_column(String(120), index=True)
+    country: Mapped[str] = mapped_column(String(2), default="NL", server_default="NL", index=True)
     address: Mapped[str | None] = mapped_column(Text)
     description: Mapped[str | None] = mapped_column(Text)
     source: Mapped[str | None] = mapped_column(String(60))
@@ -49,6 +50,11 @@ class Job(Base):
     source: Mapped[str | None] = mapped_column(String(40), default="company-site")
     description: Mapped[str | None] = mapped_column(Text)
     category: Mapped[str] = mapped_column(String(16), default="other", index=True)   # tech | other
+    sector: Mapped[str] = mapped_column(String(24), default="other", server_default="other", index=True)   # tech | architecture | engineering | ... (crawler/sectors.py)
+    country: Mapped[str] = mapped_column(String(2), default="NL", server_default="NL", index=True)            # ISO code of the first place named
+    countries: Mapped[list[str]] = mapped_column(ARRAY(String(2)), default=list, server_default="{}")        # every country the posting names
+    work_mode: Mapped[str] = mapped_column(String(8), default="onsite", server_default="onsite", index=True)  # onsite | hybrid | remote
+    remote_scope: Mapped[str | None] = mapped_column(String(16))                                              # remote jobs: region open to (europe, emea, world...)
     domain: Mapped[str | None] = mapped_column(String(16), index=True)               # mobile | backend | frontend | data | devops … (see crawler/domains.py)
     job_type: Mapped[str] = mapped_column(String(16), default="job", index=True)     # internship | traineeship | junior | job | senior
     language: Mapped[str] = mapped_column(String(20), default="english_ok")

@@ -17,9 +17,14 @@ class JobOut(BaseModel):
     company: CompanyMini
     location: str | None = None
     city: str | None = None
+    country: str | None = None
+    countries: list[str] = []
+    work_mode: str = "onsite"
+    remote_scope: str | None = None
     url: str
     job_type: str
     category: str
+    sector: str | None = None
     domain: str | None = None
     language: str
     remote: bool = False
@@ -33,6 +38,7 @@ class JobOut(BaseModel):
     matched: list[str] = []
     fit: int | None = None
     fit_reason: str | None = None
+    ai: dict | None = None                # AI assessment against the user's CV: {score, verdict, reason, ...}
     stage: str | None = None              # the signed-in user's pipeline stage
     description: str | None = None        # only on the detail endpoint
 

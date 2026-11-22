@@ -1,6 +1,6 @@
 """Typed settings from environment variables / .env (12-factor). Nothing deployment-specific is hard-coded elsewhere."""
 from functools import lru_cache
-from pydantic import Field, AliasChoices
+from pydantic import Field, AliasChoices, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     verify_ttl_hours: int = 48
     reset_ttl_min: int = 60
     # --- what to store (apply on ingest, and via the Prune action to existing data) ---
+    crawl_countries: str = "NL"                   # comma list of ISO codes to store jobs for (NL, BE, DE, AE ...), or region keys (benelux, dach, europe, gcc, emea). Empty = everywhere
+    keep_remote: bool = True                      # also store remote jobs that are open to those countries ("Remote - Europe", "Anywhere")
     keep_domains: str = ""                        # comma list of: mobile, frontend, backend, fullstack, software, data, devops, security, qa, embedded, design, product, other. Empty = store every domain
     max_job_age_days: int = 0                     # 0 = no limit. Otherwise skip jobs posted longer ago than this, and delete stored ones that got older
     delete_expired_after_days: int = 60           # jobs no longer on the employer's page are deleted after this many days (0 = keep forever). Saved/pipeline jobs are never deleted
@@ -58,6 +60,14 @@ class Settings(BaseSettings):
     # --- optional
     anthropic_api_key: str | None = None
     latex_compile: bool = True
+
+    @field_validator("database_url")
+    @classmethod
+    def _driver(cls, v: str) -> str:
+        """Hosted databases (Neon, Supabase, Render ...) hand out plain postgres:// URLs: use the psycopg 3 driver."""
+        for pre in ("postgres://", "postgresql://"):
+            if v.startswith(pre): return "postgresql+psycopg://" + v[len(pre):]
+        return v
 
     @property
     def user_agent(self) -> str: return f"nl-career-tracker/0.3 (+{self.contact})"

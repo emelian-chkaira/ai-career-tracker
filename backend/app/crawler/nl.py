@@ -9,6 +9,8 @@ CITIES = ("amsterdam rotterdam utrecht eindhoven den haag the hague 's-gravenhag
           "venray weert kerkrade brunssum eijsden zutphen doetinchem winterswijk tiel zevenaar harderwijk ermelo elst wijchen boxtel vught haaren oisterwijk goirle dongen geldrop mierlo eindhoven-airport "
           "capelle aan den ijssel krimpen alphen aan den rijn nieuwkoop boskoop hattem hardinxveld").split(" ")
 PROV = r"noord-holland|zuid-holland|noord-brabant|north brabant|north holland|south holland|gelderland|overijssel|flevoland|limburg|drenthe|friesland|fryslân|zeeland|groningen"
+_NOT_PLACES = {"de", "den", "the", "op", "aan", "best", "son", "en"}          # halves of "de bilt", "the hague", "bergen op zoom"...: never a place on their own
+CITIES = tuple(c for c in CITIES if c and c not in _NOT_PLACES) + ("den haag", "den bosch", "den helder", "de bilt", "the hague", "bergen op zoom", "alphen aan den rijn", "capelle aan den ijssel", "son en breugel", "de meern", "de lier", "den dolder")
 _c = [re.escape(c.replace("-", " ")).replace(r"\ ", r"[ -]") for c in CITIES if c]
 NL_RE = re.compile(r"netherlands|nederland|\b(holland|nld|nl)\b|" + PROV + r"|\b(" + "|".join(_c) + r")\b", re.I)
 def is_nl(location, url="", source=""):

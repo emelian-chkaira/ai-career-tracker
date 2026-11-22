@@ -8,7 +8,7 @@ from sqlalchemy import select, exists
 from app.core.db import SessionLocal
 from app.core.config import settings
 from app.models import Company, Job
-from app.services import task_service, alert_service, sponsor_service, maintenance_service
+from app.services import task_service, alert_service, tracking_service, sponsor_service, maintenance_service, schedule_service
 from . import tasks, embeddings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -17,11 +17,23 @@ log = logging.getLogger("worker")
 STOP = False
 HANDLERS = {
     "scan_all": lambda t, db: tasks.scan_all(t, db), "scan_unscanned": lambda t, db: tasks.scan_all(t, db, unscanned=True), "scan_company": tasks.scan_company,
-    "discover": tasks.discover, "census": tasks.census, "internships": tasks.internships, "broad_sources": tasks.broad_sources, "logos": tasks.logos, "live_search": tasks.live_search,
+    "discover": tasks.discover, "discover_country": tasks.discover_country, "census": tasks.census, "internships": tasks.internships, "broad_sources": tasks.broad_sources, "logos": tasks.logos, "live_search": tasks.live_search,
     "sponsors_refresh": lambda t, db: (sponsor_service.refresh(db), sponsor_service.recheck_all(db)),
     "mail_sync": tasks.mail_sync,
     "embed": lambda t, db: task_service.progress(db, t, embedded=embeddings.backfill()),
 }
+
+
+_now: dict = {"state": "idle", "task": None, "note": "just started"}       # what the worker is doing, written by the main loop
+
+
+def _heartbeat():
+    """Own thread: report every 10 s even while the main loop is busy with a long task (discovery can take many minutes)."""
+    while not STOP:
+        try:
+            with SessionLocal() as db: schedule_service.beat(db, _now["state"], len(_inflight), task=_now["task"], note=_now["note"])
+        except Exception: log.warning("could not write the heartbeat")
+        time.sleep(10)
 
 
 def _every(last: dict, key: str, seconds: float) -> bool:
@@ -34,28 +46,37 @@ def main():
     signal.signal(signal.SIGTERM, lambda *_: globals().__setitem__("STOP", True)); signal.signal(signal.SIGINT, lambda *_: globals().__setitem__("STOP", True))
     last: dict = {}
     log.info("worker started")
+    import threading
+    threading.Thread(target=_heartbeat, daemon=True, name="heartbeat").start()
     while not STOP:
         did = False
         with SessionLocal() as db:
             t = task_service.claim(db)
             if t:
                 did = True; log.info("task %s #%s %s", t.kind, t.id, t.payload)
+                _now.update(state="running", task=t.kind, note=f"running task #{t.id}")
                 try:
                     HANDLERS[t.kind](t, db); task_service.finish(db, t)
+                    _now.update(task=None, note="")
                 except Exception as e:
                     db.rollback(); log.error("task failed: %s", traceback.format_exc()); task_service.finish(db, db.get(type(t), t.id), str(e)[:300])
         if not did:
             try:
                 with SessionLocal() as db:
-                    if _every(last, "alerts", 300): n = alert_service.run_due(db); alert_service.send_outbox(db); n and log.info("alerts created: %s", n)
+                    if _every(last, "alerts", 300): n = alert_service.run_due(db); alert_service.send_outbox(db); n and log.info("alerts created: %s", n); m = tracking_service.notify_due(db); m and log.info("follow-up reminders: %s", m)
                     if _every(last, "embed", 120): embeddings.backfill(limit=500)
                     if _every(last, "purge", 86400): r = maintenance_service.purge_old(db); any(r.values()) and log.info("retention purge: %s", r)      # daily retention
-                    if _every(last, "refresh", 5): _refresh(db)       # keep jobs fresh: top up the scan pool with the next due companies
+                    if _every(last, "refresh", 5):                  # keep jobs fresh: top up the scan pool with the next due companies, inside the schedule
+                        ok, why, nxt = schedule_service.window()
+                        if ok: _refresh(db)
+                        elif _every(last, "paused-log", 600): log.info("automatic crawling paused: %s%s", why, f" (next start {nxt})" if nxt else "")
+                        last["state"] = ("running" if _inflight else "idle") if ok else "paused"; last["why"] = why
+                    _now.update(state=last.get("state", "idle"), task=None, note=last.get("why", ""))
             except Exception: log.error("scheduler error: %s", traceback.format_exc())
             time.sleep(3)
 
 
-POOL_SIZE = 20; STUCK_AFTER = 900                      # scans in flight at once; a scan older than 15 min is treated as hung and its slot is reused
+POOL_SIZE = 40; STUCK_AFTER = 900                      # scans in flight at once; a scan older than 15 min is treated as hung and its slot is reused
 _pool = ThreadPoolExecutor(POOL_SIZE + 8); _inflight: dict[int, float] = {}
 
 
@@ -65,14 +86,16 @@ def _refresh(db):
     now = time.time()
     for cid, t0 in list(_inflight.items()):
         if now - t0 > STUCK_AFTER: log.warning("scan of company %s looks hung (>%ss); freeing its slot", cid, STUCK_AFTER); _inflight.pop(cid, None)
-    free = POOL_SIZE - len(_inflight)
+    free = min(POOL_SIZE, schedule_service.current()["parallel"]) - len(_inflight)
     if free <= 0: return
     has_open = exists().where(Job.company_id == Company.id, Job.status == "open")      # companies that actually have live postings are refreshed first
     q = select(Company.id).where((Company.website.is_not(None)) | (Company.ats_slug.is_not(None)),
                                  Company.ats.is_(None) | ~Company.ats.like("board:%"),      # board-level sources are scanned per board, never per company (they would return instantly and clog the queue)
                                  (Company.next_scan.is_(None)) | (Company.next_scan <= dt.datetime.now(dt.timezone.utc)))
     if _inflight: q = q.where(Company.id.not_in(list(_inflight)))
-    for cid in db.scalars(q.order_by(has_open.desc(), Company.next_scan.asc().nullsfirst()).limit(free)):
+    fresh = list(db.scalars(q.where(Company.last_scan.is_(None)).order_by(Company.id.desc()).limit(max(1, free // 2))))     # half the slots: employers never read (new countries fill fast)
+    rest = list(db.scalars(q.where(Company.id.not_in(fresh or [-1])).order_by(has_open.desc(), Company.next_scan.asc().nullsfirst()).limit(free - len(fresh))))
+    for cid in fresh + rest:
         _inflight[cid] = time.time()
         _pool.submit(_run_scan, cid)
 

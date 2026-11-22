@@ -11,11 +11,14 @@ now = lambda: dt.datetime.now(dt.timezone.utc)
 
 
 def _params(s: SavedSearch) -> ss.SearchParams:
-    return ss.SearchParams(**{**(s.params or {}), "page": 1, "limit": 100})
+    raw = dict(s.params or {})
+    if "scope" not in raw and not raw.get("sector") and not raw.get("category"): raw["sector"] = ["tech"]      # saved before sectors existed: they meant tech
+    return ss.SearchParams(**{**raw, "page": 1, "limit": 100})
 
 
 def new_matches(db: Session, s: SavedSearch, since: dt.datetime) -> list[Job]:
-    ids = ss.run(db, _params(s))["ids"]
+    p, _ = jobs_service.personalize(_params(s), db.get(User, s.user_id))          # "my feed" alerts follow the owner's profile as it is now
+    ids = ss.run(db, p)["ids"]
     if not ids: return []
     new_ids = db.execute(text("SELECT id FROM jobs WHERE id = ANY(:ids) AND first_seen > :since ORDER BY first_seen DESC"), {"ids": ids, "since": since}).scalars().all()
     from sqlalchemy.orm import selectinload
