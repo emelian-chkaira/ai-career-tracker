@@ -71,7 +71,7 @@
 
 ## 🧠 What makes it different
 
-| | |
+| Principle | What it means |
 |---|---|
 | **🏢 Employer-direct** | Reads official job-system feeds and career pages. Polite: `robots.txt`, rate limits, a schedule, a named user agent. |
 | **🧩 One role, one card** | A role is the employer plus its title without places, gender tags or hours. Repeats fold into one job; junk link labels become real titles. |
@@ -83,31 +83,34 @@
 ## 🏗️ How it works
 
 ```mermaid
-flowchart LR
-  subgraph SRC[" Sources "]
+flowchart TB
+  subgraph SRC[" 1 · Sources "]
+    direction LR
     A["🏢 Career pages<br/>11 job systems + HTML"]
     B["🗺️ Open data<br/>maps · Wikipedia · IND"]
     C["🌐 Job boards<br/>optional"]
     D["📬 Gmail<br/>read-only"]
+    A ~~~ B ~~~ C ~~~ D
   end
-  subgraph WRK[" Worker "]
-    E["⏱️ Schedule<br/>+ heartbeat"] --> F["🕷️ Scanner pool"] --> G["🧩 Ingest<br/>places · fields · one role"]
+  subgraph WRK[" 2 · Worker "]
+    direction LR
+    E["⏱️ Schedule + heartbeat"] --> F["🕷️ Scanner pool<br/>polite, robots.txt"] --> G["🧩 Ingest<br/>places · fields · one role, one card"]
   end
-  H[("🐘 Postgres<br/>+ pgvector")]
-  subgraph API[" FastAPI "]
+  H[("🐘 Postgres + pgvector")]
+  subgraph API[" 3 · FastAPI "]
+    direction LR
     I["🔎 Hybrid search"]
     J["🎯 Feeds & alerts"]
-    K["🧠 AI: fit · tailor · inbox"]
+    K["🧠 AI: fit · tailoring · inbox"] <--> L[["🤖 Any LLM"]]
+    I ~~~ J ~~~ K
   end
-  L[["🤖 Any LLM"]]
-  M["💻 React app"]
-  N["📱 Flutter app"]
-  A & B --> F
-  C -.-> G
-  G --> H --> I & J
-  D --> K <--> L
-  K --> H
-  I & J & K --> M & N
+  subgraph UI[" 4 · Apps "]
+    direction LR
+    M["💻 React web app"]
+    N["📱 Flutter app"]
+    M ~~~ N
+  end
+  SRC --> WRK --> H --> API --> UI
 ```
 
 <table>
