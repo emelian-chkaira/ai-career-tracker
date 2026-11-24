@@ -22,6 +22,17 @@ class RrError(Exception):
 def get_conn(db: Session, user_id) -> UserRr | None: return db.get(UserRr, user_id)
 
 
+def normalize_base(url: str) -> str:
+    """Accept whatever address the user copies (site, /mcp, /api/openapi, a dashboard or builder link) and keep the site root.
+    The MCP endpoint is a JSON-RPC server and answers 405 to REST calls; the REST API lives under <root>/api/openapi."""
+    from urllib.parse import urlsplit
+    u = urlsplit((url or HOSTED).strip()); path = u.path.rstrip("/")
+    for marker in ("/mcp", "/api", "/dashboard", "/builder", "/auth"):
+        i = path.find(marker)
+        if i >= 0: path = path[:i]; break
+    return f"{u.scheme}://{u.netloc}{path}"
+
+
 def _api(base: str) -> str: return base.rstrip("/") + "/api/openapi"
 
 
@@ -31,12 +42,20 @@ def _call(conn_base: str, key: str, method: str, path: str, **kw) -> httpx.Respo
     except httpx.HTTPError as e: raise RrError(f"Could not reach Reactive Resume: {type(e).__name__}")
     if r.status_code in (401, 403): raise RrError("Reactive Resume refused the key. Create one with read, write and delete access under Settings, Developer, API keys." if r.status_code == 403 else "Reactive Resume did not accept the API key.", 400)
     if r.status_code == 429: raise RrError("Reactive Resume is rate limiting this key. Wait a minute and try again.", 429)
-    if r.status_code >= 400: raise RrError(f"Reactive Resume answered {r.status_code}.")
+    if r.status_code == 405: raise RrError("Reactive Resume answered 405: this address is not its REST API. Use the site address (https://rxresu.me or your own server), not /mcp.", 400)
+    if r.status_code >= 400: raise RrError(f"Reactive Resume answered {r.status_code}{_why(r)}.")
     return r
 
 
+def _why(r: httpx.Response) -> str:
+    """The server's own explanation of a 4xx (its structured error message), so a person can act on it. Never includes the request."""
+    try: j = r.json(); m = j.get("message") or j.get("code") if isinstance(j, dict) else None
+    except ValueError: m = None
+    return f": {str(m)[:200]}" if m and r.status_code < 500 else ""
+
+
 def save_conn(db: Session, user_id, base_url: str, api_key: str) -> UserRr:
-    base = check_url((base_url or HOSTED).strip()); _call(base, api_key, "GET", "/resumes", params={"limit": 1})          # proves URL and key before saving
+    base = check_url(normalize_base(base_url)); _call(base, api_key, "GET", "/resumes", params={"limit": 1})          # proves URL and key before saving
     row = db.get(UserRr, user_id) or UserRr(user_id=user_id)
     row.base_url, row.api_key_enc = base, seal(api_key); db.add(row); db.commit(); return row
 
@@ -67,13 +86,24 @@ def fetch_cv(db: Session, user_id, resume_id: str) -> dict:
 
 
 def push_cv(db: Session, user_id, cv: dict, template: str, paper: str, name: str) -> dict:
-    """Create a new resume in Reactive Resume from our CV (never overwrites an existing one)."""
-    base, key = _conn(db, user_id); doc = json.dumps(rxresume.to_rx(cv, template, paper)).encode()
-    r = _call(base, key, "POST", "/resumes/file-imports", files={"file": (f"{name or 'cv'}.json", doc, "application/json")}, data={"format": "REACTIVE_RESUME"}, timeout=60)
-    try: rid = r.json()
-    except ValueError: rid = None
-    rid = rid.get("id") if isinstance(rid, dict) else rid
-    return {"id": str(rid) if rid else None, "url": f"{base}/builder/{rid}" if rid else base}
+    """Create a NEW resume in Reactive Resume from our CV (never overwrites an existing one).
+    Three calls: create a blank resume, read its valid default document, write our content into it."""
+    base, key = _conn(db, user_id); name = (name or "CV")[:80]
+    r = _call(base, key, "POST", "/resumes", json={"name": name, "tags": ["ai-career-tracker"], "withSampleData": False}, timeout=60)
+    rid = _id_of(r)
+    if not rid: raise RrError("Reactive Resume created the resume but did not say which one.")
+    try:
+        d = _call(base, key, "GET", f"/resumes/{rid}").json(); data = d.get("data") if isinstance(d, dict) and isinstance(d.get("data"), dict) else d
+        _call(base, key, "PUT", f"/resumes/{rid}", json={"data": rxresume.fill_rx6(data, cv, template, paper)}, timeout=60)
+    except RrError as e: raise RrError(f"The resume was created in Reactive Resume (named '{name}') but could not be filled: {e}", e.status)
+    return {"id": rid, "url": f"{base}/builder/{rid}"}
+
+
+def _id_of(r: httpx.Response) -> str | None:
+    try: v = r.json()
+    except ValueError: return None
+    v = v.get("id") if isinstance(v, dict) else v
+    return str(v) if v else None
 
 
 def pdf(db: Session, user_id, resume_id: str) -> bytes:

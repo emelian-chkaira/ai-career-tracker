@@ -290,3 +290,9 @@ def mail_sync(t: Task, db):
         db.rollback(); acc = db.get(MailAccount, p["account_id"])
         if acc: acc.last_error = str(e)[:300]; db.commit()
         raise
+
+
+def tailor_cv(t, db):
+    """Followed job -> AI-tailored CV -> new resume in Reactive Resume (queued by tailor_service.queue_if_auto)."""
+    from app.services import tailor_service
+    task_service.progress(db, t, stage=tailor_service.run_queued(db, t.payload["user_id"], int(t.payload["job_id"])))

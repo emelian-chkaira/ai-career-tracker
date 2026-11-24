@@ -49,6 +49,25 @@ def field(body: FieldIn, db: Session = Depends(get_db), user: User = Depends(cur
     return {"text": new}
 
 
+class AutoIn(BaseModel):
+    on: bool = False
+    stages: list[str] = ["shortlisted"]
+    push_rr: bool = True
+    consent: bool = False
+
+
+@router.get("/auto", summary="Automatic tailoring for followed jobs: current setting")
+def auto_get(user: User = Depends(current_user)): return {**ts.auto_cfg(user), "available_stages": list(ts.AUTO_STAGES)}
+
+
+@router.put("/auto", summary="Turn automatic tailor-and-rebuild on or off for the stages you choose")
+def auto_set(body: AutoIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    if body.on:
+        cfg = require(db, user, True, "tailor your CV", "tailoring")        # needs a chosen model
+        if cfg.external and not body.consent: raise HTTPException(400, "Automatic tailoring sends your CV and each posting to your AI provider. Tick the consent box, or choose a local Ollama model.")
+    return {**ts.set_auto(db, user, body.on, body.stages, body.push_rr, body.consent), "available_stages": list(ts.AUTO_STAGES)}
+
+
 @router.get("/{job_id}", summary="The tailored CV kept for this job (404 when none)")
 def get_one(job_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
     r = ts.get(db, user, job_id)
@@ -60,6 +79,17 @@ def get_one(job_id: int, db: Session = Depends(get_db), user: User = Depends(cur
 def run(job_id: int, body: RunIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
     j = _job(db, job_id); cv, cfg = _ready(db, user, body.consent, "tailor your CV")
     try: return ts.view(ts.tailor(db, user, j, cfg, cv))
+    except llm.LlmError as e: raise http_error(e, "AI tailoring failed")
+
+
+class RebuildIn(RunIn):
+    push: bool = True
+
+
+@router.post("/{job_id}/rebuild", summary="AI-tailor the CV to this job and rebuild it as a new resume in Reactive Resume")
+def rebuild(job_id: int, body: RebuildIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    j = _job(db, job_id); cv, cfg = _ready(db, user, body.consent, "tailor your CV")
+    try: return ts.rebuild(db, user, j, cfg, cv, body.push)
     except llm.LlmError as e: raise http_error(e, "AI tailoring failed")
 
 

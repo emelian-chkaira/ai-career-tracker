@@ -1,7 +1,7 @@
 """Ready-made starter data, so a fresh install has something to show before the crawler has run.
 
 backend/seed/ holds three small gzipped CSV files made from a real crawl:
-  companies.csv.gz  Dutch tech employers: name, website, careers page, ATS, city, visa-sponsor status
+  companies.csv.gz  employers: name, website, careers page, ATS, city, visa-sponsor status
   jobs.csv.gz       a snapshot of open listings: title, company, city, link, domain, type, skills (NO descriptions)
   sponsors.csv.gz   the public IND register of recognised sponsors
 The crawler replaces the snapshot with fresh, complete data as it visits each careers page, so nothing here goes stale for long."""

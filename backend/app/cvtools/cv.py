@@ -55,16 +55,15 @@ _CASE = {"ios": "iOS", "javascript": "JavaScript", "typescript": "TypeScript", "
 def pretty(t: str) -> str: return _CASE.get(t, t if len(t) <= 1 else (t.upper() if len(t) <= 2 else t[0].upper() + t[1:]))
 
 def find_terms(text: str) -> list[str]:
-    """Vocabulary terms present in `text` (whole-word, case-insensitive), ordered by first appearance."""
-    low = " " + re.sub(r"[^\w+#./ -]", " ", (text or "").lower()) + " "
+    """Vocabulary terms present in `text` (whole-word, case-insensitive, hyphen = space), ordered by first appearance."""
+    low = " " + re.sub(r"[^\w+#./ -]", " ", (text or "").lower()).replace("-", " ") + " "
     hits = []
     for t in VOCAB:
-        pat = r"(?<![\w+#.])" + re.escape(t) + r"(?![\w+#]|\.\w)"
+        pat = r"(?<![\w+#.])" + re.escape(t.replace("-", " ")) + r"(?![\w+#]|\.\w)"
         m = re.search(pat, low)
         if m: hits.append((m.start(), t))
     return [t for _, t in sorted(hits)]
 
-# ---------------------------------------------------------------- languages / footers / references
 LANGS = ("arabic english dutch german french spanish italian portuguese russian ukrainian polish turkish chinese mandarin cantonese japanese korean hindi urdu persian farsi hebrew greek swedish norwegian danish finnish "
          "czech slovak hungarian romanian bulgarian serbian croatian bosnian albanian armenian kurdish bengali tamil telugu vietnamese thai indonesian malay tagalog swahili afrikaans nederlands engels duits frans spaans arabisch turks").split()
 _LANG_RE = re.compile(r"(?<![\w])(" + "|".join(LANGS) + r")(?![\w])\s*(?:[:(–—-]\s*)?", re.I)
@@ -319,6 +318,10 @@ def job_keywords(job: dict) -> list[str]:
     for t in find_terms(desc[:6000]): scored[t] = scored.get(t, 0) + 1 + desc.lower().count(t) * 0.3
     return [t for t, _ in sorted(scored.items(), key=lambda x: -x[1])][:25]
 
+def cv_text_for_gaps(cv: dict) -> str:
+    """The CV as one string (summary, skills, roles, bullets, projects, education) for presence checks."""
+    return _ai_input(cv)[0] + " " + " ".join((cv.get("languages") or []) + (cv.get("certifications") or []))
+
 def _overlap(text: str, kws: set[str]) -> int:
     return len(kws & set(find_terms(text)))
 
@@ -483,11 +486,17 @@ def import_cv(data: bytes, filename: str = "") -> dict:
 
 
 # ---------------------------------------------------------------- AI tailoring (opt-in: the CV and the posting are sent to Anthropic)
-_AI_SYS = ("You tailor a candidate's CV to one job posting. HARD RULES: use ONLY facts already in the CV; never invent employers, dates, degrees, skills, tools, numbers or achievements; "
-           "do not add a skill the CV does not mention (list such requirements under 'gaps'). You may reword for clarity and for the posting's vocabulary, reorder, merge or shorten. "
-           "Keep every [label](url) link and **bold** marker exactly as written. Keep the candidate's language and a concise, factual tone. "
+_AI_SYS = ("You are a senior technical recruiter and CV editor tailoring a candidate's CV to ONE job posting. The goal is a CV that an ATS and a human reader both rate as a strong, honest match.\n"
+           "HARD RULES: use ONLY facts already in the CV. Never invent employers, dates, degrees, skills, tools, numbers or achievements, and never make an achievement sound bigger than the CV says ('set up' stays 'set up', not 'built'). "
+           "Keep every number exactly as written. Do not add a skill the CV does not mention: list such requirements under 'gaps'.\n"
+           "HOW TO TAILOR: (1) Summary: 2-3 sentences, open with the posting's role title if the CV supports it, then the 3 strongest matching facts. (2) For each entry that matters for this job, rewrite its bullets: "
+           "start with a strong verb, say what you did and with which technology, put the most relevant bullet first, use the posting's own wording ONLY where the CV already shows that skill, drop filler. "
+           "(3) Leave entries that are irrelevant to this job untouched (omit them). (4) skills_first: the CV's own skills most relevant to the posting, in order.\n"
+           "FORMAT RULES: the CV text shows each entry as '(i) Title | Company Dates' followed by its bullets as '- ...'. NEVER return the '(i) ...' header line, a company name or dates as a bullet. "
+           "Return exactly as many bullets as the entry has, in the same count (reordering is allowed). Keep every [label](url) link and **bold** marker as written. Keep the CV's language.\n"
            "Reply with ONLY a JSON object: {\"summary\": str, \"sections\": {\"<section id>\": [{\"i\": int, \"desc\": str|null, \"bullets\": [str]|null}]}, "
-           "\"skills_first\": [str], \"gaps\": [str], \"notes\": str}. Only include entries you changed; \"i\" is the entry index shown in the input.")
+           "\"skills_first\": [str], \"gaps\": [str], \"fit\": \"strong\"|\"partial\"|\"poor\", \"notes\": str}. Only include entries you changed; \"i\" is the entry index shown. "
+           "'fit' is your honest read of how well this candidate matches the posting; 'notes' is one sentence saying what you emphasised.")
 
 def _ai_input(cv: dict) -> tuple[str, dict]:
     """CV -> compact numbered text for the model, plus {section id: blocks} so the answer can be applied back."""
@@ -516,41 +525,76 @@ def _anthropic_ask(api_key: str, model: str = "claude-sonnet-5-5"):
 def ai_tailor(cv: dict, job: dict, api_key: str, model: str = "claude-sonnet-5-5") -> dict:
     return ai_tailor_with(cv, job, _anthropic_ask(api_key, model))
 
+def _header_echo(x: str, b: dict) -> bool:
+    """A 'bullet' that is really the entry's header line (title | company dates) the model copied from the input."""
+    low = plain(x).lower(); title = plain(b.get("title", "") or b.get("heading", "")).lower(); place = plain(b.get("place", "")).lower().split(",")[0].strip()
+    return bool((" | " in x and DATE_RE.search(x)) or (title and place and low.startswith(title) and place in low and DATE_RE.search(x)))
+
+
 def ai_tailor_with(cv: dict, job: dict, ask, guard=None) -> dict:
-    """-> {cv: tailored copy, changes: [{section, title, before, after}], rejected, gaps, notes}. Only summary, bullets, descriptions and skill order can change.
-    ask(system, user) -> text is any model; guard(text) -> list of problems rejects an edit that smuggles in facts the CV does not have."""
+    """-> {cv: tailored copy, changes: [{section, title, before, after}], rejected, gaps, notes, fit}. Only summary, bullets, descriptions and skill order can change.
+    ask(system, user) -> text is any model; guard(text) -> list of problems rejects an edit that smuggles in facts the CV does not have.
+    A bullet that fails the guard is reverted on its own (the rest of the entry is kept); if anything was rejected the model gets one chance to repair it."""
     import copy, json
-    text, secs = _ai_input(cv)
+    text, _ = _ai_input(cv); guard = guard or (lambda t: [])
     posting = f"{job.get('title', '')} at {job.get('company', '')}\n{(job.get('description') or '')[:6000]}"
-    raw = ask(_AI_SYS, f"JOB POSTING:\n{posting}\n\nCV:\n{text}")
-    m = re.search(r"\{.*\}", raw, re.S)
-    if not m: raise ValueError("the model did not return JSON")
-    out = json.loads(m.group(0)); rejected = []
-    guard = guard or (lambda t: [])
-    new = copy.deepcopy(cv); changes = []
-    bad = guard(out["summary"]) if isinstance(out.get("summary"), str) else []
-    if bad: rejected.append({"section": "Summary", "why": ", ".join(bad)})
-    elif isinstance(out.get("summary"), str) and out["summary"].strip() and out["summary"].strip() != (cv.get("summary") or "").strip():
-        changes.append({"section": "Summary", "title": "", "before": cv.get("summary", ""), "after": out["summary"].strip()}); new["summary"] = out["summary"].strip()
-    nsecs = {"experience": new.get("experience") or [], "projects": new.get("projects") or [], "education": new.get("education") or []}
-    for e in new.get("extras") or []: nsecs["x:" + e["title"]] = e["blocks"]
-    for sid, edits in (out.get("sections") or {}).items():
-        blocks = nsecs.get(sid)
-        if not blocks or not isinstance(edits, list): continue
-        for ed in edits:
-            try: i = int(ed.get("i"))
-            except Exception: continue
-            if not 0 <= i < len(blocks): continue
-            bad = guard(" ".join([str(ed.get("desc") or "")] + [str(x) for x in (ed.get("bullets") or [])]))
-            if bad: rejected.append({"section": sid.replace("x:", ""), "title": plain(blocks[i].get("title", "")), "why": ", ".join(bad)}); continue
-            b = blocks[i]; before = " / ".join(x for x in [b.get("desc", "")] + list(b.get("bullets", [])) if x)
-            if isinstance(ed.get("desc"), str) and ed["desc"].strip(): b["desc"] = ed["desc"].strip()
-            if isinstance(ed.get("bullets"), list) and ed["bullets"] and len(ed["bullets"]) <= max(len(b.get("bullets", [])), 1) + 1: b["bullets"] = [str(x).strip() for x in ed["bullets"] if str(x).strip()]
-            after = " / ".join(x for x in [b.get("desc", "")] + list(b.get("bullets", [])) if x)
-            if after != before: changes.append({"section": sid.replace("x:", ""), "title": plain(b.get("title", "")), "before": before, "after": after})
-    first = [str(x) for x in (out.get("skills_first") or []) if str(x) in (cv.get("skills") or [])]      # only skills the CV already lists
-    if first:
-        rank = {x: i for i, x in enumerate(first)}
-        new["skills"] = sorted(cv.get("skills") or [], key=lambda x: rank.get(x, 999))
-        for g in new.get("skill_groups") or []: g["items"] = sorted(g["items"], key=lambda x: rank.get(x, 999))
-    return {"cv": new, "changes": changes, "rejected": rejected, "gaps": [str(x) for x in (out.get("gaps") or [])][:12], "notes": str(out.get("notes") or "")[:400]}
+    base_msg = f"JOB POSTING:\n{posting}\n\nCV:\n{text}"
+
+    def parse(raw: str) -> dict:
+        m = re.search(r"\{.*\}", raw, re.S)
+        if not m: raise ValueError("the model did not return JSON")
+        return json.loads(m.group(0))
+
+    def apply(out: dict):
+        new = copy.deepcopy(cv); changes, rejected = [], []
+        summ = out.get("summary")
+        if isinstance(summ, str) and summ.strip() and summ.strip() != (cv.get("summary") or "").strip():
+            bad = guard(summ)
+            if bad: rejected.append({"section": "Summary", "title": "", "why": ", ".join(bad)})
+            else: changes.append({"section": "Summary", "title": "", "before": cv.get("summary", ""), "after": summ.strip()}); new["summary"] = summ.strip()
+        nsecs = {"experience": new.get("experience") or [], "projects": new.get("projects") or [], "education": new.get("education") or []}
+        for e in new.get("extras") or []: nsecs["x:" + e["title"]] = e["blocks"]
+        for sid, edits in (out.get("sections") or {}).items():
+            blocks = nsecs.get(sid)
+            if not blocks or not isinstance(edits, list): continue
+            for ed in edits:
+                try: i = int(ed.get("i"))
+                except Exception: continue
+                if not isinstance(ed, dict) or not 0 <= i < len(blocks): continue
+                b = blocks[i]; name = sid.replace("x:", ""); title = plain(b.get("title", "")); orig = list(b.get("bullets", []))
+                before = " / ".join(x for x in [b.get("desc", "")] + orig if x)
+                if isinstance(ed.get("desc"), str) and ed["desc"].strip() and ed["desc"].strip() != (b.get("desc") or "").strip():
+                    bad = guard(ed["desc"])
+                    if bad: rejected.append({"section": name, "title": title, "why": ", ".join(bad)})
+                    else: b["desc"] = ed["desc"].strip()
+                nb = [str(x).strip() for x in (ed.get("bullets") or []) if str(x).strip() and not _header_echo(str(x), b)]
+                if nb and len(nb) == len(orig):
+                    final, free = [], [o for o in orig if o not in nb]                    # originals the model did not keep verbatim: candidates to put back
+                    for x in nb:
+                        bad = guard(x) if x not in orig else []
+                        if bad:
+                            rejected.append({"section": name, "title": title, "why": ", ".join(bad)})
+                            words = set(re.findall(r"\w+", x.lower())); back = max(free, key=lambda o: len(words & set(re.findall(r"\w+", o.lower()))), default=None)
+                            if back is not None: free.remove(back); final.append(back)          # the closest original bullet returns; the other edits stay
+                        else: final.append(x)
+                    b["bullets"] = final
+                after = " / ".join(x for x in [b.get("desc", "")] + list(b.get("bullets", [])) if x)
+                if after != before: changes.append({"section": name, "title": title, "before": before, "after": after})
+        first = [str(x) for x in (out.get("skills_first") or []) if str(x) in (cv.get("skills") or [])]      # only skills the CV already lists
+        if first:
+            rank = {x: i for i, x in enumerate(first)}
+            new["skills"] = sorted(cv.get("skills") or [], key=lambda x: rank.get(x, 999))
+            for g in new.get("skill_groups") or []: g["items"] = sorted(g["items"], key=lambda x: rank.get(x, 999))
+        return new, changes, rejected
+
+    out = parse(ask(_AI_SYS, base_msg)); new, changes, rejected = apply(out)
+    if rejected:                                                          # one repair round: tell the model exactly what was refused and why
+        why = "; ".join(f"{r['section']}{(' - ' + r['title']) if r.get('title') else ''}: {r['why']}" for r in rejected[:6])
+        try:
+            out2 = parse(ask(_AI_SYS, base_msg + f"\n\nYour previous answer was partly refused because it added facts the CV does not contain ({why}). "
+                                                 "Return the full JSON again. Redo only those parts using wording and facts that are already in the CV; keep the good edits."))
+            new2, changes2, rejected2 = apply(out2)
+            if len(rejected2) < len(rejected) or (len(rejected2) == len(rejected) and len(changes2) >= len(changes)): out, new, changes, rejected = out2, new2, changes2, rejected2
+        except Exception: pass
+    fit = str(out.get("fit") or "").lower(); fit = fit if fit in ("strong", "partial", "poor") else ""
+    return {"cv": new, "changes": changes, "rejected": rejected, "gaps": [str(x) for x in (out.get("gaps") or [])][:12], "notes": str(out.get("notes") or "")[:400], "fit": fit}

@@ -53,15 +53,15 @@
 
 <table align="center">
 <tr>
-<td align="center" width="25%"><h1>6,346</h1><b>employers</b><br><sub>watched on their own career pages</sub></td>
-<td align="center" width="25%"><h1>10,965</h1><b>open roles</b><br><sub>one card each, no reposts</sub></td>
-<td align="center" width="25%"><h1>1,385</h1><b>duplicates folded</b><br><sub>into 703 multi-city roles</sub></td>
+<td align="center" width="25%"><h1>6,583</h1><b>employers</b><br><sub>watched on their own career pages</sub></td>
+<td align="center" width="25%"><h1>11,086</h1><b>open roles</b><br><sub>one card each, no reposts</sub></td>
+<td align="center" width="25%"><h1>1,818</h1><b>duplicates folded</b><br><sub>into 902 multi-link roles</sub></td>
 <td align="center" width="25%"><h1>59</h1><b>countries</b><br><sub>Europe · Middle East · Africa</sub></td>
 </tr>
 <tr>
 <td align="center"><h1>11</h1><b>job systems</b><br><sub>Greenhouse, Lever, Workday, Personio…</sub></td>
 <td align="center"><h1>11</h1><b>fields</b><br><sub>tech, architecture, engineering, finance…</sub></td>
-<td align="center"><h1>13,089</h1><b>visa sponsors</b><br><sub>matched to the IND register</sub></td>
+<td align="center"><h1>13,089</h1><b>visa sponsors</b><br><sub>matched to the NL IND register</sub></td>
 <td align="center"><h1>11</h1><b>AI providers</b><br><sub>Ollama, Claude, OpenAI, Groq…</sub></td>
 </tr>
 </table>
@@ -126,7 +126,11 @@ Interview invites, assessments, offers, rejections and recruiter messages are re
 
 <p align="center"><img src="docs/media/how-it-works.png" width="100%" alt="How AI Career Tracker works: life of a posting, matching to your spec and CV, CV Studio with fact guard, AI inbox"></p>
 
-<sub>Vector versions: <a href="docs/media/system-design.svg">system-design.svg</a> · <a href="docs/media/how-it-works.svg">how-it-works.svg</a> · regenerate with <code>python3 docs/media/system_design.py</code> and <code>python3 docs/media/how_it_works.py</code></sub>
+**Under the hood:** the technical view. How hybrid search fuses three engines, the `SKIP LOCKED` task queue, the ingest pipeline, auth and encryption, AI scoring with hard caps, and the indexes behind it.
+
+<p align="center"><img src="docs/media/technical.png" width="100%" alt="Under the hood: hybrid search with reciprocal rank fusion, SKIP LOCKED task queue, ingest pipeline, auth and secrets, AI fit score weights and caps, indexes and API surface"></p>
+
+<sub>Vector versions: <a href="docs/media/system-design.svg">system-design.svg</a> · <a href="docs/media/how-it-works.svg">how-it-works.svg</a> · <a href="docs/media/technical.svg">technical.svg</a> · regenerate with <code>python3 docs/media/system_design.py</code>, <code>how_it_works.py</code> and <code>technical.py</code></sub>
 
 <table>
 <tr>
@@ -147,18 +151,18 @@ Interview invites, assessments, offers, rejections and recruiter messages are re
 | **AI** | Provider-agnostic LLM client: Ollama · Claude · OpenAI · Groq · OpenRouter · DeepSeek · Qwen · Kimi · GLM · Grok · any OpenAI-compatible endpoint; JSON mode with fallbacks; fact guard |
 | **Mail & auth** | Gmail API (read-only OAuth) · Firebase Auth · Google Sign-In · SMTP alerts |
 | **Web** | React 18 · TypeScript (strict) · Vite · TanStack Query & Virtual · React Router · Radix UI · cmdk · Recharts · Sonner |
-| **Mobile** | Flutter ([separate repository](https://github.com/emelian-chkaira/nl-career-tracker-mobile)) |
+| **Mobile** | Flutter ([separate repository](https://github.com/emelian-chkaira/ai-career-tracker-mobile)) |
 | **Quality** | pytest on real Postgres (165) · Vitest + Testing Library (16) · Playwright end-to-end (8) · scripted screenshots and video |
 | **Ops** | Docker Compose · Caddy (HTTPS) · Render blueprint · Oracle Cloud free tier · GitHub Actions |
 
 ## 🚀 Run it
 
 ```bash
-git clone https://github.com/emelian-chkaira/nl-career-tracker.git && cd nl-career-tracker
+git clone https://github.com/emelian-chkaira/ai-career-tracker.git && cd ai-career-tracker
 ./setup.sh          # needs only Docker: installs, migrates, loads starter data, starts everything
 ```
 
-Open **http://localhost:8787** and register; the first account is the admin. The starter data holds 3,200 companies, 4,000+ listings and the IND register, so the app is full from the first minute.
+Open **http://localhost:8787** and register; the first account is the admin. The starter data holds 6,583 companies, 11,000+ listings and the NL IND register, so the app is full from the first minute.
 
 <details>
 <summary><b>Manual setup</b></summary>
@@ -223,4 +227,4 @@ Deploy for free with [Oracle Cloud](docs/DEPLOY_ORACLE.md) or [Render](docs/DEPL
 
 ---
 
-<p align="center"><sub>📱 Native app: <a href="https://github.com/emelian-chkaira/nl-career-tracker-mobile">nl-career-tracker-mobile</a> · 📐 <a href="PLAN.md">Design notes</a> · ⚖️ <a href="docs/JOBOPS_COMPARISON.md">Compared with JobOps</a> · 🤝 <a href="CONTRIBUTING.md">Contributing</a> · MIT licensed</sub></p>
+<p align="center"><sub>📱 Native app: <a href="https://github.com/emelian-chkaira/ai-career-tracker-mobile">ai-career-tracker-mobile</a> · 📐 <a href="PLAN.md">Design notes</a> · ⚖️ <a href="docs/JOBOPS_COMPARISON.md">Compared with JobOps</a> · 🤝 <a href="CONTRIBUTING.md">Contributing</a> · MIT licensed</sub></p>

@@ -139,3 +139,26 @@ def from_rx(d: dict) -> dict:
             "header": {"tagline": [b["headline"]] if b.get("headline") else [], "contact": []}, "footer": "", "summary": " ".join([st, *sb]).strip(),
             "skills": skills, "skill_groups": groups if len(groups) > 1 or (groups and groups[0]["label"] != "Skills") else [], "experience": exp, "education": edu, "projects": prj,
             "languages": [l for l in langs if l], "references": [], "certifications": [i.get("title", "") for i in items("certifications") if i.get("title")], "extras": [], "order": order, "titles": {}, "warnings": []}
+
+
+# ---------------------------------------------------------------- ours -> Reactive Resume 6 (fills the valid default document the server created)
+_ICONS = {"skills": {"icon": "", "iconColor": ""}, "profiles": {"icon": "", "iconColor": ""}}
+
+
+def fill_rx6(base: dict, cv: dict, template: str = "classic", paper: str = "a4") -> dict:
+    """`base` is the full ResumeData of a freshly created resume (so every required design/layout field is valid by construction).
+    Returns a copy with our content in basics, summary and the section items; nothing else is touched."""
+    import copy
+    mine = to_rx(cv, template, paper); out = copy.deepcopy(base)
+    b = out.setdefault("basics", {}); mb = mine["basics"]
+    b.update({k: mb[k] for k in ("name", "headline", "email", "phone", "location")}); b["website"] = {**mb["url"], "inlineLink": False}; b.setdefault("customFields", [])
+    sm = out.setdefault("summary", {}); sm.update({"content": mine["summary"]["content"], "hidden": mine["summary"]["hidden"]})
+    secs = out.setdefault("sections", {})
+    for key, sec in mine["sections"].items():
+        items = [{**_ICONS.get(key, {}), **it, **({"website": {**it["website"], "inlineLink": False}} if isinstance(it.get("website"), dict) else {})} for it in sec["items"]]
+        tgt = secs.setdefault(key, {}); tgt["items"] = items; tgt["hidden"] = not items
+    for key, sec in secs.items():                                 # sections we do not fill stay empty and hidden
+        if key not in mine["sections"] and isinstance(sec, dict) and "items" in sec: sec["items"] = []; sec["hidden"] = True
+    page = (out.get("metadata") or {}).get("page")
+    if isinstance(page, dict) and paper in ("a4", "letter"): page["format"] = paper
+    return out

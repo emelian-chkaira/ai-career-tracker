@@ -72,7 +72,7 @@ arrow([(1270, 1168), (1215, 992)], "pink", "classify mail", lx=-62)
 
 # ------------------------------------------------------------------ row 7: the outside world
 card(60, 1450, 1320, 160, "#64748b", "#f8fafc", dash=True); pill(170, 1450, "Outside world", "#475569", size=14)
-ext = [("🏢", "Career pages", "11 ATS APIs + HTML"), ("💼", "Job boards", "LinkedIn · Indeed · Glassdoor"), ("🗺️", "Open data", "OSM · Wikipedia · IND"), ("✉️", "Gmail API", "read-only OAuth"), ("📑", "Reactive Resume", "REST import / push"), ("🖨️", "Tectonic", "LaTeX → PDF, sandboxed")]
+ext = [("🏢", "Career pages", "11 ATS APIs + HTML"), ("💼", "Job boards", "LinkedIn · Indeed · Glassdoor"), ("🗺️", "Open data", "OSM · Wikipedia · NL IND"), ("✉️", "Gmail API", "read-only OAuth"), ("📑", "Reactive Resume", "REST import / push"), ("🖨️", "Tectonic", "LaTeX → PDF, sandboxed")]
 for i, (e, a, b) in enumerate(ext):
     cx = 170 + i * 220
     icon(cx, 1530, e, 36, "#64748b"); t(cx, 1563, a, 14, 800); t(cx, 1582, b, 11.5, 600, "#475569")

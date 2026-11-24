@@ -28,8 +28,8 @@ Optional: **Networking -> Reserved public IPs** so the address never changes.
 ## 5. Prepare the server
 ```bash
 ssh ubuntu@<public-ip>
-git clone https://github.com/emelian-chkaira/nl-career-tracker.git     # private repo: use a deploy key or a personal access token
-cd nl-career-tracker
+git clone https://github.com/emelian-chkaira/ai-career-tracker.git     # private repo: use a deploy key or a personal access token
+cd ai-career-tracker
 sh deploy/oracle-setup.sh        # Docker, firewall rules for 80/443, 4 GB swap
 exit                             # log in again so the docker group applies
 ```
@@ -37,7 +37,7 @@ exit                             # log in again so the docker group applies
 ## 6. Configure and start
 ```bash
 ssh ubuntu@<public-ip>
-cd nl-career-tracker
+cd ai-career-tracker
 cp deploy/env.production.example .env
 nano .env                        # DOMAIN, POSTGRES_PASSWORD, CAREERS_JWT_SECRET (openssl rand -hex 32), admin e-mail, Firebase keys
 docker compose -f docker-compose.prod.yml up -d --build
@@ -58,7 +58,7 @@ The first build takes several minutes (Chromium and the embedding model). Caddy 
 | Deploy new code | `sh deploy/update.sh` |
 | Logs | `docker compose -f docker-compose.prod.yml logs -f api worker` |
 | Status | `docker compose -f docker-compose.prod.yml ps` |
-| Backup | `sh deploy/backup.sh` (cron: `0 3 * * * sh ~/nl-career-tracker/deploy/backup.sh`) |
+| Backup | `sh deploy/backup.sh` (cron: `0 3 * * * sh ~/ai-career-tracker/deploy/backup.sh`) |
 | Restore | `gunzip -c backups/careers-DATE.sql.gz \| docker compose -f docker-compose.prod.yml exec -T db psql -U careers careers` |
 
 Copy `backups/` off the VM now and then (the disk is not a backup). Keep the VM patched: `sudo apt update && sudo apt -y upgrade`.

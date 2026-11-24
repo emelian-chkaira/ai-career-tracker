@@ -16,7 +16,9 @@ class Fake:
         path = url.split("/api/openapi", 1)[1]
         if method == "GET" and path == "/resumes": return httpx.Response(200, json=[{"id": "abc-123", "name": "My CV", "updatedAt": "2026-01-01"}], request=req)
         if method == "GET" and path == "/resumes/abc-123": return httpx.Response(200, json={"id": "abc-123", "data": self.rx}, request=req)
-        if method == "POST" and path == "/resumes/file-imports": return httpx.Response(201, json="new-id-9", request=req)
+        if method == "POST" and path == "/resumes": return httpx.Response(200, json="new-id-9", request=req)                         # RR 6: create a blank resume ...
+        if method == "GET" and path == "/resumes/new-id-9": return httpx.Response(200, json={"id": "new-id-9", "data": {"basics": {"customFields": []}, "summary": {}, "sections": {}, "metadata": {"page": {}}}}, request=req)    # ... read its default document ...
+        if method == "PUT" and path == "/resumes/new-id-9": self.filled = kw["json"]["data"]; return httpx.Response(200, json={"id": "new-id-9"}, request=req)   # ... and write our content into it
         if method == "GET" and path.endswith("/exports/pdf"): return httpx.Response(200, content=b"%PDF-1.4 fake", request=req)
         return httpx.Response(404, request=req)
 
@@ -30,8 +32,8 @@ def test_connect_list_import_push_pdf(client, make_user, monkeypatch):
     st = client.get(A, headers=h); assert st.json() == {"connected": True, "base_url": "https://rr.example.org", "default_url": "https://rxresu.me"} and "rr_goodkey123" not in st.text
     assert client.get(f"{A}/resumes", headers=h).json()[0]["name"] == "My CV"
     cv = client.post(f"{A}/import/abc-123", headers=h).json()["cv"]; assert cv["name"] == "Sam Doe" and cv["experience"]
-    p = client.post(f"{A}/push", json={"cv": CV, "name": "Tailored"}, headers=h); assert p.status_code == 201 and p.json()["id"] == "new-id-9" and p.json()["url"].endswith("/builder/new-id-9")
-    sent = [c for c in fake.calls if c[0] == "POST"][0]; assert sent[2]["data"]["format"] == "REACTIVE_RESUME" and json.loads(sent[2]["files"]["file"][1])
+    p = client.post(f"{A}/push", json={"cv": CV, "name": "Tailored"}, headers=h); assert p.status_code == 201 and p.json()["id"] == "new-id-9" and p.json()["url"].endswith("/builder/new-id-9") and fake.filled["basics"]["name"] == "Sam Doe"
+    sent = [c for c in fake.calls if c[0] == "POST"][0]; assert sent[2]["json"]["name"] == "Tailored" and sent[2]["json"]["withSampleData"] is False and fake.filled["sections"]["experience"]["items"]
     import base64; assert base64.b64decode(client.get(f"{A}/pdf/abc-123", headers=h).json()["pdf_b64"]).startswith(b"%PDF")
     assert client.delete(A, headers=h).status_code == 204 and client.get(A, headers=h).json()["connected"] is False
 

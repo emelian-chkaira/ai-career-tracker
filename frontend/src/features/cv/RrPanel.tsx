@@ -17,7 +17,7 @@ export function RrPanel({ cv, template, paper, onImport, connectOnly = false }: 
     <div className="small muted">Reactive Resume is a free, open source resume builder. Connect it with an API key to pull a resume into this studio or send your CV there for its templates. The key is stored encrypted and is never shown again.</div>
     {err && <div className="notice err">{err}</div>}{msg && <div className="notice">{msg}</div>}
     {!c?.connected ? <div className="stack" style={{ gap: 8 }}>
-      <label className="field"><span>Instance address</span><input type="text" value={url} placeholder={c?.default_url ?? "https://rxresu.me"} onChange={(e) => setUrl(e.target.value)} /></label>
+      <label className="field"><span>Instance address</span><input type="text" value={url} placeholder={c?.default_url ?? "https://rxresu.me"} onChange={(e) => setUrl(e.target.value)} /><span className="small muted">The site address, e.g. https://rxresu.me. Links ending in /mcp or /api/openapi are shortened for you. Create the API key under Settings, Developer.</span></label>
       <label className="field"><span>API key</span><input type="password" autoComplete="off" value={key} placeholder="Create one in Reactive Resume: Settings, Developer, API keys" onChange={(e) => setKey(e.target.value)} /></label>
       <div className="row"><button className="btn" disabled={key.length < 8 || !!busy} onClick={connect}>{busy === "c" ? "Checking…" : "Connect"}</button></div></div>
       : <div className="stack" style={{ gap: 10 }}>

@@ -5,7 +5,7 @@ Read this before hosting a public instance.
 | Source | Used for | Terms |
 |---|---|---|
 | Company career pages / public ATS APIs (Greenhouse, Lever, Ashby, Recruitee, SmartRecruiters, Workable, Teamtailor, Personio, BambooHR, Homerun, Workday) | job postings | Public endpoints intended for job-board embedding. Postings link back to the employer's own page. Respect each site's terms. |
-| IND register of recognised sponsors (ind.nl) | "recognised sponsor" badge | Public register. Informational only, **not legal advice**; always verify at ind.nl. |
+| NL IND register of recognised sponsors (ind.nl) | "recognised sponsor" badge | Public register. Informational only, **not legal advice**; always verify at ind.nl. |
 | Wikidata | company names, websites | CC0 |
 | Wikipedia | company categories/websites | CC BY-SA 4.0 (attribute if you republish) |
 | OpenStreetMap (Overpass) | company names/cities/websites | ODbL — **© OpenStreetMap contributors**; attribution required on public instances |

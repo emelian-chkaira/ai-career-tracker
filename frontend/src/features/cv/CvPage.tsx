@@ -9,6 +9,7 @@ import { Studio } from "./Studio";
 import { TemplateGallery } from "./Gallery";
 import { SectionToggles } from "./SectionsEditor";
 import { RrPanel } from "./RrPanel";
+import { GapsPanel } from "./GapsPanel";
 import { useAiSettings } from "@/features/ai/AiPanel";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -137,7 +138,7 @@ function CvStudio() {
         {letter && <Panel id="cv-letter" title="Cover letter"><div className="stack"><textarea rows={14} value={letter} onChange={(e) => setLetter(e.target.value)} style={{ fontFamily: "inherit", fontSize: 14 }} />
           <div className="row"><button className="btn ghost small" onClick={() => navigator.clipboard.writeText(letter)}>Copy</button><button className="btn ghost small" onClick={() => download("cover-letter.txt", letter, "text/plain")}>Download</button></div></div></Panel>}
   </>);
-  const tools = [{ id: "tailor", label: "Tailor to a job", icon: "🎯", node: tailorNode }, { id: "rr", label: "Reactive Resume", icon: "♻", node: <RrPanel cv={cv?.cv} template={template} paper={paper} onImport={(c) => { setCv({ cv: c as CvData, latex: "", source: "reactive-resume" }); setDirty(true); }} /> }, { id: "latex", label: "LaTeX", icon: "∑", node: latexNode }];
+  const tools = [{ id: "gaps", label: "Missing keywords", icon: "🧭", node: <GapsPanel cv={cv?.cv ?? {}} jobId={jobId} edit={(p) => edit(p as Partial<CvData>)} /> }, { id: "tailor", label: "Tailor to a job", icon: "🎯", node: tailorNode }, { id: "rr", label: "Reactive Resume", icon: "♻", node: <RrPanel cv={cv?.cv} template={template} paper={paper} onImport={(c) => { setCv({ cv: c as CvData, latex: "", source: "reactive-resume" }); setDirty(true); }} /> }, { id: "latex", label: "LaTeX", icon: "∑", node: latexNode }];
 
   return (<div className={"stack" + (cv ? " cvfull" : "")}>
     {!cv && <><div><h1>CV Studio</h1><div className="muted">Import your CV (PDF, Word, LaTeX or Reactive Resume JSON), fix what the parser got wrong, watch the PDF update as you edit, and export. {user ? "Your draft is saved, encrypted, to your account only: another account on this computer never sees it." : "Without an account the draft stays in this browser only; sign in to keep it in your account."}</div></div>

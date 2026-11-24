@@ -19,7 +19,7 @@ HANDLERS = {
     "scan_all": lambda t, db: tasks.scan_all(t, db), "scan_unscanned": lambda t, db: tasks.scan_all(t, db, unscanned=True), "scan_company": tasks.scan_company,
     "discover": tasks.discover, "discover_country": tasks.discover_country, "board_search": tasks.board_search, "dedupe_jobs": tasks.dedupe_jobs, "census": tasks.census, "internships": tasks.internships, "broad_sources": tasks.broad_sources, "logos": tasks.logos, "live_search": tasks.live_search,
     "sponsors_refresh": lambda t, db: (sponsor_service.refresh(db), sponsor_service.recheck_all(db)),
-    "mail_sync": tasks.mail_sync,
+    "mail_sync": tasks.mail_sync, "tailor_cv": tasks.tailor_cv,
     "embed": lambda t, db: task_service.progress(db, t, embedded=embeddings.backfill()),
 }
 

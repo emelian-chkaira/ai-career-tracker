@@ -18,10 +18,16 @@ def cv_text(cv: dict) -> str: return cvmod._ai_input(cv)[0]
 
 
 def make_guard(cv: dict):
-    base = cv_text(cv); nums = set(NUM.findall(base)); terms = {t.lower() for t in cvmod.find_terms(base)}
+    """Rejects text that brings in a number or a technology the CV never mentioned. A generic multi-word term ('mobile development') is allowed
+    when every word of it is already in the CV, so honest rewording is not punished; a real new tool or skill is still refused."""
+    base = cv_text(cv); nums = set(NUM.findall(base)); terms = {t.lower().replace("-", " ") for t in cvmod.find_terms(base)}
+    words = set(re.findall(r"[a-z0-9+#]+", base.lower().replace("-", " ")))
+    def known(t: str) -> bool:
+        t = t.lower().replace("-", " "); parts = [w for w in t.split() if len(w) > 2]
+        return t in terms or (len(t.split()) > 1 and bool(parts) and all(w in words for w in parts))
     def guard(text: str) -> list[str]:
         bad = [f"new number {n}" for n in set(NUM.findall(text or "")) - nums if len(n.strip(".,")) > 0]
-        bad += [f"new skill {t}" for t in cvmod.find_terms(text or "") if t.lower() not in terms]
+        bad += [f"new skill {t}" for t in cvmod.find_terms(text or "") if not known(t)]
         return bad[:4]
     return guard
 
@@ -29,6 +35,13 @@ def make_guard(cv: dict):
 def coverage(cv: dict, keywords: list[str]) -> dict:
     have = {t.lower() for t in cvmod.find_terms(cv_text(cv))}; hit = [k for k in keywords if k.lower() in have]
     return {"matched": hit, "missing": [k for k in keywords if k.lower() not in have], "percent": round(100 * len(hit) / len(keywords)) if keywords else 0}
+
+
+def poor_match(kws: list[str], before: dict, fit: str) -> str:
+    """A plain-words warning when tailoring cannot help: the posting asks for things the CV does not show (or has no readable requirements at all)."""
+    if not kws: return "This posting names no recognisable skills or tools, so there is nothing to tailor to. Check that it is a real job description."
+    if fit == "poor" or before["percent"] < 15: return f"Poor match: only {before['percent']}% of this posting's requirements appear in your CV. Rewording cannot create a fit, so apply only if you can honestly cover the gaps."
+    return ""
 
 
 def job_dict(j: Job) -> dict:
@@ -79,7 +92,8 @@ def tailor(db: Session, user: User, j: Job, cfg: llm.Cfg, cv: dict) -> JobCv:
     except ValueError as e: raise llm.LlmTransientError(str(e))
     except json.JSONDecodeError: raise llm.LlmTransientError("the model returned broken JSON, try again")
     after = coverage(out["cv"], kws)
-    report = {"keywords": kws, "before": before, "after": after, "changes": out["changes"], "rejected": out["rejected"], "gaps": out["gaps"], "notes": out["notes"], "job": {"title": j.title, "company": j.company.name}}
+    report = {"keywords": kws, "before": before, "after": after, "changes": out["changes"], "rejected": out["rejected"], "gaps": out["gaps"], "notes": out["notes"], "fit": out.get("fit", ""), "job": {"title": j.title, "company": j.company.name}}
+    report["poor_match"] = poor_match(kws, before, out.get("fit", ""))
     return save(db, user, j.id, out["cv"], report=report, model=cfg.label)
 
 
@@ -94,3 +108,53 @@ def letter(db: Session, user: User, j: Job, cfg: llm.Cfg, cv: dict, tone: str = 
     if len(text) < 80: raise llm.LlmTransientError("the model returned an empty letter")
     r = get(db, user, j.id)
     return save(db, user, j.id, json.loads(unseal(r.data_enc)) if r else cv, cover_letter=text[:6000], model=cfg.label)
+
+
+# ---------------------------------------------------------------- tailor + rebuild in Reactive Resume, by hand or automatically for followed jobs
+AUTO_DEFAULT = {"on": False, "stages": ["shortlisted"], "push_rr": True, "consent": False}
+AUTO_STAGES = ("shortlisted", "applied", "screening", "interview")
+
+
+def auto_cfg(user: User) -> dict: return {**AUTO_DEFAULT, **((user.profile or {}).get("auto_tailor") or {})}
+
+
+def set_auto(db: Session, user: User, on: bool, stages: list[str], push_rr: bool, consent: bool) -> dict:
+    cfg = {"on": bool(on), "stages": [s for s in stages if s in AUTO_STAGES] or ["shortlisted"], "push_rr": bool(push_rr), "consent": bool(consent)}
+    user.profile = {**(user.profile or {}), "auto_tailor": cfg}; db.add(user); db.commit(); return cfg
+
+
+def rebuild(db: Session, user: User, j: Job, cfg: llm.Cfg, cv: dict, push: bool = True) -> dict:
+    """AI-tailor the saved CV to this posting, keep it, and (when Reactive Resume is connected) create a fresh resume there from it.
+    The tailored CV is never lost if Reactive Resume is down: the failure is recorded next to it."""
+    from . import rr_service
+    r = tailor(db, user, j, cfg, cv); out = json.loads(unseal(r.data_enc)); rep = dict(r.report or {}); rep.pop("reactive_resume", None); rep.pop("reactive_resume_error", None)
+    if push and rr_service.get_conn(db, user.id):
+        name = f"CV - {j.title[:40]} @ {j.company.name[:30]}"
+        try: rep["reactive_resume"] = {**rr_service.push_cv(db, user.id, out, r.template, rep.get("paper", "a4"), name), "name": name}
+        except rr_service.RrError as e: rep["reactive_resume_error"] = str(e)
+    elif push: rep["reactive_resume_error"] = "Reactive Resume is not connected (CV Studio, Reactive Resume)."
+    r.report = rep; db.add(r); db.commit(); return view(r)
+
+
+def queue_if_auto(db: Session, user: User, job_id: int, stage: str | None) -> bool:
+    """Called when a job is followed (its stage set): queue a background tailor-and-rebuild when the user turned that on for this stage."""
+    from . import task_service
+    a = auto_cfg(user)
+    if not a["on"] or stage not in a["stages"] or get(db, user, job_id): return False        # one tailored CV per job: re-run it by hand
+    task_service.enqueue(db, "tailor_cv", {"user_id": str(user.id), "job_id": job_id}); return True
+
+
+def run_queued(db: Session, user_id: str, job_id: int) -> str:
+    """Worker side of queue_if_auto. Returns a one-line result; raises for hard failures so the task shows as failed."""
+    from app.models import Notification
+    from .ai_cfg import cfg_of
+    from . import fit_service
+    user = db.get(User, user_id); j = db.get(Job, job_id)
+    if not user or not j: return "user or job gone"
+    a = auto_cfg(user); cv = fit_service.get_cv(db, user); cfg = cfg_of(db, user, "tailoring")
+    if cv is None: raise RuntimeError("no saved CV")
+    if not cfg.configured: raise RuntimeError("no AI model chosen")
+    if cfg.external and not a["consent"]: raise RuntimeError("the AI provider is external and automatic tailoring has no consent")
+    v = rebuild(db, user, j, cfg, cv, push=a["push_rr"]); rr = (v["report"] or {}).get("reactive_resume")
+    db.add(Notification(user_id=user.id, kind="cv", title=f"Tailored CV ready: {j.title}", body=(f"Rebuilt in Reactive Resume ({rr['name']})." if rr else "Review it in CV Studio."), data={"job_id": job_id, "resume": rr}))
+    db.commit(); return "tailored" + (" and rebuilt in Reactive Resume" if rr else "")

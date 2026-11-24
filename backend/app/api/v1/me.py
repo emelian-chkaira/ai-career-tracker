@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.db import get_db
 from app.core.deps import current_user
 from app.models import User, UserJob, SavedSearch, Notification, Job
-from app.services import jobs_service, search_service as ss, alert_service, tracking_service as ts
+from app.services import jobs_service, search_service as ss, alert_service, tracking_service as ts, tailor_service
 
 router = APIRouter(prefix="/me", tags=["me"])
 STAGES = ["shortlisted", "applied", "screening", "assessment", "team_match", "interview", "final_round", "offer", "accepted", "rejected", "withdrawn", "skipped"]
@@ -36,6 +36,8 @@ def set_stage(job_id: int, body: StageIn, db: Session = Depends(get_db), user: U
     ts.change_stage(db, user.id, job_id, body.stage or uj.stage or "shortlisted", uj=uj)
     if body.notes is not None: uj.notes = body.notes
     db.commit()
+    try: tailor_service.queue_if_auto(db, user, job_id, uj.stage)          # followed job: tailor + rebuild in the background when the user opted in
+    except Exception: db.rollback()
     return {"job_id": job_id, **ts.view(uj)}
 
 

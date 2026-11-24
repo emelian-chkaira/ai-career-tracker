@@ -1,6 +1,6 @@
 # AI Career Tracker: project plan
 
-A tracker for **jobs, internships and traineeships in the Netherlands**. It knows Dutch companies, checks each one against the **IND list of recognised sponsors**, compares each salary with the **IND salary thresholds**, analyses **your CV**, finds matching vacancies, and has a **Flutter mobile app (separate repo)**.
+A tracker for **jobs, internships and traineeships in the Netherlands**. It knows Dutch companies, checks each one against the **NL IND list of recognised sponsors**, compares each salary with the **NL IND salary thresholds**, analyses **your CV**, finds matching vacancies, and has a **Flutter mobile app (separate repo)**.
 
 Status: planning only, nothing is built yet. Facts below were checked on **2026-11-18** against the pages listed in the Appendix. Anything marked **[verify]** was not confirmed and must be checked before you rely on it.
 
@@ -16,10 +16,10 @@ The tool must ask for it once (Profile screen) and then behave differently. I do
 |---|---|
 | EU / EEA / Swiss citizen | No permit needed. Sponsor badge and salary threshold are shown as "not required" and hidden by default. |
 | Needs a permit and you (may) qualify for the **orientation year** (search year) | You can work freely for up to one year without a sponsor. The tool tracks the permit's end date and the **reduced salary threshold** that applies if you later apply within 3 years of graduating. |
-| Needs a permit as a **highly skilled migrant** | The employer must be a **recognised sponsor** and the salary must meet the threshold for your age. This is the main use of the IND features. |
-| Student on an internship | Internship rules apply [verify]. The IND table lists a lower "Internship" amount, but whether it applies to your case needs confirming. |
+| Needs a permit as a **highly skilled migrant** | The employer must be a **recognised sponsor** and the salary must meet the threshold for your age. This is the main use of the NL IND features. |
+| Student on an internship | Internship rules apply [verify]. The NL IND table lists a lower "Internship" amount, but whether it applies to your case needs confirming. |
 
-Whether the university you attend qualifies for the orientation year depends on the IND's list of designated foreign institutions [verify]. Do not assume it from this plan.
+Whether the university you attend qualifies for the orientation year depends on the NL IND's list of designated foreign institutions [verify]. Do not assume it from this plan.
 
 ### 0.2 What this plan deliberately does NOT build
 
@@ -32,7 +32,7 @@ If you later want to go further on either point, check the legal position first.
 
 ### 0.3 One rule for the whole project
 
-Every number that comes from an outside source (IND amounts, register data, vacancy salary) is stored with its **source URL and date**, and the app shows it. A threshold without a date is a bug.
+Every number that comes from an outside source (NL IND amounts, register data, vacancy salary) is stored with its **source URL and date**, and the app shows it. A threshold without a date is a bug.
 
 ---
 
@@ -41,7 +41,7 @@ Every number that comes from an outside source (IND amounts, register data, vaca
 ### Goals
 
 1. One place to track every job, internship and traineeship you consider, from "found" to "offer" or "rejected".
-2. For every posting, show clearly: **is the employer an IND-recognised sponsor**, **does the salary meet the threshold for my status**, **does it need Dutch**, **how well does it match my CV and why**.
+2. For every posting, show clearly: **is the employer an NL IND-recognised sponsor**, **does the salary meet the threshold for my status**, **does it need Dutch**, **how well does it match my CV and why**.
 3. Analyse your CV once, then keep finding postings that fit it.
 4. Work on your phone: triage new postings, get follow-up reminders, add a posting from your browser with one tap.
 5. Be a good portfolio project: clean architecture, tests, measured accuracy, honest limits.
@@ -51,15 +51,15 @@ Every number that comes from an outside source (IND amounts, register data, vaca
 - Applying for you. The app drafts, you send.
 - Mass emailing or any automated outreach.
 - Scraping sites whose terms forbid it.
-- Legal or immigration advice. It shows what the IND publishes; you decide.
+- Legal or immigration advice. It shows what the NL IND publishes; you decide.
 
 ---
 
-## 2. What the IND publishes (checked 2026-11-18)
+## 2. What the NL IND publishes (checked 2026-11-18)
 
 ### 2.1 Salary thresholds for 2026
 
-From the IND page "Required amounts income requirements". Amounts are **gross per month, without holiday allowance**. The page says the highly skilled migrant and Blue Card amounts change every **1 January**.
+From the NL IND page "Required amounts income requirements". Amounts are **gross per month, without holiday allowance**. The page says the highly skilled migrant and Blue Card amounts change every **1 January**.
 
 | Category | Gross monthly amount |
 |---|---|
@@ -73,23 +73,23 @@ From the IND page "Required amounts income requirements". Amounts are **gross pe
 
 The "other categories" amounts on that page are marked valid **1 July to 31 December 2026**, so they change twice a year. The under-30 amount also applies if you turned 30 but changed employers while still under 30.
 
-**Salary must also be "in line with the market rate"** (IND highly skilled migrant page). Meeting the number is necessary, not sufficient.
+**Salary must also be "in line with the market rate"** (NL IND highly skilled migrant page). Meeting the number is necessary, not sufficient.
 
 ### 2.2 The register of recognised sponsors
 
-- Only an employer **recognised by the IND** can apply for a highly skilled migrant permit for you.
-- The register is on the IND website in four categories: **Work, Exchange, Study, Research**. This project needs **Work** (regular labour and highly skilled migrants).
+- Only an employer **recognised by the NL IND** can apply for a highly skilled migrant permit for you.
+- The register is on the NL IND website in four categories: **Work, Exchange, Study, Research**. This project needs **Work** (regular labour and highly skilled migrants).
 - The Work page is **one HTML table with two columns: Organisation and KvK (Chamber of Commerce) number**, sorted alphabetically. The page text is very large (about half a million characters). One entry has no KvK number.
 - It is **updated once a month**. The page showed "last updated 3 November 2026".
 - No download file and no usage terms were visible [verify by opening the page and its footer].
 
-### 2.3 The orientation year (summary, from government.nl and IND forms)
+### 2.3 The orientation year (summary, from government.nl and NL IND forms)
 
 - Up to **one year** to look for skilled work, applied for by yourself, **no sponsor**, and you may **work freely** during it.
 - Routes: a **Dutch** bachelor's, master's or post-master's (10+ months) completed within **3 years before applying**; or a master's/post-master's/PhD from a **designated foreign institution** (the "top university" route); other routes exist.
 - A foreign diploma must be evaluated by **EP-Nuffic**. The 2026 application fee was **EUR 254**.
 - If you later get a highly skilled migrant job, the **reduced salary criterion** applies if you apply **within 3 years of graduation**.
-- The two sources differ slightly on the foreign-university wording, so check the IND's current list before relying on it.
+- The two sources differ slightly on the foreign-university wording, so check the NL IND's current list before relying on it.
 
 ---
 
@@ -97,11 +97,11 @@ The "other categories" amounts on that page are marked valid **1 July to 31 Dece
 
 ### 3.1 Dutch company directory
 
-- **Seed from the IND register**: every recognised sponsor with a KvK number is a Dutch legal entity. That gives a first list of roughly all companies that can hire a migrant.
+- **Seed from the NL IND register**: every recognised sponsor with a KvK number is a Dutch legal entity. That gives a first list of roughly all companies that can hire a migrant.
 - Add your own: any company you care about, even if not in the register (the badge then says "not listed").
 - Per company: name, KvK number, city, industry, careers-page URL, applicant-system type (Section 4.3), your notes, sponsor status and the date it was checked.
 
-### 3.2 Sponsor check (compare with the IND list)
+### 3.2 Sponsor check (compare with the NL IND list)
 
 1. Download the Work register page once a month and parse the table into a **snapshot** (organisation, KvK, snapshot date). Keep old snapshots so you can see when a company appeared or disappeared.
 2. Match a company to the register **by KvK number first** (exact), then by **normalised name** (lower case, strip "B.V.", "N.V.", punctuation) with fuzzy matching.
@@ -113,7 +113,7 @@ The "other categories" amounts on that page are marked valid **1 July to 31 Dece
 
 ### 3.3 Salary check
 
-For each posting with a salary, convert to the IND's unit and compare:
+For each posting with a salary, convert to the NL IND's unit and compare:
 
 ```
 monthly_gross_excl_holiday = annual_gross_incl_holiday / 12.96     # assumes 8% holiday allowance [verify per posting]
@@ -209,7 +209,7 @@ sources -> fetch (polite) -> parse -> normalise -> dedupe -> enrich -> score -> 
 
 ### 4.3 Turning the register into a vacancy source
 
-The IND register gives a list of Dutch employers that can sponsor. For each one, the company web-resolution layer (Section 4.5) finds the website, the careers page and the applicant system, so the register becomes a source of vacancies without touching sites that forbid it. Expect many companies to need manual configuration, and some to publish nothing usable.
+The NL IND register gives a list of Dutch employers that can sponsor. For each one, the company web-resolution layer (Section 4.5) finds the website, the careers page and the applicant system, so the register becomes a source of vacancies without touching sites that forbid it. Expect many companies to need manual configuration, and some to publish nothing usable.
 
 ### 4.4 Alert-email reader (the entry point)
 
@@ -246,7 +246,7 @@ alert (company, title, city)
 | c | An **official search API** with a query like `"<company>" official website Netherlands` | Provider, price and terms **[verify]**. **Do not scrape the result pages of Google, Bing or DuckDuckGo**; their terms forbid it. |
 | d | Guessed domains (`name.nl`, `name.com`, name without "B.V.") | Always verified by fetching the homepage |
 
-Score each candidate by: the company name in the page title, Dutch or English text, and above all **the KvK number**. Dutch businesses normally have to show their KvK number on their website **[verify the rule]**. If the number on the site equals a number in the IND register, you have confirmed **both the website and the legal entity**, and the sponsor check becomes exact instead of fuzzy. That is the strongest signal in the whole design.
+Score each candidate by: the company name in the page title, Dutch or English text, and above all **the KvK number**. Dutch businesses normally have to show their KvK number on their website **[verify the rule]**. If the number on the site equals a number in the NL IND register, you have confirmed **both the website and the legal entity**, and the sponsor check becomes exact instead of fuzzy. That is the strongest signal in the whole design.
 
 Confidence levels: **high** (KvK matches), **medium** (name and country match, no KvK found), **low** (a guess). Low confidence is shown to you in the app ("Is this the right site?") and nothing is extracted until you confirm. Name collisions are common, so wrong-company data is the main risk of this layer.
 
@@ -284,7 +284,7 @@ A field that cannot be found stays **empty**; it is never guessed. Salary and da
 
 ## 5. Using the data you already hold
 
-The IND register is a **cold list of employers**. Combine it with:
+The NL IND register is a **cold list of employers**. Combine it with:
 
 - Your target **industries and cities**: filter the register by city only if you add a company's address from the company's own site or a public registry **[verify which registry and its terms, for example the Chamber of Commerce (KvK) open data]**.
 - Your **own history**: companies you have applied to or heard back from.
@@ -352,7 +352,7 @@ Same style as project 01: **feature folders with clean-architecture layers**, so
 ```
 backend/careers/
   features/
-    sponsors/      domain: matching rules | application: RefreshRegister, CheckCompany | infrastructure: IND page parser, SQL | api
+    sponsors/      domain: matching rules | application: RefreshRegister, CheckCompany | infrastructure: NL IND page parser, SQL | api
     thresholds/    domain: salary normalisation, verdict rules | infrastructure: config loader | api
     profile/       domain: profile model | application: AnalyseCv | infrastructure: PDF/DOCX reader, skills extractor | api
     jobs/          domain: dedupe, normalisation | application: Discover, Rescore | infrastructure: source adapters | api
@@ -422,7 +422,7 @@ A small REST API with a **single-user token** (you are the only user). The serve
 This is the AI-engineering showpiece, built after the tracker works.
 
 - **RAG over your own documents**: your CV, cover-letter drafts, notes, the postings you saved. A question like "which of my projects best matches this posting?" returns an answer with citations to your own text. Reuse the retrieval and evaluation approach from project 01.
-- **Multiple knowledge sources** with a router that picks where to look: your documents, the stored postings, and the IND and threshold facts (answered from the database, not from model memory). Measure routing accuracy.
+- **Multiple knowledge sources** with a router that picks where to look: your documents, the stored postings, and the NL IND and threshold facts (answered from the database, not from model memory). Measure routing accuracy.
 - **An MCP server** that exposes tools: `search_jobs`, `check_sponsor(company)`, `salary_check(salary, status)`, `list_pipeline`, `add_application`, `draft_message(job, contact)`. Any MCP client or agent can then use the tracker. Keep the tool set small and well described; measure token cost per question.
 - **Models**: Hugging Face. Use local models for anything touching your CV; use a hosted model only for non-personal text, and say so.
 - **Refusals**: when the sources do not cover a question, the assistant says so. Salary thresholds and sponsor status are **never answered from memory**, only from the stored, dated records.
@@ -442,9 +442,9 @@ This is the AI-engineering showpiece, built after the tracker works.
 
 ## 12. Roadmap (phases, each with a "done when")
 
-**Phase 0: Feasibility checks.** Open each planned source's terms and `robots.txt`; fetch the IND Work register once and confirm it parses; confirm which applicant systems have public JSON; confirm Adzuna's official terms and the `nl` country; decide the work-status profile. *Done when:* a one-page table of sources marked allowed or not, and a script that turns the register page into 2 columns of data.
+**Phase 0: Feasibility checks.** Open each planned source's terms and `robots.txt`; fetch the NL IND Work register once and confirm it parses; confirm which applicant systems have public JSON; confirm Adzuna's official terms and the `nl` country; decide the work-status profile. *Done when:* a one-page table of sources marked allowed or not, and a script that turns the register page into 2 columns of data.
 
-**Phase 1: Core tracker and IND features (web or API only).** Sponsor snapshot and matching, thresholds config and salary verdicts, company directory, manual job entry, application tracker with states, tests, CI, Docker. *Done when:* you can add a posting by hand and see sponsor and salary verdicts with sources and dates; sponsor matching checked by hand on 100 companies with the precision reported.
+**Phase 1: Core tracker and NL IND features (web or API only).** Sponsor snapshot and matching, thresholds config and salary verdicts, company directory, manual job entry, application tracker with states, tests, CI, Docker. *Done when:* you can add a posting by hand and see sponsor and salary verdicts with sources and dates; sponsor matching checked by hand on 100 companies with the precision reported.
 
 **Phase 2: CV analysis and matching.** CV reader, profile extraction and correction, classifiers, fit score with reasons, your 150 labelled postings, the comparison table. *Done when:* the evaluation table exists and you can state what the score is worth.
 
@@ -501,13 +501,13 @@ This is the AI-engineering showpiece, built after the tracker works.
 
 ## Appendix: sources checked on 2026-11-18
 
-- IND, required amounts (income requirements): https://ind.nl/en/required-amounts-income-requirements (2026 highly skilled migrant, Blue Card and other amounts)
-- IND, highly skilled migrant: https://ind.nl/en/residence-permits/work/highly-skilled-migrant (employer must be recognised; salary in line with market rate)
-- IND, public register of recognised sponsors: https://ind.nl/en/public-register-recognised-sponsors (monthly updates; four categories)
-- IND, register for regular labour and highly skilled migrants: https://ind.nl/en/public-register-recognised-sponsors/public-register-regular-labour-and-highly-skilled-migrants (two columns: organisation and KvK number; last updated 3 Nov 2026 when read)
-- Government of the Netherlands, orientation year: https://www.government.nl/topics/immigration-to-the-netherlands/options-for-entrepreneurs-and-employees-from-abroad/orientation-year-highly-educated-persons (summary read through a search result; the IND page itself was not reachable at the address I tried)
+- NL IND, required amounts (income requirements): https://ind.nl/en/required-amounts-income-requirements (2026 highly skilled migrant, Blue Card and other amounts)
+- NL IND, highly skilled migrant: https://ind.nl/en/residence-permits/work/highly-skilled-migrant (employer must be recognised; salary in line with market rate)
+- NL IND, public register of recognised sponsors: https://ind.nl/en/public-register-recognised-sponsors (monthly updates; four categories)
+- NL IND, register for regular labour and highly skilled migrants: https://ind.nl/en/public-register-recognised-sponsors/public-register-regular-labour-and-highly-skilled-migrants (two columns: organisation and KvK number; last updated 3 Nov 2026 when read)
+- Government of the Netherlands, orientation year: https://www.government.nl/topics/immigration-to-the-netherlands/options-for-entrepreneurs-and-employees-from-abroad/orientation-year-highly-educated-persons (summary read through a search result; the NL IND page itself was not reachable at the address I tried)
 - Greenhouse Job Board API: https://docs.greenhouse.io/job-board.html (public GET endpoints, no authentication)
 - Adzuna API overview: https://developer.adzuna.com/overview (the official page did not state countries, limits or storage terms)
 - career-ops (similar open-source project): https://github.com/career-ops-hq/career-ops (read only the README; statistics on that page are self-reported)
 
-**Not verified, so treat as open:** LinkedIn, Indeed and Glassdoor current terms; Lever, Ashby, Workable, Recruitee and SmartRecruiters public APIs; Adzuna's official country list, limits and storage terms; whether your university is on the IND's designated list; the internship rules for your status; ESCO licence and format; Dutch rules on unsolicited messages; Flutter package versions; push-notification setup and costs.
+**Not verified, so treat as open:** LinkedIn, Indeed and Glassdoor current terms; Lever, Ashby, Workable, Recruitee and SmartRecruiters public APIs; Adzuna's official country list, limits and storage terms; whether your university is on the NL IND's designated list; the internship rules for your status; ESCO licence and format; Dutch rules on unsolicited messages; Flutter package versions; push-notification setup and costs.

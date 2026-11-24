@@ -1,5 +1,5 @@
 #!/bin/sh
-# Database backup to ./backups (keeps 14).  Cron example:  0 3 * * * sh /home/ubuntu/nl-career-tracker/deploy/backup.sh
+# Database backup to ./backups (keeps 14).  Cron example:  0 3 * * * sh /home/ubuntu/ai-career-tracker/deploy/backup.sh
 set -e
 cd "$(dirname "$0")/.."
 mkdir -p backups

@@ -8,7 +8,7 @@ from app.core import ratelimit
 from app.core.config import settings
 from app.core.db import get_db
 from app.core.deps import client_ip
-from app.cvtools import cv as cvmod, latexcv
+from app.cvtools import cv as cvmod, latexcv, gaps
 from app.models import Job
 
 router = APIRouter(prefix="/cv", tags=["cv"])
@@ -83,6 +83,17 @@ def ai_tailor(req: AiReq, db: Session = Depends(get_db)):
     r["latex"] = latexcv.to_latex(r["cv"])
     r["job"] = {"title": j["title"], "company": j["company"]}
     return r
+
+
+class GapsReq(BaseModel):
+    cv: dict
+    target: str = ""              # mobile | software | internship (ignored when job_id is given)
+    job_id: int | None = None
+
+
+@router.post("/gaps", dependencies=[Depends(guard)], summary="What the CV is missing for a target role or one job: pre-filled, editable proposals (nothing is applied)")
+def cv_gaps(req: GapsReq, db: Session = Depends(get_db)):
+    return gaps.analyse(req.cv, req.target, _job(db, req.job_id) if req.job_id else None)
 
 
 @router.get("/compilers", summary="Which LaTeX compilers can build a PDF")
