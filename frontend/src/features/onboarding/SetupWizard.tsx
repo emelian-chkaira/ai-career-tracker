@@ -79,7 +79,7 @@ export function PlaceStep({ p, set }: { p: P; set: Set }) {
     <ChipPicker label="Cities (optional: leave empty for whole countries)" value={p.cities ?? []} onChange={(v) => set({ cities: v })} options={CITIES.slice(0, 8)} placeholder="Any city, e.g. Berlin, Dubai…" />
     <WorkModePicker value={p.work_modes ?? []} onChange={(v) => set({ work_modes: v })} />
     <Switch checked={p.remote_ok !== false} onChange={(v) => set({ remote_ok: v })} label="Remote jobs open to my countries count as near me" />
-    <Switch checked={!!p.sponsor_needed} onChange={(v) => set({ sponsor_needed: v })} label="I need visa sponsorship (show IND-recognised sponsors only)" />
+    <Switch checked={!!p.sponsor_needed} onChange={(v) => set({ sponsor_needed: v })} label="I need visa sponsorship (show NL IND-recognised sponsors only)" />
   </div>);
 }
 

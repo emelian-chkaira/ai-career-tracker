@@ -46,7 +46,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
           <div><b>Interview invite detected</b><i>moved to Interview · just now</i></div>
           <div><b>CV tailored for Backend Developer</b><i>3 bullets rewritten · 0 facts invented</i></div>
         </div>
-        <div className="small" style={{ opacity: .75 }}>IND sponsor status is shown as a flag, never as advice.</div>
+        <div className="small" style={{ opacity: .75 }}>NL IND sponsor status is shown as a flag, never as advice.</div>
       </aside>
       <main className="authmain">
         <form className="authform authcard stack" onSubmit={submit} noValidate>

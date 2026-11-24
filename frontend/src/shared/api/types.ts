@@ -20,7 +20,7 @@ export interface RegionInfo { key: string; label: string; countries: string[]; j
 export interface SectorsOut { sectors: SectorPreset[]; countries: CountryInfo[]; regions: RegionInfo[]; work_modes: { key: string; label: string; jobs: number }[] }
 export interface TokenOut { access_token: string; refresh_token: string; expires_in: number; user: User }
 export interface SearchParams {
-  q?: string; scope?: "mine" | "all"; sector?: string[]; country?: string[]; region?: string[]; work_mode?: string[]; remote_open?: boolean; mode?: "hybrid" | "keyword" | "semantic"; sort?: string; category?: string; kind?: string; job_type?: string[]; domain?: string[]; language?: string[]; city?: string[]; near?: string; radius_km?: number;
+  q?: string; scope?: "mine" | "all"; sector?: string[]; country?: string[]; region?: string[]; work_mode?: string[]; remote_open?: boolean; mode?: "hybrid" | "exact" | "keyword" | "semantic"; sort?: string; category?: string; kind?: string; job_type?: string[]; domain?: string[]; language?: string[]; city?: string[]; near?: string; radius_km?: number;
   remote?: boolean; sponsor?: boolean; skills?: string[]; skills_mode?: "any" | "all"; min_salary?: number; days?: number; page?: number; limit?: number; company_id?: number;
 }
 export interface SavedSearch { id: number; name: string; params: SearchParams; alert_frequency: string; channel_email: boolean; last_run_at?: string | null }

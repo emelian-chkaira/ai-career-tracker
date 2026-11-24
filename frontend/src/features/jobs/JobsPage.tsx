@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
-import { ApiError } from "@/shared/api/client";
-import type { SearchParams } from "@/shared/api/types";
+import { api, ApiError } from "@/shared/api/client";
+import type { SearchParams, SearchResult } from "@/shared/api/types";
 import { label, parseQs, qs } from "@/shared/lib/format";
 import { SaveSearchButton } from "@/features/alerts/SaveSearchButton";
 import { getConsent, runBatch, useStoredCv } from "@/features/fit/api";
@@ -12,17 +12,17 @@ import { useShortcuts } from "@/shared/lib/useShortcuts";
 import { liveSearch, taskStatus, useJobFeed, useSetStage, useSuggest } from "./api";
 import { Filters } from "./Filters";
 import { useSentinel, ListEnd } from "@/shared/lib/useSentinel";
-import { Drawer, Splitter, Tip, usePane } from "@/shared/ui/kit";
+import { Drawer, Splitter, usePane } from "@/shared/ui/kit";
 import { Icon } from "@/shared/ui/Icon";
+import { Menu } from "./Menu";
+import { FilterPills } from "./FilterPills";
 import { JobCard } from "./JobCard";
 import { JobDetail, JobDrawer } from "./JobDrawer";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@/shared/api/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { openSetup } from "@/features/onboarding/SetupWizard";
 import { useSectors } from "@/shared/api/meta";
 import { flag, modeLabel } from "@/shared/lib/geo";
-import { CountUp, EmptyState } from "@/shared/ui";
+import { EmptyState } from "@/shared/ui";
 import { CrawlNotice } from "./CrawlNotice";
 
 const ARR = ["job_type", "domain", "language", "city", "skills", "sector", "country", "region", "work_mode"] as const;
@@ -40,10 +40,8 @@ function useWide() {
   useEffect(() => { const m = window.matchMedia("(min-width:1101px)"); const f = () => setW(m.matches); m.addEventListener("change", f); return () => m.removeEventListener("change", f); }, []);
   return w;
 }
-const QUICK = ["python", "react", "flutter", "data engineer", "devops", "machine learning", "backend", "intern"];
 const LEVEL: Record<string, string> = { internship: "Internship", traineeship: "Traineeship", junior: "Junior", job: "Medior", senior: "Senior" };
 
-const greeting = (name?: string | null) => { const h = new Date().getHours(), who = name ? `, ${name.split(" ")[0]}` : ""; return `${h < 5 ? "Burning the midnight oil" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"}${who}`; };
 export function JobsPage({ internships = false }: { internships?: boolean }) {
   const [sp, setSp] = useSearchParams();
   const params = useMemo(() => fromUrl(sp.toString(), internships), [sp, internships]);
@@ -71,14 +69,17 @@ export function JobsPage({ internships = false }: { internships?: boolean }) {
     ...(params.near && params.radius_km ? [{ key: "near", text: `${params.radius_km} km of ${params.near}`, clear: () => update({ near: undefined, radius_km: undefined }) }] : [])];
   const cvSaved = useStoredCv(!!user); const aiSet = useAiSettings(); const [batch, setBatch] = useState("");
   const canScore = !!user && !!cvSaved.data && !!aiSet.data?.provider;
+  /** Only when asked: the AI reads your CV against the 60 most promising jobs of the current view (the whole filtered feed, best guess first). */
   async function scoreTop() {
-    const ids = (data?.items ?? []).filter((j) => !j.ai).slice(0, 20).map((j) => j.id);
-    if (!ids.length) { setBatch("Everything on this page is already scored."); return; }
     if (isExternalAi(aiSet.data) && !getConsent()) { setBatch("Open any job and tick the AI consent box first (your CV is sent to the provider)."); return; }
     try {
-      setBatch(`Scoring ${ids.length} roles…`);
-      const r = await runBatch(ids, getConsent(), (t) => setBatch(`Scoring… ${t.progress?.done ?? 0} / ${t.progress?.total ?? ids.length}`));
-      setBatch(r.status === "done" ? `Scored ${r.progress?.scored ?? 0}${r.progress?.failed ? `, ${r.progress.failed} failed` : ""}.` : `Stopped: ${r.error ?? r.progress?.error ?? "unknown error"}`);
+      setBatch("Choosing the best 60 jobs in this view…");
+      const r0 = await api.get<SearchResult>("/jobs", { ...feed, sort: "fit", limit: 60, page: 1 } as Record<string, unknown>);
+      const ids = r0.items.filter((j) => !j.ai).map((j) => j.id);
+      if (!ids.length) { setBatch("The best 60 jobs in this view are already scored."); return; }
+      setBatch(`AI scoring ${ids.length} jobs…`);
+      const r = await runBatch(ids, getConsent(), (t) => setBatch(`AI scoring ${t.progress?.done ?? 0} / ${t.progress?.total ?? ids.length}`));
+      setBatch(r.status === "done" ? `Scored ${r.progress?.scored ?? 0}${r.progress?.failed ? `, ${r.progress.failed} failed` : ""}. Sort by AI score to see them first.` : `Stopped: ${r.error ?? r.progress?.error ?? "unknown error"}`);
       qc.invalidateQueries({ queryKey: ["jobs"] });
     } catch (e) { setBatch(e instanceof ApiError ? e.message : (e as Error).message); }
   }
@@ -107,43 +108,42 @@ export function JobsPage({ internships = false }: { internships?: boolean }) {
     s: () => { if (user && open != null) setStage.mutate({ id: open, stage: "shortlisted" }, { onSuccess: () => toast.success("Shortlisted") }); },
     x: () => { if (open != null) pick(open, !picked.has(open)); },
   });
-  const stats = useQuery({ queryKey: ["hero-stats"], staleTime: 300_000, queryFn: () => api.get<{ kpi: { open_jobs: number; hiring_companies: number; internships: number; new_7d: number } }>("/analytics/overview", { days: 30 }) });
-  const k = stats.data?.kpi;
   useEffect(() => { if (wide && data?.items.length && (open == null || !data.items.some((j) => j.id === open))) setOpen(data.items[0].id); }, [wide, data]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const sorts: [string, string][] = [...(params.q ? [["", "Relevance"], ["newest", "Newest"]] : [["", "Newest"]]), ...(user ? [["ai_fit", "AI score"]] : [])] as [string, string][];
+  const where = mine ? [(prof.sector ?? []).map(secName).join(", "), [...(prof.country ?? []).map((c) => `${flag(c)} ${c}`), ...(prof.region ?? []).map((r) => sec?.regions.find((x) => x.key === r)?.label ?? r)].join(", "), (prof.work_mode ?? []).map(modeLabel).join("/"), (prof.job_type ?? []).map((x) => LEVEL[x] ?? x).join(", ")].filter(Boolean).join(" · ") : "";
   return (<div className={wide ? "jfull" : ""}>
-    <div className="jtop">
-    <div className="jhead">
-      <div className="seg"><Link to="/" className={internships ? "" : "on"}>Jobs</Link><Link to="/internships" className={internships ? "on" : ""}>Internships</Link></div>
-      <div className="jsub"><span className="greet">{greeting(user?.name)}.</span> {internships ? "Internships and traineeships straight from employers' career pages." : "Roles straight from employers' career pages: no middlemen, no duplicates, visa sponsors flagged."}</div>
-      {k && <div className="jstats"><span><b><CountUp value={k.open_jobs} /></b> open roles</span><span><b><CountUp value={k.hiring_companies} /></b> companies</span><span><b><CountUp value={k.new_7d} /></b> new this week</span></div>}
-    </div>
-    <form className="sbar" onSubmit={(e) => { e.preventDefault(); update({ q }); }}>
-      <Icon name="search" size={18} />
-      <input type="search" list="sug" placeholder={'Search title, skill or company — try  flutter -senior  or  "data engineer"'} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search jobs" />
-      <datalist id="sug">{[...(sug.data?.skills ?? []), ...(sug.data?.titles ?? [])].slice(0, 8).map((s2) => <option key={s2} value={q.replace(/\S*$/, "") + s2} />)}</datalist>
-      <select value={params.mode ?? "hybrid"} onChange={(e) => update({ mode: e.target.value as SearchParams["mode"] })} title="Search mode" aria-label="Search mode"><option value="hybrid">Smart</option><option value="keyword">Exact words</option><option value="semantic">By meaning</option></select>
-      <select value={params.sort ?? ""} onChange={(e) => update({ sort: e.target.value || undefined })} aria-label="Sort"><option value="">{params.q ? "Best match" : "Newest first"}</option>{params.q && <option value="newest">Newest first</option>}<option value="oldest">Oldest</option><option value="salary">Salary</option>{user && <option value="fit">Profile match</option>}{user && <option value="ai_fit">AI fit</option>}</select>
-      <button type="button" className="btn ghost" onClick={() => setFiltersOpen(true)}><Icon name="filter" size={16} />Filters{active.length > 0 && <span className="fcount">{active.length}</span>}</button>
-      <button className="btn">Search</button>
-    </form>
-    </div>
-    <div className="jrow2">
-    {user ? <div className="feedbar" aria-label="Whose jobs">
-      <div className="seg"><button className={mine ? "on" : ""} aria-pressed={mine} onClick={() => update({ scope: undefined })}>My feed</button><button className={!mine ? "on" : ""} aria-pressed={!mine} onClick={() => update({ scope: "all" })}>All jobs</button></div>
-      {mine && (Object.keys(prof).length ? <span className="fact">From your profile: <b>{[(prof.sector ?? []).map(secName).join(", "), [...(prof.country ?? []).map((c) => `${flag(c)} ${c}`), ...(prof.region ?? []).map((r) => sec?.regions.find((x) => x.key === r)?.label ?? r)].join(", "), (prof.work_mode ?? []).map(modeLabel).join("/"), prof.cities?.length ? prof.cities.join(", ") + " or remote" : "", (prof.job_type ?? []).map((x) => LEVEL[x] ?? x).join(", "), prof.language ? "English OK" : "", prof.sponsor ? "visa sponsors" : ""].filter(Boolean).join(" · ")}</b></span>
-        : <span className="fact">Your profile is empty, so this is everything.</span>)}
-      <button className="linkbtn" onClick={openSetup}>Edit preferences</button></div>
-    : <label className="feedbar">Field <select value={(params.sector ?? [])[0] ?? "tech"} onChange={(e) => update({ sector: [e.target.value] })} aria-label="Field">{(sec?.sectors ?? []).map((s) => <option key={s.key} value={s.key}>{s.label} ({s.jobs})</option>)}</select></label>}
-    <div className="seg jtabs" role="tablist" aria-label="Quick views">{([["All", {}], ["New this week", { days: 7 }], ["Visa sponsors", { sponsor: true }], ["Remote", { work_mode: ["remote"] }], ["Hybrid", { work_mode: ["hybrid"] }], ["English is enough", { language: ["english_ok"] }]] as [string, Partial<SearchParams>][]).map(([name, patch]) => {
-      const keys = Object.keys(patch) as (keyof SearchParams)[]; const on = keys.length ? keys.every((k) => JSON.stringify(params[k]) === JSON.stringify(patch[k])) : !params.days && !params.sponsor && !params.remote && !(params.language as string[] | undefined)?.length && !(params.work_mode as string[] | undefined)?.length;
-      return <button key={name} role="tab" aria-selected={on} className={on ? "on" : ""} onClick={() => update(keys.length ? patch : { days: undefined, sponsor: undefined, remote: undefined, language: undefined, work_mode: undefined })}>{name}</button>; })}</div>
-    <div className="chips-row">
-      {active.map((c) => <button key={c.key} className="achip" onClick={c.clear} aria-label={`Remove filter ${c.text}`}>{c.text}<span aria-hidden>✕</span></button>)}
-      {active.length > 0 && <button className="linkbtn" onClick={() => setSp(qs({ q: params.q, mode: params.mode, sort: params.sort }), { replace: true })}>Clear all</button>}
-      {!active.length && (user?.profile?.titles?.length ? user.profile.titles.slice(0, 8) : QUICK).map((t) => <button key={t} className="qchip" onClick={() => { setQ(t); update({ q: t }); }}>{t}</button>)}
-    </div>
-    <div className="row small muted" style={{ marginTop: 14 }}><strong style={{ color: "var(--text)" }}>{data ? `${data.total.toLocaleString()} result${data.total === 1 ? "" : "s"}` : ""}</strong><Tip text="j / k move · / search · s shortlist · x select · ⌘K command bar"><span className="kbd" tabIndex={0}>⌨ shortcuts</span></Tip>{canScore && <button className="btn ghost small" disabled={!!batch && batch.startsWith("Scoring")} onClick={scoreTop} title="AI reads each posting against your saved CV">Score this page with AI</button>}{batch && <span>{batch}</span>}{isFetching && <span>updating…</span>}
-      <button className="btn ghost small" onClick={runLive} disabled={!q.trim()} title={q.trim() ? "Read the career pages of employers related to your search, right now" : "Type a search first (e.g. flutter or data engineer): it re-reads the employers related to it"}>⟳ Re-read employers live</button>{!q.trim() && <span className="small muted">type a search to enable</span>}<span>{live}</span>{user && <span className="right"><SaveSearchButton params={feed} /></span>}</div>
+    <div className="jb">
+      <div className="jb1">
+        <div className="seg"><Link to="/" className={internships ? "" : "on"}>Jobs</Link><Link to="/internships" className={internships ? "on" : ""}>Internships</Link></div>
+        {user ? <div className="seg" aria-label="Whose jobs"><button className={mine ? "on" : ""} aria-pressed={mine} onClick={() => update({ scope: undefined })}>My feed</button><button className={!mine ? "on" : ""} aria-pressed={!mine} onClick={() => update({ scope: "all" })}>All jobs</button></div>
+          : <select className="jfield" value={(params.sector ?? [])[0] ?? "tech"} onChange={(e) => update({ sector: [e.target.value] })} aria-label="Field">{(sec?.sectors ?? []).map((s) => <option key={s.key} value={s.key}>{s.label} ({s.jobs})</option>)}</select>}
+        <form className="sbar" onSubmit={(e) => { e.preventDefault(); update({ q }); }}>
+          <Icon name="search" size={18} />
+          <input type="search" list="sug" placeholder={internships ? "Search internships: title, skill or company" : "Search title, skill or company"} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search jobs" />
+          <datalist id="sug">{[...(sug.data?.skills ?? []), ...(sug.data?.titles ?? [])].slice(0, 8).map((s2) => <option key={s2} value={q.replace(/\S*$/, "") + s2} />)}</datalist>
+          <button className="btn">Search</button>
+        </form>
+        <Menu label="More ▾">
+          <button type="button" onClick={runLive} disabled={!q.trim()} title={q.trim() ? "" : "Type a search first"}>Re-read employers live{!q.trim() ? " (type a search)" : ""}</button>
+          {user && <div className="menu-item"><SaveSearchButton params={feed} /></div>}
+          {user && <button type="button" onClick={openSetup}>Edit my preferences</button>}
+          <div className="menu-note">Keys: j / k move, / search, s shortlist, x select</div>
+        </Menu>
+      </div>
+      <div className="jb2">
+        <FilterPills params={params} onChange={(p) => update(p)} onAll={() => setFiltersOpen(true)} count={active.length} />
+        <div className="jb2r">
+          <span className="jcount"><strong>{data ? `${data.total.toLocaleString()} ${internships ? "internship" : "job"}${data.total === 1 ? "" : "s"}` : "…"}</strong>{isFetching && <em>updating…</em>}{batch && <em>{batch}</em>}{live && <em>{live}</em>}</span>
+          <select className="jsort" value={params.sort ?? ""} onChange={(e) => update({ sort: e.target.value || undefined })} aria-label="Order">{sorts.map(([v, name]) => <option key={v || "default"} value={v}>{name}</option>)}</select>
+          {canScore && <button type="button" className="btn small" onClick={scoreTop} disabled={batch.startsWith("AI scoring") || batch.startsWith("Choosing")} title="The AI reads your CV against the 60 most promising jobs in this view">✦ AI score best 60</button>}
+        </div>
+      </div>
+      {user && params.q?.trim() && <div className="alertbar"><span>🔔 Get notified about new <b>“{params.q}”</b> jobs</span><SaveSearchButton params={feed} /></div>}
+      {(active.length > 0 || where) && <div className="chips-row">
+        {active.map((c) => <button key={c.key} className="achip" onClick={c.clear} aria-label={`Remove filter ${c.text}`}>{c.text}<span aria-hidden>✕</span></button>)}
+        {active.length > 0 && <button className="linkbtn" onClick={() => setSp(qs({ q: params.q, mode: params.mode, sort: params.sort }), { replace: true })}>Clear all</button>}
+        {!active.length && where && <span className="fact">Showing jobs for your profile: {where}</span>}
+      </div>}
     </div>
     <Drawer open={filtersOpen} onOpenChange={setFiltersOpen} title="Filters" side="left" size={360}><Filters params={params} facets={data?.facets} onChange={(p) => update(p)} /></Drawer>
     <div className={"layout" + (wide ? "" : " noDetail")} style={{ "--wl": `${pane.width}px` } as React.CSSProperties}>

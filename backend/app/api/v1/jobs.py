@@ -103,5 +103,6 @@ def job_detail(job_id: int, db: Session = Depends(get_db), user: User | None = D
     ai = None
     if user:
         from app.services import fit_service
+        fit_service.ensure_match(db, user)
         ai = fit_service.out(fit_service.scores_for(db, user.id, [j.id]).get(j.id))
     return jobs_service.to_out(j, user, {j.id: stage.stage} if stage else {}, full=True, ai=ai)

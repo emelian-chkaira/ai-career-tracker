@@ -102,3 +102,19 @@ def test_level_preference_keeps_postings_without_a_level(client, make_user, db):
     assert {j["title"] for j in client.get(f"{H}/jobs", headers=h, params={"scope": "mine"}).json()["items"]} == {"Junior Python Developer", "Python Developer"}
     client.put(f"{H}/auth/profile", headers=h, json={"job_types": ["internship"]})
     assert {j["title"] for j in client.get(f"{H}/jobs", headers=h, params={"scope": "mine"}).json()["items"]} == {"Python Developer Internship"}
+
+
+def test_best_match_sort_puts_the_closest_jobs_first(client, make_user, db):
+    from sqlalchemy import select
+    from app.models import Job, JobScore
+    c = ing.add_company(db, "Acme")
+    ing.store_jobs(db, c, [J("Account Manager"), J("Backend Developer"), J("Data Engineer"), J("Office Cleaner")]); db.commit()
+    h, u = make_user("best@example.com"); client.put(f"{H}/auth/profile", headers=h, json={"sectors": ["tech"], "titles": ["Backend Developer"], "skills": ["python"]})
+    jid = {j.title: j.id for j in db.scalars(select(Job))}
+    r = client.get(f"{H}/jobs", headers=h, params={"scope": "all", "sort": "best"}).json()
+    assert r["sort"] == "best" and r["items"][0]["title"] == "Backend Developer"                    # profile match ranks the developer role first
+    from app.models import User
+    uid = db.scalar(select(User.id).where(User.email == "best@example.com"))
+    db.add(JobScore(user_id=uid, job_id=jid["Office Cleaner"], score=99, verdict="strong", reason="x", model="m", basis_hash="h")); db.commit()
+    r = client.get(f"{H}/jobs", headers=h, params={"scope": "all", "sort": "best"}).json()
+    assert r["items"][0]["title"] == "Office Cleaner"                                                    # an AI score of 99 outranks any profile match

@@ -19,8 +19,8 @@ from sqlalchemy.orm import Session
 from app.crawler import search as onto
 from . import embedding_service
 
-Sort = Literal["relevance", "newest", "oldest", "salary", "fit", "ai_fit"]
-Mode = Literal["hybrid", "keyword", "semantic"]
+Sort = Literal["relevance", "newest", "oldest", "salary", "fit", "ai_fit", "best"]
+Mode = Literal["hybrid", "exact", "keyword", "semantic"]   # smart | exact words (LinkedIn-style) | related words (synonyms) | by meaning
 
 
 class SearchParams(BaseModel):
@@ -136,7 +136,7 @@ def _or_tsq(terms: list[str], prefix: str, a: dict) -> str | None:
 BASE = "FROM jobs j JOIN companies c ON c.id = j.company_id"
 
 
-def _keyword_candidates(db: Session, p: SearchParams, pq: dict, groups: list[dict], limit=800):
+def _keyword_candidates(db: Session, p: SearchParams, pq: dict, groups: list[dict], limit=800, fuzzy=True):
     where, args = _filters(p)
     ow, oa = _operator_sql(pq); args.update(oa)
     conds = list(ow)
@@ -149,7 +149,7 @@ def _keyword_candidates(db: Session, p: SearchParams, pq: dict, groups: list[dic
         full = " || ".join(x for x in (tsq_s, tsq_r) if x)
         typo = []
         for i, g in enumerate(specific):
-            if len(g["label"]) >= 5: args[f"ty{i}"] = g["label"]; typo.append(f":ty{i} <% j.title")
+            if fuzzy and len(g["label"]) >= 5: args[f"ty{i}"] = g["label"]; typo.append(f":ty{i} <% j.title")
         conds.append("(j.search_vector @@ (" + full + ")" + ("".join(" OR " + t for t in typo)) + ")")
         rank_expr = f"ts_rank_cd(j.search_vector, {tsq_s}, 32) * 2" + (f" + ts_rank_cd(j.search_vector, {tsq_r}, 32) * 0.5" if tsq_r else "") if tsq_s else f"ts_rank_cd(j.search_vector, {tsq_r}, 32) * 0.5"
     if conds: where += " AND " + " AND ".join(conds)
@@ -185,6 +185,9 @@ def run(db: Session, p: SearchParams) -> dict:
     sort = p.sort or ("relevance" if p.q.strip() else "newest")
     qtext = pq["text"] or " ".join(pq["phrases"])
     groups = onto.parse(qtext) if qtext else []
+    exact = p.mode == "exact"
+    if exact:                                            # only the words you typed (plain plural stem allowed): no synonyms, no related roles, no typo tolerance, no embeddings
+        groups = [dict(g, strong=[t for t in g["strong"] if t == g["label"] or t == onto._stem(g["label"])], related=[]) for g in groups]
     has_terms = bool(groups)
     info = {"groups": [g["label"] for g in groups], "mode": p.mode, "semantic": False, "operators": {"phrases": pq["phrases"], "exclude": pq["excl"], "fields": pq["fields"]}}
     relevance, matched = {}, {}
@@ -195,8 +198,11 @@ def run(db: Session, p: SearchParams) -> dict:
         return {"ids": list(ids), "relevance": relevance, "matched": matched, "info": info, "sort": sort}
 
     kw_scores: dict[int, float] = {}
-    if p.mode in ("hybrid", "keyword"):
-        for r in _keyword_candidates(db, p, pq, groups):
+    if p.mode in ("hybrid", "keyword", "exact"):
+        for r in _keyword_candidates(db, p, pq, groups, fuzzy=not exact):
+            if exact:                                    # every typed word must really appear (generic ones like "developer" may be missing)
+                hay = f"{r['title']} {r['company']} {r['location']} {r['description']}".lower()
+                if not all(any(onto._hit(t, hay) for t in g["strong"]) for g in groups if not g["generic"]): continue
             s, why = onto.score(groups, r["title"] or "", r["company"] or "", r["location"] or "", r["description"] or "")
             if s >= 25: kw_scores[r["id"]] = s + float(r["kw"] or 0); relevance[r["id"]] = s; matched[r["id"]] = why
     sem_sim: dict[int, float] = {}

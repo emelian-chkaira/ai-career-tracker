@@ -20,7 +20,7 @@ export const TASK_INFO: Record<string, { icon: string; title: string; what: stri
   broad_sources: { icon: "search", title: "Wide discovery", what: "Sweeping bigger open-data sources for employers" },
   logos: { icon: "company", title: "Fetch logos", what: "Downloading company logos" },
   dedupe_jobs: { icon: "jobs", title: "Merge duplicate jobs", what: "Folding the same role from other cities, links and boards into one job" },
-  sponsors_refresh: { icon: "company", title: "Refresh visa sponsors", what: "Downloading the IND sponsor register" },
+  sponsors_refresh: { icon: "company", title: "Refresh visa sponsors", what: "Downloading the NL IND sponsor register" },
   embed: { icon: "cv", title: "Build search vectors", what: "Preparing jobs for smart search" },
   live_search: { icon: "crawler", title: "Live re-read", what: "Re-reading the employers related to a search" },
   mail_sync: { icon: "inbox", title: "Sync inbox", what: "Reading job e-mails" },

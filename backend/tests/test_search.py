@@ -73,3 +73,15 @@ def test_semantic_mode_finds_by_meaning(seeded):
     r = ss.run(seeded, ss.SearchParams(q="smartphone application programmer", mode="semantic", category=None))
     t = [seeded.get(Job, i).title for i in r["ids"]]
     assert t and t[0] in ("Flutter Developer", "Android Engineer", "iOS Developer", "Flutter Intern") and "Accountant" not in t[:3]
+
+
+def test_exact_mode_returns_only_jobs_that_contain_the_word(seeded):
+    """Exact = LinkedIn-style: 'flutter' must appear in the posting. Related mode may add iOS/Android roles, exact never does."""
+    def run(mode):
+        r = ss.run(seeded, ss.SearchParams(q="flutter", mode=mode, category=None))
+        return [seeded.get(Job, i) for i in r["ids"]]
+    exact, related = run("exact"), run("keyword")
+    assert exact
+    for j in exact: assert "flutter" in f"{j.title} {j.description}".lower(), j.title
+    assert {j.id for j in exact} <= {j.id for j in related}
+    assert {j.title for j in related} - {j.title for j in exact}, "related mode should still add synonym roles"

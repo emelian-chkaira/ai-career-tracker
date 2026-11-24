@@ -17,7 +17,7 @@ export const GROUPS: { title: string; items: Def[] }[] = [
     { kind: "board_search", title: "Search job boards", what: "LinkedIn, Indeed, Glassdoor, Bayt…", note: "Experimental: via JobSpy, needs CAREERS_BOARD_SITES, and is against those sites' terms. Open the Job boards tab to choose keywords first." }] },
   { title: "Keep tidy", items: [
     { kind: "dedupe_jobs", title: "Merge duplicate jobs", what: "One role, one job", note: "Folds the same role from other cities, links or boards into one and fixes link-label titles. Also runs daily." },
-    { kind: "sponsors_refresh", title: "Refresh sponsor list", what: "IND register, re-check companies" },
+    { kind: "sponsors_refresh", title: "Refresh sponsor list", what: "NL IND register, re-check companies" },
     { kind: "logos", title: "Fetch logos", what: "For the job cards" },
     { kind: "embed", title: "Build search vectors", what: "For smart search" }] },
 ];

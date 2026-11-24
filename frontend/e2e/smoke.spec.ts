@@ -35,9 +35,9 @@ test("search, sign up, track a job and open the AI panels", async ({ page }) => 
   // open a job, see the AI fit box, track it
   await page.goto("/");
   await page.locator(".job").first().click();
-  await expect(page.getByRole("button", { name: /AI fit/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /How well you match/ })).toBeVisible();
   await page.locator("select").filter({ hasText: "Track…" }).first().selectOption("applied");
-  await expect(page.getByRole("button", { name: /Tracking/ })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /Tracking/ })).toBeVisible();
   await page.getByPlaceholder("Add to the timeline…").fill("Sent the application");
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(page.getByText("Sent the application")).toBeVisible();
@@ -55,8 +55,8 @@ test("panels minimise and the assistant docks, minimises and closes", async ({ p
   await page.getByRole("checkbox").check(); await page.getByRole("button", { name: "Create account" }).click();
   await page.getByRole("button", { name: "Skip setup" }).click({ timeout: 15_000 }); await expect(page.getByRole("button", { name: "Account menu" }).first()).toBeVisible();
   await page.goto("/"); await page.locator(".job").first().click();
-  const fit = page.getByRole("button", { name: /AI fit/ }); await expect(fit).toHaveAttribute("aria-expanded", "true"); await fit.click(); await expect(fit).toHaveAttribute("aria-expanded", "false");
-  await page.getByRole("button", { name: /Ask the assistant/ }).click();
+  const fit = page.getByRole("button", { name: /How well you match/ }); await expect(fit).toHaveAttribute("aria-expanded", "true"); await fit.click(); await expect(fit).toHaveAttribute("aria-expanded", "false");
+  await page.locator(".jdact summary").click(); await page.getByRole("button", { name: /Ask the assistant/ }).click();
   const dock = page.getByRole("region", { name: /Assistant/ }); await expect(dock).toBeVisible();
   await dock.getByRole("button", { name: "Minimise" }).click(); await expect(dock.getByLabel("Message")).toHaveCount(0);
   await dock.getByRole("button", { name: "Expand" }).click(); await expect(dock.getByLabel("Message")).toBeVisible();

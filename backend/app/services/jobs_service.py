@@ -66,6 +66,7 @@ def _snippets(db: Session, ids: list[int], q: str) -> dict[int, str]:
 
 
 def search(db: Session, p: ss.SearchParams, user: User | None = None) -> SearchOut:
+    if user: fs.ensure_match(db, user)
     p, applied = personalize(p, user)
     res = ss.run(db, p)
     res["info"]["profile"] = applied
@@ -74,6 +75,11 @@ def search(db: Session, p: ss.SearchParams, user: User | None = None) -> SearchO
         cand = db.scalars(select(Job).where(Job.id.in_(ids[:1500])).options(selectinload(Job.company))).all()
         fits = {j.id: scoring.fit(j.title, j.description or "", j.location or "", j.job_type, j.language, user.profile, j.sector)[0] for j in cand}
         ids = sorted(ids[:1500], key=lambda i: -fits.get(i, 0)) + ids[1500:]
+    if res["sort"] == "best" and user:                   # one "match" order: the AI score; jobs the AI has not read yet count at 60% of the instant estimate
+        cand = db.scalars(select(Job).where(Job.id.in_(ids[:1500])).options(selectinload(Job.company))).all()
+        sc = {r.job_id: r.score for r in db.scalars(select(JobScore).where(JobScore.user_id == user.id, JobScore.job_id.in_(ids[:1500])))}
+        best = {j.id: sc[j.id] if j.id in sc else 0.6 * scoring.fit(j.title, j.description or "", j.location or "", j.job_type, j.language, user.profile, j.sector)[0] for j in cand}   # an unscored job is only a guess: it ranks below an AI-confirmed good one
+        ids = sorted(ids[:1500], key=lambda i: -best.get(i, 0)) + ids[1500:]
     if res["sort"] == "ai_fit" and user:                 # AI-scored jobs first (best first), unscored ones keep their order
         sc = {r.job_id: r.score for r in db.scalars(select(JobScore).where(JobScore.user_id == user.id, JobScore.job_id.in_(ids[:3000])))}
         ids = sorted(ids[:3000], key=lambda i: -sc.get(i, -1)) + ids[3000:]

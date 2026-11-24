@@ -36,7 +36,16 @@ def cv_skills(cv: dict) -> list[str]:
 
 
 def remember_skills(user: User, cv: dict | None):
-    pr = dict(user.profile or {}); pr["cv_skills"] = cv_skills(cv) if cv else []; user.profile = pr
+    from . import cvmatch
+    pr = dict(user.profile or {}); pr["cv_skills"] = cv_skills(cv) if cv else []; pr["cv_match"] = cvmatch.build(cv) if cv else {}; user.profile = pr
+
+
+def ensure_match(db: Session, user: User):
+    """Users who saved a CV before the whole-CV match existed get its summary built once, on first use."""
+    pr = user.profile or {}
+    if "cv_match" in pr: return
+    cv = get_cv(db, user)
+    remember_skills(user, cv); db.commit()
 
 
 def put_cv(db: Session, user: User, cv: dict) -> UserCv:
@@ -110,8 +119,8 @@ def job_facts(j: Job) -> str:
     sal = ""
     if j.salary_min or j.salary_max: sal = f"{int(j.salary_min or 0)}-{int(j.salary_max or 0)} per {j.salary_period or 'year'}"
     rows = [("Title", j.title), ("Company", j.company.name), ("Location", j.location), ("Remote", "yes" if j.remote else "no"), ("Level", j.job_type),
-            ("Language", {"english_ok": "English is enough", "dutch_required": "Dutch required", "dutch_plus": "Dutch is a plus"}.get(j.language, j.language)),
-            ("Visa sponsor (IND)", {"recognised": "recognised sponsor", "possible": "possible sponsor"}.get(j.company.sponsor_status, "not confirmed")), ("Salary", sal)]
+            ("Language", {"english_ok": "English is enough", "dutch_required": "Dutch required", "dutch_plus": "Dutch is a plus", "non_english": "Not written in English"}.get(j.language, j.language)),
+            ("Visa sponsor (NL IND)", {"recognised": "recognised sponsor", "possible": "possible sponsor"}.get(j.company.sponsor_status, "not confirmed")), ("Salary", sal)]
     return "\n".join(f"{k}: {v}" for k, v in rows if v)
 
 
@@ -140,6 +149,7 @@ def _server_flags(j: Job, cv: dict) -> tuple[list[str], int | None]:
     """Hard facts the server knows. -> (flags, score cap)"""
     flags, cap = [], None
     if j.language == "dutch_required" and not cv_speaks_dutch(cv): flags.append("Dutch required, CV lists no Dutch"); cap = 55
+    if j.language == "non_english": flags.append("The posting is not written in English"); cap = 45
     return flags, cap
 
 
