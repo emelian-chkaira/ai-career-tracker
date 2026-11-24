@@ -38,7 +38,7 @@ div.job{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;alig
 .jdclose{align-self:start}
 .jdhead>.jchips{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 0}.jdhead>.jchips .chip{margin:0}
 .jdhead .jdact{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
-.jdhead .jdact>.btn,.jdhead .jdact>select,.jdhead .jdact .menu>summary{height:38px;display:inline-flex;align-items:center;box-sizing:border-box;padding-top:0;padding-bottom:0}
+.jdhead .jdact>.btn,.jdhead .jdact>select,.jdhead .jdact .menu>summary{height:var(--btn-h);display:inline-flex;align-items:center;box-sizing:border-box;padding-top:0;padding-bottom:0}
 .jdhead .jdact>select{padding-inline:12px;min-width:140px}
 .jdhead .jdact .grow{flex:1}
 .jd .bd{padding-bottom:84px}
@@ -58,10 +58,10 @@ div.job{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;alig
 .jb{display:flex;flex-direction:column;gap:10px}
 .jb1{display:flex;align-items:center;gap:10px}
 .jb1 .seg{flex:none}
-.jb1 .jfield{flex:none;width:auto;max-width:260px;height:40px;padding-right:30px}
+.jb1 .jfield{flex:none;width:auto;max-width:260px;height:var(--btn-h);padding-right:30px}
 .jb1 .sbar{flex:1;min-width:0;flex-wrap:nowrap;padding:4px 4px 4px 14px;border-radius:12px;box-shadow:none}
 .jb1 .sbar input[type=search]{min-width:0;padding:7px 4px;font-size:14.5px}
-.jb1>.btn,.jb1 .menu>summary{height:40px;display:inline-flex;align-items:center;gap:6px;box-sizing:border-box;padding-top:0;padding-bottom:0;flex:none}
+.jb1>.btn,.jb1 .menu>summary{height:var(--btn-h);display:inline-flex;align-items:center;gap:6px;box-sizing:border-box;padding-top:0;padding-bottom:0;flex:none}
 .jb2{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .jb2 .quick{display:flex;gap:6px;flex-wrap:wrap}
 .jb2 .qtoggle{padding:5px 12px;font-size:13px}

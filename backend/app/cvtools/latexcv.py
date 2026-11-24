@@ -597,7 +597,123 @@ def compile_any(src: str, mode: str = "auto") -> dict:
 
 
 # ------------------------------------------------------------------ layouts and paper size
-TEMPLATES = ("classic", "compact", "modern")
+
+# ------------------------------------------------------------------ "mine" layout: the look of the author's own CV (serif, teal rules, compact)
+PREAMBLE_MINE = r"""\documentclass[10pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage{tgtermes}
+\usepackage[margin=1.5cm,top=1.0cm,bottom=0.9cm]{geometry}
+\usepackage{parskip}
+\usepackage{enumitem}
+\usepackage[svgnames]{xcolor}
+\definecolor{accent}{HTML}{0E5A73}
+\definecolor{soft}{HTML}{4A6572}
+\usepackage[colorlinks=true,urlcolor=accent,linkcolor=accent]{hyperref}
+\pagestyle{empty}
+\setlist[itemize]{leftmargin=1.2em,itemsep=0.5pt,topsep=1pt,parsep=0pt}
+\newcommand{\cvsec}[1]{\par\vspace{6pt}{\bfseries\color{accent}\MakeUppercase{#1}}\par\vspace{1pt}{\color{accent}\hrule height 0.6pt}\vspace{4pt}}
+\newcommand{\job}[4]{\noindent\textbf{#1} \hfill {\color{soft}#4}\par\noindent {\color{soft}#2}\par\vspace{1pt}}
+\newcommand{\app}[3]{\noindent\textbf{\color{accent}#1} \hfill {\small #3}\par\noindent #2\par\vspace{2.5pt}}
+\newcommand{\sk}[2]{\noindent\textbf{\color{accent}#1:} #2\par}
+\newcommand{\sep}{\ |\ }
+\hypersetup{pdftitle={@@TITLE@@},pdfauthor={@@AUTHOR@@}}
+\begin{document}
+"""
+
+
+def _all_links(cv: dict) -> list[str]:
+    """Header links without duplicates (the same address with and without https://, www., a trailing slash), portfolio-style links from a PDF import's note first."""
+    raw = [m.group(2) for m in re.finditer(r"\[([^\]]+)\]\(([^)\s]+)\)", (cv.get("header") or {}).get("note") or "")] + list(cv.get("links") or [])
+    seen, out = set(), []
+    for l in raw:
+        u = l if l.startswith("http") else "https://" + l; key = re.sub(r"^https?://(www\.)?", "", u).rstrip("/").lower()
+        if key not in seen: seen.add(key); out.append(u)
+    return out
+
+
+def _order(cv: dict) -> list[str]:
+    order = [k for k in (cv.get("order") or []) if k in _DEF_TITLES or k.startswith("x:")] or ["summary", "experience", "education", "projects", "skills"]
+    for k in ("summary", "experience", "education", "projects", "skills", "languages", "certifications"):
+        if k not in order and cv.get(k): order.append(k)
+    return [k for k in order if k not in (cv.get("hidden") or [])]
+
+
+def _mine_blocks(blocks) -> list[str]:
+    o = []
+    for b in blocks:
+        title, place, date = b.get("title") or b.get("heading", ""), b.get("place", ""), b.get("date", "")
+        if not place and " | " in title: title, place = (x.strip() for x in title.split(" | ", 1))
+        if b.get("kind") == "project":
+            right = _links_tex(b.get("links", []))
+            o.append(f"\\app{{{rich(title)}}}{{{rich(', '.join(x for x in (b.get('meta', ''), b.get('tech', '')) if x) or b.get('desc', ''))}}}{{{right}}}")
+            if b.get("desc") and (b.get("meta") or b.get("tech")): o.append(f"{rich(b['desc'])}\\par")
+        else:
+            o.append(f"\\job{{{rich(title)}}}{{{rich(place)}}}{{}}{{{rich(date)}}}")
+            if b.get("desc"): o.append(f"{rich(b['desc'])}\\par")
+        if b.get("bullets"): o += ["\\begin{itemize}", *[f"  \\item {rich(x)}" for x in b["bullets"]], "\\end{itemize}"]
+        o.append("")
+    return o
+
+
+def to_latex_mine(cv: dict) -> str:
+    """Structured CV -> LaTeX in the look of the author's own CV: bold teal name, a contact line, a soft headline, small-caps-style teal section
+    rules, bold-title / right-aligned-date entries with the company in grey-blue, and a labelled skills list."""
+    name = (cv.get("name") or "").strip(); h = cv.get("header") or {}
+    o = [PREAMBLE_MINE.replace("@@TITLE@@", _plain_esc(f"{name} CV").replace("\\", "")).replace("@@AUTHOR@@", _plain_esc(name).replace("\\", ""))]
+    o.append(f"{{\\LARGE\\bfseries\\color{{accent}} {rich(name or 'Your Name')}}}\\par\\vspace{{2pt}}")
+    items = [rich(cv.get("location", "")), (f"\\href{{tel:{re.sub(r'[^+0-9]', '', cv['phone'])}}}{{{rich(cv['phone'])}}}" if cv.get("phone") else ""),
+             (f"\\href{{mailto:{cv['email']}}}{{{rich(cv['email'])}}}" if cv.get("email") else "")]
+    if any(items): o.append(" | ".join(x for x in items if x) + "\\par")
+    links = [f"\\href{{{u}}}{{{_plain_esc(re.sub(r'^https?://(www\.)?', '', u).rstrip('/'))}}}" for u in _all_links(cv)]
+    if links: o.append(" | ".join(links) + "\\par")
+    tag = (h.get("tagline") or [""])[0] or cv.get("headline") or cv.get("title") or ""
+    if not tag and h.get("note"):                                    # a PDF import keeps the headline at the end of the contact note, after the last link
+        tail = re.split(r"\]\([^)]*\)", h["note"])[-1].strip()
+        if tail and not re.match(r"(?i)(portfolio|linkedin|github)", tail): tag = tail
+    if tag: o.append("\\vspace{2pt}{\\large\\bfseries\\color{soft} " + " | ".join(rich(x.strip()) for x in re.split(r"\s*\|\s*", tag)) + "}\\par")
+    titles = cv.get("titles") or {}
+    for k in _order(cv):
+        title = rich(_title_case(titles.get(k) or _DEF_TITLES.get(k, k)))
+        if k == "summary" and cv.get("summary"): o += [f"\\cvsec{{{title}}}", rich(cv["summary"]), ""]
+        elif k in ("experience", "education", "projects") and cv.get(k): o += [f"\\cvsec{{{title}}}", *_mine_blocks(cv[k])]
+        elif k == "skills" and (cv.get("skill_groups") or cv.get("skills")):
+            groups = cv.get("skill_groups") or [{"label": "Skills", "items": cv["skills"]}]
+            o += [f"\\cvsec{{{title}}}", *[f"\\sk{{{rich(g['label'])}}}{{{', '.join(rich(x) for x in g['items'])}}}" for g in groups], ""]
+        elif k == "languages" and cv.get("languages"): o += [f"\\cvsec{{{title}}}", " | ".join(rich(x) for x in cv["languages"]) + "\\par", ""]
+        elif k == "certifications" and cv.get("certifications"): o += [f"\\cvsec{{{title}}}", "\\begin{itemize}", *[f"  \\item {rich(c)}" for c in cv["certifications"]], "\\end{itemize}", ""]
+        elif k == "references" and cv.get("references"): o += [f"\\cvsec{{{title}}}", *[f"{rich(r)}\\par" for r in cv["references"]], ""]
+        elif k.startswith("x:"):
+            ex = next((e for e in cv.get("extras", []) if e["title"] == k[2:]), None)
+            if ex: o += [f"\\cvsec{{{title}}}", *_mine_blocks(ex["blocks"])]
+    for e in cv.get("extras", []):
+        if f"x:{e['title']}" not in _order(cv) and e["blocks"]: o += [f"\\cvsec{{{rich(_title_case(e['title']))}}}", *_mine_blocks(e["blocks"])]
+    o.append(r"\end{document}")
+    return "\n".join(o)
+
+
+def letter_latex(text: str, cv: dict, job: dict | None = None, paper: str = "a4") -> str:
+    """A cover letter in the same look as the CV: teal name with a rule, a contact block, the date, then the letter text (paragraphs split on blank lines)."""
+    import datetime as _dt
+    name = (cv.get("name") or "").strip()
+    items = [rich(cv.get("location", "")), (rich(cv["phone"]) if cv.get("phone") else ""), (f"\\href{{mailto:{cv['email']}}}{{{rich(cv['email'])}}}" if cv.get("email") else "")]
+    links = [f"\\href{{{l if l.startswith('http') else 'https://' + l}}}{{{_plain_esc(re.sub(r'^https?://(www\.)?', '', l))}}}" for l in cv.get("links", [])[:3]]
+    head = PREAMBLE_MINE.replace("10pt,a4paper", "11pt,a4paper").replace("margin=1.5cm,top=1.0cm,bottom=0.9cm", "margin=2.2cm,top=1.8cm,bottom=1.6cm")
+    head = head.replace("@@TITLE@@", _plain_esc(f"{name} cover letter").replace("\\", "")).replace("@@AUTHOR@@", _plain_esc(name).replace("\\", ""))
+    head = head.replace("\\pagestyle{empty}", "\\pagestyle{empty}\n\\setlength{\\parskip}{7pt}")
+    o = [head, f"{{\\LARGE\\bfseries\\color{{accent}} {rich(name or 'Your Name')}}}\\par\\vspace{{0pt}}", "{\\color{accent}\\hrule height 0.6pt}\\vspace{4pt}"]
+    if any(items): o.append(" | ".join(x for x in items if x) + "\\par")
+    if links: o.append(" | ".join(links) + "\\par")
+    o += ["\\vspace{6pt}", _dt.date.today().strftime("%-d %B %Y") + "\\par"]
+    if job and job.get("company"): o.append(f"\\textbf{{{rich(job.get('title') or 'Application')}, {rich(job['company'])}}}\\par")
+    for para in re.split(r"\n\s*\n", (text or "").strip()):
+        para = para.strip()
+        if para: o.append(rich(para).replace("\n", " \\\\\n") + "\\par")
+    o.append(r"\end{document}")
+    src = "\n".join(o)
+    return src.replace("a4paper", "letterpaper") if paper == "letter" else src
+
+
+TEMPLATES = ("mine", "classic", "compact", "modern")
 PAPERS = ("a4", "letter")
 
 
@@ -624,6 +740,7 @@ def render(cv: dict, template: str = "classic", paper: str = "a4") -> str:
     """Structured CV -> LaTeX in one of the layouts and paper sizes. Unknown values fall back to classic / A4."""
     template = template if template in TEMPLATES else "classic"; paper = paper if paper in PAPERS else "a4"
     cv = _drop_hidden_items(cv)
-    src = to_latex_jake(cv) if template == "compact" else to_latex(cv)
+    if template == "mine": src = to_latex_mine(cv)
+    else: src = to_latex_jake(cv) if template == "compact" else to_latex(cv)
     if template == "modern": src = _modern(src)
     return src.replace("letterpaper", "a4paper") if paper == "a4" else src.replace("a4paper", "letterpaper")

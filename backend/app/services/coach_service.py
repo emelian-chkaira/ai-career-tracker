@@ -18,7 +18,9 @@ SYSTEM = """You are a CV coach. The candidate tells you about real experience th
 
 Rules:
 - Use ONLY facts the candidate states in this conversation or that <cv> already shows. Never invent employers, dates, numbers, tools or results.
-- If the candidate is vague (no tool, no place, no outcome), ask ONE short question in "reply" and propose nothing.
+- When the candidate names a skill, tool or area they have ("add image processing as a skill", "I know Docker"), add it as a "skill" proposal right away. Do NOT ask for a project, a place or proof first: their word is enough for a skill.
+- Only ask a question when you really cannot write anything useful, and then ONE short question. Never ask for a project or example the candidate has said they do not have, and never repeat a question you already asked.
+- If the candidate chats or asks you something ("how are you", "which AI are you"), answer in one friendly sentence (you are the CV coach of this app, running on the AI model configured in Settings; do not claim to be a specific model), then say you can add skills, bullets or a summary line from what they tell you. Propose nothing.
 - Write bullets in CV style: start with a past-tense verb, one line, concrete, no first person, no buzzwords. Keep numbers only if the candidate gave them.
 - Prefer small, honest additions: a skill, a bullet under the right existing role (use its index from the <cv> list), a short project, or one summary sentence.
 - <job> only tells you which gaps matter; never add a requirement the candidate did not claim.
@@ -80,6 +82,11 @@ def chat(db: Session, user: User, job: Job | None, cfg: llm.Cfg, cv: dict, histo
     said = " ".join(h["content"] for h in hist if h["role"] == "user") + " " + message
     props = [c for c in (_clean(p, cv, said) for p in (d.get("proposals") if isinstance(d.get("proposals"), list) else [])[:5] if isinstance(p, dict)) if c]
     dropped = len([p for p in (d.get("proposals") or [])[:5]]) - len(props)
+    if not props:                                                 # "add X as a skill" is enough on its own: never block it on follow-up questions
+        m = re.match(r"(?is)^\s*(?:please\s+)?(?:add|include|put)\s+(?:a\s+|an\s+|the\s+)?(?:(?:new\s+)?skills?\s+(?:of|in|for|called|named)?\s*:?\s*)?(.{2,60}?)(?:\s+(?:as\s+)?(?:a\s+|my\s+)?skills?)?(?:\s+(?:to|in|on)\s+(?:my|the)\s+cv)?\s*[.!]?\s*$", message)
+        if m and len(m.group(1).split()) <= 5:
+            t = m.group(1).strip(" .,:;")
+            if t and t.lower() not in {x.lower() for x in cv.get("skills") or []}: props = [{"kind": "skill", "text": t[0].upper() + t[1:]}]; d = {**d, "reply": f"Added {t} to your skills. Review it and accept."}
     reply = str(d.get("reply") or "").strip()[:600] or ("Tell me what you have done with it (where, and what it achieved)." if not props else "Here is what I would add.")
     if dropped > 0 and not props: reply += " I could not add that without details I can check against what you told me; say where you used it."
     return {"reply": reply, "proposals": props, "missing": miss}

@@ -1,4 +1,5 @@
 const TEMPLATES: { id: string; name: string; blurb: string }[] = [
+  { id: "mine", name: "My CV", blurb: "The look of my own CV: serif type, teal section rules, bold titles with dates on the right, labelled skills." },
   { id: "classic", name: "Classic", blurb: "Centred header, clear rules. The safest choice for applicant-tracking systems." },
   { id: "compact", name: "Compact", blurb: "Dense and tight, fits more on one page." },
   { id: "modern", name: "Modern", blurb: "Accent colour on headings, more air." }];

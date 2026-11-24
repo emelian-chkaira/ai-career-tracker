@@ -1,0 +1,24 @@
+/* One button system for the whole app. Loaded last: every button, menu button, segmented control and filter pill shares one height,
+   padding, radius and type size, so rows of mixed controls line up. Only .lg (sign-in) and icon buttons differ on purpose. */
+:root{--btn-h:36px;--btn-px:14px;--btn-r:10px;--btn-fs:14px}
+
+.btn,.btn.small,.menu>summary.btn,a.btn{
+  box-sizing:border-box;height:var(--btn-h);min-height:var(--btn-h);padding:0 var(--btn-px);border-radius:var(--btn-r);
+  font-size:var(--btn-fs);font-weight:600;line-height:1;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;
+}
+.btn.ghost{border:1px solid var(--line)}
+.btn:not(.ghost){border:1px solid transparent}
+.btn.lg{height:44px;min-height:44px;padding:0 22px;font-size:15px}
+.user .btn.ghost.small{padding:0 12px 0 6px}
+
+/* segmented controls */
+.seg{box-sizing:border-box;height:var(--btn-h);align-items:stretch;padding:3px;border-radius:var(--btn-r)}
+.seg button,.seg a{display:inline-flex;align-items:center;justify-content:center;padding:0 var(--btn-px);font-size:13.5px;font-weight:600;line-height:1;border-radius:calc(var(--btn-r) - 3px)}
+.feedbar .seg button{padding:0 var(--btn-px);font-size:13.5px}
+
+/* filter pills and quick toggles */
+.pill>summary,.pill-btn,.qtoggle,.jb2 .qtoggle{box-sizing:border-box;height:var(--btn-h);padding:0 var(--btn-px);font-size:13.5px;border-radius:999px;display:inline-flex;align-items:center;gap:6px}
+.jsort{height:var(--btn-h);font-size:var(--btn-fs);border-radius:var(--btn-r)}
+
+/* selects sitting in a row of buttons */
+.row>select,.libbar select,.jdact>select{box-sizing:border-box;height:var(--btn-h);padding-top:0;padding-bottom:0;font-size:var(--btn-fs);border-radius:var(--btn-r)}

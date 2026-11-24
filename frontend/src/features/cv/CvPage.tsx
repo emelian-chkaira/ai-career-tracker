@@ -3,7 +3,10 @@ import { useSearchParams } from "react-router-dom";
 import { api } from "@/shared/api/client";
 import { uget, uset } from "@/shared/lib/userStore";
 import { useAuth } from "@/features/auth/AuthContext";
-import { saveStoredCv } from "@/features/fit/api";
+import { useDocs, useRefreshDocs, foldersOf, type DocMeta } from "@/features/fit/api";
+import { DocBar } from "./DocBar";
+import { LettersWorkspace } from "./LettersWorkspace";
+import { ChatPanel } from "./ChatPanel";
 import { Panel, usePane, Splitter } from "@/shared/ui/kit";
 import { Studio } from "./Studio";
 import { TemplateGallery } from "./Gallery";
@@ -11,7 +14,6 @@ import { SectionToggles } from "./SectionsEditor";
 import { RrPanel } from "./RrPanel";
 import { GapsPanel } from "./GapsPanel";
 import { useAiSettings } from "@/features/ai/AiPanel";
-import { useQueryClient } from "@tanstack/react-query";
 
 interface CvData { name: string; email: string; phone: string; location: string; links: string[]; summary: string; skills: string[]; languages: string[]; references?: string[]; skill_groups?: unknown; certifications: string[]; order?: string[]; [k: string]: unknown }
 interface Extracted { cv: CvData; latex: string; source?: string }
@@ -32,32 +34,39 @@ export function CvPage() {
 
 function CvStudio() {
   const [sp] = useSearchParams(); const [jobId, setJobId] = useState(sp.get("job") ?? "");
-  const [cv, setCvState] = useState<Extracted | null>(load); const [tailored, setTailored] = useState<Tailored | null>(null); const [letter, setLetter] = useState("");
+  const [cv, setCvState] = useState<Extracted | null>(load); const [docId, setDocId] = useState<number | null>(null); const [focus] = useState<{ tab: string; n: number }>({ tab: "experience", n: 0 }); const [tailored, setTailored] = useState<Tailored | null>(null);
   const [pdf, setPdf] = useState<{ url: string; engine: string; bytes: number } | null>(null);
   const [busy, setBusy] = useState(""); const [err, setErr] = useState(""); const [tone, setTone] = useState("professional");
   const [mode, setMode] = useState<Mode>("local"); const [consent, setConsent] = useState(false); const [localOk, setLocalOk] = useState<boolean | null>(null);
   const [aiOk, setAiOk] = useState(false); const [aiConsent, setAiConsent] = useState(false); const [ai, setAi] = useState<AiOut | null>(null);
+  const [section, setSection] = useState<"cv" | "cover">("cv"); const [rtab, setRtab] = useState<"ai" | "layout">("ai"); const [incoming, setIncoming] = useState({ text: "", n: 0 });
   const [over, setOver] = useState(false); const fileRef = useRef<HTMLInputElement>(null); const [dirty, setDirty] = useState(false);
 
   useEffect(() => { api.get<{ local: boolean; ai: boolean }>("/cv/compilers").then((r) => { setLocalOk(r.local); setAiOk(r.ai); if (!r.local) setMode("public"); }).catch(() => setLocalOk(false)); }, []);
-  const { user } = useAuth(); const qcl = useQueryClient(); const [stored, setStored] = useState("");
-  const [template, setTemplate] = useState(() => uget("cv-template") ?? "classic");
+  const { user } = useAuth(); const docsQ = useDocs("cv", !!user); const refreshDocs = useRefreshDocs();
+  const [template, setTemplate] = useState(() => uget("cv-template") ?? "mine");
   const [paper, setPaper] = useState(() => uget("cv-paper") ?? "a4");
   const [live, setLive] = useState(true); const [prevBusy, setPrevBusy] = useState(false); const [prevErr, setPrevErr] = useState("");
   const pick = (k: string, v: string, set: (x: string) => void) => { set(v); uset(k, v); };
-  // The account's own draft lives on the server: load it once, then save every change a second after the last edit.
+  // The account's CVs live on the server (CV Studio library): open the one used last, then save every change a second after the last edit.
   const [synced, setSynced] = useState(!user); const [saveErr, setSaveErr] = useState("");
+  const openData = (id: number, d: Extracted & { template?: string; paper?: string }) => { const { template: t, paper: pp, ...rest } = d; setDocId(id); uset("cv-active", String(id)); setCvState(rest.cv ? rest : null); save(rest.cv ? rest : null); setTailored(null); setPdf(null); setAi(null); setDirty(false); if (t) { setTemplate(t); uset("cv-template", t); } if (pp) { setPaper(pp); uset("cv-paper", pp); } };
   useEffect(() => {
     if (!user) return;
-    api.get<{ draft: Extracted & { template?: string; paper?: string } }>("/me/cv/draft")
-      .then((r) => { const { template: t, paper: pp, ...d } = r.draft; setCvState(d.cv ? d : null); save(d.cv ? d : null); if (t) { setTemplate(t); uset("cv-template", t); } if (pp) { setPaper(pp); uset("cv-paper", pp); } })
-      .catch(() => { /* 404: nothing saved yet; keep this account's local cache, if any */ })
-      .finally(() => setSynced(true));
+    (async () => {
+      try {
+        const { docs } = await api.get<{ docs: DocMeta[] }>("/me/docs", { kind: "cv" }); const want = +(uget("cv-active") ?? 0);
+        const d = docs.find((x) => x.id === want) ?? docs.find((x) => x.is_default) ?? docs[0];
+        if (d) { const r = await api.get<{ data: Extracted & { template?: string; paper?: string } }>(`/me/docs/${d.id}`); openData(d.id, r.data); }
+      } catch (e) { setSaveErr(`CV library unavailable (${(e as Error).message.slice(0, 80)}). Restart the backend so it has the latest version.`); } finally { setSynced(true); }
+    })();
   }, [user?.id]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const payload = () => ({ ...cv!, template, paper });
+  const saveNow = async () => { if (!user || !cv || !synced) return; if (docId) await api.put(`/me/docs/${docId}`, { data: payload() }); };
   useEffect(() => {
-    if (!user || !synced) return;
+    if (!user || !synced || !cv) return;
     const t = setTimeout(() => {
-      const req = cv ? api.put("/me/cv/draft", { draft: { ...cv, template, paper } }) : api.del("/me/cv/draft");
+      const req = docId ? api.put(`/me/docs/${docId}`, { data: payload() }) : api.post<{ id: number }>("/me/docs", { kind: "cv", name: cv.cv.name ? `${cv.cv.name} CV` : "My CV", data: payload() }).then((r) => { setDocId(r.id); uset("cv-active", String(r.id)); refreshDocs(); });
       req.then(() => setSaveErr("")).catch((e) => setSaveErr((e as Error).message));
     }, 1000);
     return () => clearTimeout(t);
@@ -87,7 +96,34 @@ function CvStudio() {
     if (added.length) { const o = kept.find((g) => g.label === "Other"); if (o) o.items.push(...added); else kept.push({ label: "Other", items: added }); }
     edit({ skills: v, skill_groups: kept });
   };
-  const upload = (f: File) => run("upload", async () => { const r = await api.upload<Extracted>("/cv/extract", f, { filename: f.name }); setCv(r); setTailored(null); setPdf(null); setDirty(false); });
+  const upload = (files: File[]) => run("upload", async () => {
+    await saveNow().catch(() => undefined);                      // the CV you are leaving is saved first
+    let last: { id: number; r: Extracted } | null = null; const bad: string[] = [];
+    for (const f of files) {
+      try {
+        const r = await api.upload<Extracted>("/cv/extract", f, { filename: f.name });
+        if (user) { const d = await api.post<{ id: number }>("/me/docs", { kind: "cv", name: f.name.replace(/\.[^.]+$/, "").slice(0, 80) || "Uploaded CV", folder: cur?.folder ?? "", data: { ...r, template, paper } }); last = { id: d.id, r }; }
+        else last = { id: 0, r };
+      } catch (e) { bad.push(`${f.name}: ${(e as Error).message}`); }
+    }
+    if (last) { if (last.id) { openData(last.id, { ...last.r, template, paper }); refreshDocs(); } else { setCv(last.r); setTailored(null); setPdf(null); setAi(null); setDirty(false); } }
+    if (bad.length) throw new Error(`Could not read ${bad.join("; ")}`);
+  });
+  const openDoc = (id: number) => run("open", async () => { await saveNow().catch(() => undefined); const r = await api.get<{ data: Extracted & { template?: string; paper?: string } }>(`/me/docs/${id}`); openData(id, r.data); refreshDocs(); });
+  const cur = (docsQ.data ?? []).find((d) => d.id === docId);
+  const renameDoc = () => run("doc", async () => { const n = window.prompt("New name for this CV", cur?.name ?? ""); if (docId && n?.trim()) { await api.put(`/me/docs/${docId}`, { name: n }); refreshDocs(); } });
+  const dupDoc = () => run("doc", async () => { const n = window.prompt("Name for the copy", `${cur?.name ?? "CV"} copy`); if (!cv || !n?.trim()) return; const d = await api.post<{ id: number }>("/me/docs", { kind: "cv", name: n, data: payload() }); setDocId(d.id); uset("cv-active", String(d.id)); refreshDocs(); });
+  const delDoc = () => run("doc", async () => {
+    if (!docId || !window.confirm(`Delete “${cur?.name}”? This cannot be undone.`)) return;
+    await api.del(`/me/docs/${docId}`); const left = (docsQ.data ?? []).filter((d) => d.id !== docId); refreshDocs();
+    if (left.length) { const next = left.find((d) => d.is_default) ?? left[0]; const r = await api.get<{ data: Extracted & { template?: string; paper?: string } }>(`/me/docs/${next.id}`); openData(next.id, r.data); }
+    else { setDocId(null); uset("cv-active", null); setCv(null); }
+  });
+  const defDoc = () => run("doc", async () => { if (!docId) return; await saveNow(); await api.post(`/me/docs/${docId}/default`); refreshDocs(); });
+  const moveDoc = (f: string) => run("doc", async () => { if (docId) { await api.put(`/me/docs/${docId}`, { folder: f }); refreshDocs(); } });
+  const saveAs = (name: string, href: string) => { const a = document.createElement("a"); a.href = href; a.download = name; a.click(); };
+  const cvPdf = () => run("pdf", async () => { if (pdf) return saveAs(`${cur?.name ?? "cv"}.pdf`, pdf.url); const r = await api.post<PdfOut>("/cv/preview", { cv: cv!.cv, template, paper }); saveAs(`${cur?.name ?? "cv"}.pdf`, URL.createObjectURL(new Blob([Uint8Array.from(atob(r.pdf_b64), (c) => c.charCodeAt(0))], { type: "application/pdf" }))); });
+  const copyCv = (n: Record<string, unknown>, fold: string) => run("doc", async () => { await saveNow().catch(() => undefined); const d = await api.post<{ id: number }>("/me/docs", { kind: "cv", name: `${cur?.name ?? "CV"} (AI)`, folder: fold, data: { ...cv!, cv: n, template, paper } }); refreshDocs(); openData(d.id, { ...cv!, cv: n as CvData, template, paper }); });
   const rebuild = () => run("rebuild", async () => { const r = await api.post<{ latex: string }>("/cv/latex", { cv: cv!.cv, template, paper }); setCv({ ...cv!, latex: r.latex }); setDirty(false); });
   const build = (latex: string, name: string) => run("pdf", async () => {
     if (mode === "public" && !consent) throw new Error("Tick the consent box to use a public LaTeX service.");
@@ -98,13 +134,12 @@ function CvStudio() {
   const tailor = () => run("tailor", async () => { const t = await api.post<Tailored>("/cv/tailor", { cv: cv!.cv, latex: cv!.latex, job_id: +jobId }); setTailored(t); });
   const aiTailor = () => run("ai", async () => setAi(await api.post<AiOut>("/cv/ai-tailor", { cv: cv!.cv, job_id: +jobId, consent: aiConsent })));
   const applyAi = () => { if (!ai || !cv) return; setCv({ ...cv, cv: ai.cv, latex: ai.latex }); setPdf(null); setAi(null); setDirty(false); };
-  const cover = () => run("letter", async () => setLetter((await api.post<{ text: string }>("/cv/cover-letter", { cv: cv!.cv, job_id: +jobId, tone })).text));
+  const cover = () => run("letter", async () => { const t = (await api.post<{ text: string }>("/cv/cover-letter", { cv: cv!.cv, job_id: +jobId, tone })).text; setIncoming((x) => ({ text: t, n: x.n + 1 })); setSection("cover"); });
   const download = (name: string, data: BlobPart, type: string) => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([data], { type })); a.download = name; a.click(); };
   const step = !cv ? 1 : tailored ? 4 : 2;
 
-  const aiSet = useAiSettings(); const paneL = usePane("cv-left", 500, 340, 760); const paneR = usePane("cv-right", 270, 220, 460, -1);
-  const latexNode = cv ? (<Panel id="cv-details" title="LaTeX source"><div className="stack"><div className="row"><h2 style={{ margin: 0 }}>LaTeX</h2><span className="chip plain">{cv.source ?? "text"}</span>
-    <button className="btn ghost small right" onClick={() => { setCv(null); setTailored(null); setPdf(null); setLetter(""); }}>Replace CV</button></div>
+  const aiSet = useAiSettings(); const paneL = usePane("cv-left", 500, 340, 760); const paneR = usePane("cv-right2", 360, 280, 520, -1);
+  const latexNode = cv ? (<Panel id="cv-details" title="LaTeX source"><div className="stack"><div className="row"><h2 style={{ margin: 0 }}>LaTeX</h2><span className="chip plain">{cv.source ?? "text"}</span></div>
     <div className="row"><button className="btn" onClick={rebuild} disabled={!!busy}>{busy === "rebuild" ? "Rebuilding…" : dirty ? "Apply edits → LaTeX" : "Rebuild LaTeX"}</button>{dirty && <span className="small muted">You have edits not yet in the LaTeX.</span>}</div>
     <details open={!structured}><summary className="small">LaTeX source ({cv.latex.length.toLocaleString()} chars), editable</summary><textarea rows={14} value={cv.latex} onChange={(e) => setCv({ ...cv, latex: e.target.value })} /></details></div></Panel>) : null;
   const tailorNode = (<>
@@ -135,34 +170,41 @@ function CvStudio() {
             {ai.gaps.length > 0 && <div><span className="small muted">Requirements your CV does not show (not added): </span>{ai.gaps.map((g) => <span key={g} className="chip plain">{g}</span>)}</div>}
             <div className="row"><button className="btn" onClick={applyAi}>Apply changes</button><button className="btn ghost" onClick={() => setAi(null)}>Discard</button><span className="small muted">After applying, press “Build PDF”.</span></div></div>}
         </div></Panel>
-        {letter && <Panel id="cv-letter" title="Cover letter"><div className="stack"><textarea rows={14} value={letter} onChange={(e) => setLetter(e.target.value)} style={{ fontFamily: "inherit", fontSize: 14 }} />
-          <div className="row"><button className="btn ghost small" onClick={() => navigator.clipboard.writeText(letter)}>Copy</button><button className="btn ghost small" onClick={() => download("cover-letter.txt", letter, "text/plain")}>Download</button></div></div></Panel>}
   </>);
+  const chatNode = <ChatPanel target="cv" docName={cur?.name ?? ""} cv={(cv?.cv ?? {}) as Record<string, unknown>} letter="" jobId={jobId} folders={foldersOf(docsQ.data ?? [])}
+    applyCv={(n) => { if (cv) { setCv({ ...cv, cv: n as CvData }); setDirty(true); } }} copyCv={copyCv} applyLetter={() => {}} copyLetter={() => {}} />;
   const tools = [{ id: "gaps", label: "Missing keywords", icon: "🧭", node: <GapsPanel cv={cv?.cv ?? {}} jobId={jobId} edit={(p) => edit(p as Partial<CvData>)} /> }, { id: "tailor", label: "Tailor to a job", icon: "🎯", node: tailorNode }, { id: "rr", label: "Reactive Resume", icon: "♻", node: <RrPanel cv={cv?.cv} template={template} paper={paper} onImport={(c) => { setCv({ cv: c as CvData, latex: "", source: "reactive-resume" }); setDirty(true); }} /> }, { id: "latex", label: "LaTeX", icon: "∑", node: latexNode }];
 
-  return (<div className={"stack" + (cv ? " cvfull" : "")}>
-    {!cv && <><div><h1>CV Studio</h1><div className="muted">Import your CV (PDF, Word, LaTeX or Reactive Resume JSON), fix what the parser got wrong, watch the PDF update as you edit, and export. {user ? "Your draft is saved, encrypted, to your account only: another account on this computer never sees it." : "Without an account the draft stays in this browser only; sign in to keep it in your account."}</div></div>
+  const segNode = <div className="seg" role="tablist" aria-label="Section"><button role="tab" aria-selected={section === "cv"} className={section === "cv" ? "on" : ""} onClick={() => setSection("cv")}>CVs</button>
+        <button role="tab" aria-selected={section === "cover"} className={section === "cover" ? "on" : ""} onClick={() => setSection("cover")}>Cover letters</button></div>;
+  const noCv = section === "cv" && !cv;
+  const saveText = saveErr ? <span className="bad">Not saved: {saveErr}</span> : synced ? "Saved to your account" : "Loading your CVs…";
+  return (<div className={"stack" + (cv && section === "cv" ? " cvfull" : "")}>
+    {!user && <div className="docbar">{segNode}</div>}
+    {noCv && <><div className="muted">Import your CV (PDF, Word, LaTeX or Reactive Resume JSON), fix what the parser got wrong, watch the PDF update as you edit, and export. {user ? "Your CVs are saved, encrypted, to your account only: another account on this computer never sees them." : "Without an account the draft stays in this browser only; sign in to keep it in your account."}</div>
     <div className="steps">{["Import", "Review", "Tailor to a job", "Export PDF"].map((s, i) => <div key={s} className={"step" + (step === i + 1 ? " on" : step > i + 1 ? " done" : "")}><b>{step > i + 1 ? "✓" : i + 1}</b>{s}</div>)}</div></>}
     {err && <div className="notice err">{err}</div>}
-    {cv && user && <div className="row small">{user && <span className="small muted cvsave" title="Your CV is kept on the server for this account only">{saveErr ? <span className="bad">Not saved: {saveErr}</span> : synced ? "Saved to your account" : "Loading your CV…"}</span>}<button className="btn ghost small" onClick={async () => { try { await saveStoredCv(cv.cv); qcl.invalidateQueries({ queryKey: ["stored-cv"] }); setStored("Saved. Jobs can now be scored against this CV."); } catch (e) { setStored((e as Error).message); } }}>Use for AI scoring</button><span className="muted">{stored || "Stores this CV encrypted on your account so AI can compare it with job postings."}</span></div>}
-
-    {!cv && <div className={"drop" + (over ? " over" : "")} onClick={() => fileRef.current?.click()} onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
-      onDrop={(e) => { e.preventDefault(); setOver(false); e.dataTransfer.files[0] && upload(e.dataTransfer.files[0]); }}>
-      <div style={{ fontSize: 34 }}>📄</div><h2>{busy === "upload" ? "Reading your CV…" : "Drop your CV here or click to browse"}</h2><div className="muted">PDF, DOCX, LaTeX (.tex), Reactive Resume JSON or plain text · max 3 MB</div>
-      <input ref={fileRef} hidden type="file" accept=".pdf,.docx,.txt,.tex,.md,.json" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} /></div>}
-
-    {cv && <div className="ws" style={{ "--wl": `${paneL.width}px`, "--wr": `${paneR.width}px` } as React.CSSProperties}>
+    {section === "cover" && <LettersWorkspace lead={segNode} cv={(cv?.cv ?? {}) as Record<string, unknown>} jobId={jobId} tone={tone} setTone={setTone} generating={busy === "letter"} onGenerate={cover} incoming={incoming} onErr={setErr} />}
+    {section === "cv" && user && <DocBar lead={segNode} kind="cv" docs={docsQ.data ?? []} selectedId={docId} busy={!!busy} status={saveText} onSelect={openDoc} onFiles={upload}
+      onRename={renameDoc} onDuplicate={dupDoc} onMove={moveDoc} onDelete={delDoc} onDefault={defDoc} onPdf={cvPdf} />}
+    {noCv && <div className={"drop" + (over ? " over" : "")} onClick={() => fileRef.current?.click()} onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
+      onDrop={(e) => { e.preventDefault(); setOver(false); const f = [...e.dataTransfer.files]; if (f.length) upload(f); }}>
+      <div style={{ fontSize: 34 }}>📄</div><h2>{busy === "upload" ? "Reading your CV…" : "Drop your CVs here or click to browse"}</h2><div className="muted">PDF, DOCX, LaTeX (.tex), Reactive Resume JSON or plain text · max 3 MB each · several files at once</div>
+      <input ref={fileRef} hidden multiple type="file" accept=".pdf,.docx,.txt,.tex,.md,.json" onChange={(e) => { const f = [...(e.target.files ?? [])]; e.target.value = ""; if (f.length) upload(f); }} /></div>}
+    {cv && section === "cv" && <div className="ws" style={{ "--wl": `${paneL.width}px`, "--wr": `${paneR.width}px` } as React.CSSProperties}>
       <div className="ws-left">
-        {structured ? <Studio cv={cv.cv} edit={(p) => edit(p as Partial<CvData>)} setSkills={setSkills} aiReady={!!aiSet.data?.provider} tools={tools} /> : <>{latexNode}{tailorNode}</>}
+        {structured ? <Studio key={docId ?? "new"} cv={cv.cv} edit={(p) => edit(p as Partial<CvData>)} setSkills={setSkills} aiReady={!!aiSet.data?.provider} tools={tools} focus={focus} /> : <>{latexNode}{tailorNode}</>}
       </div>
 
       <Splitter props={paneL.props} label="Resize editor" />
       <div className="ws-mid">
-{pdf ? <iframe className="pdfview" title="PDF preview" src={pdf.url} /> : <div className="card empty">Your PDF preview appears here{localOk ? " and updates as you type" : ""}.</div>}
+{pdf ? <iframe className="pdfview" title="PDF preview" src={pdf.url + "#view=FitH&toolbar=1"} /> : <div className="card empty">Your PDF preview appears here{localOk ? " and updates as you type" : ""}.</div>}
       </div>
       <Splitter props={paneR.props} label="Resize settings" />
       <div className="ws-right">
-        <div className="card stack"><div className="row"><h2 style={{ margin: 0 }}>Layout & PDF</h2>
+        <div className="seg rtabs" role="tablist" aria-label="Side panel"><button role="tab" aria-selected={rtab === "ai"} className={rtab === "ai" ? "on" : ""} onClick={() => setRtab("ai")}>✨ AI</button><button role="tab" aria-selected={rtab === "layout"} className={rtab === "layout" ? "on" : ""} onClick={() => setRtab("layout")}>Layout & PDF</button></div>
+        {rtab === "ai" && <div className="card">{chatNode}</div>}
+        {rtab === "layout" && <><div className="card stack"><div className="row"><h2 style={{ margin: 0 }}>Layout & PDF</h2>
           <div className="seg right"><button className={mode === "local" ? "on" : ""} disabled={localOk === false} onClick={() => setMode("local")} title={localOk === false ? "No LaTeX compiler on this server" : ""}>This server</button><button className={mode === "public" ? "on" : ""} onClick={() => setMode("public")}>Public LaTeX service</button></div></div>
           {structured && <TemplateGallery value={template} onChange={(v) => pick("cv-template", v, setTemplate)} />}
           {structured && <div className="row"><select value={paper} onChange={(e) => pick("cv-paper", e.target.value, setPaper)} aria-label="Paper size"><option value="a4">A4</option><option value="letter">US Letter</option></select>
@@ -178,7 +220,7 @@ function CvStudio() {
             <a className="small" href="https://www.overleaf.com/docs" target="_blank" rel="noreferrer noopener">Overleaf ↗</a></div>
           {pdf && <div className="small muted">Built with {pdf.engine} · {(pdf.bytes / 1024).toFixed(0)} KB</div>}
         </div>
-        {structured && <SectionToggles cv={cv.cv} edit={(p) => edit(p as Partial<CvData>)} />}
+        {structured && <SectionToggles cv={cv.cv} edit={(p) => edit(p as Partial<CvData>)} />}</>}
       </div>
     </div>}
   </div>);

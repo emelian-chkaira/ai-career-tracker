@@ -106,6 +106,22 @@ class UserCv(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class UserDoc(Base):
+    """A document in the user's CV Studio library: several CVs (structured CV + LaTeX + layout) and several cover letters, encrypted.
+    `is_default` marks the CV that AI scoring uses when no CV is chosen for a job."""
+    __tablename__ = "user_docs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(8))                  # cv | cover
+    name: Mapped[str] = mapped_column(String(120))
+    data_enc: Mapped[str] = mapped_column(Text)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    folder: Mapped[str] = mapped_column(String(60), default="", server_default="")   # "" = the default folder
+    job_id: Mapped[int | None] = mapped_column(Integer)           # cover letters: the job it was written for (plain number, no FK: the letter outlives the posting)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class JobScore(Base):
     """AI assessment of one job against the user's CV. Cached by a hash of (CV, posting, model)."""
     __tablename__ = "job_scores"
@@ -118,6 +134,7 @@ class JobScore(Base):
     gaps: Mapped[list] = mapped_column(JSONB, default=list)
     flags: Mapped[list] = mapped_column(JSONB, default=list)      # deal-breakers: Dutch required, visa, onsite far away ...
     summary: Mapped[str | None] = mapped_column(Text)
+    cv_name: Mapped[str | None] = mapped_column(String(120))      # which CV of the library this score used
     model: Mapped[str] = mapped_column(String(100), default="")
     basis_hash: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

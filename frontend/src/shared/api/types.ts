@@ -1,5 +1,5 @@
 export interface Company { id: number; name: string; logo?: string | null; website?: string | null; sponsor_status: string; sponsor_match?: string | null; careers_url?: string | null; city?: string | null; description?: string | null; ats?: string | null; last_scan?: string | null; open_jobs?: number }
-export interface AiFit { score: number; verdict: "strong" | "good" | "stretch" | "weak"; reason: string; strengths: string[]; gaps: string[]; flags: string[]; summary?: string | null; model: string; at: string }
+export interface AiFit { score: number; verdict: "strong" | "good" | "stretch" | "weak"; reason: string; strengths: string[]; gaps: string[]; flags: string[]; summary?: string | null; cv_name?: string | null; model: string; at: string }
 /** The same role elsewhere: another city, another link, another site (see backend crawler/dedupe.py). */
 export interface JobAlt { url: string; location?: string | null; city?: string | null; countries?: string[]; source?: string | null; work_mode?: string | null }
 export interface Job {

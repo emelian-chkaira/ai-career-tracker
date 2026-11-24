@@ -1,7 +1,7 @@
 """CV tools — stateless: nothing is stored server-side; the client keeps the CV and sends it with each request."""
 import base64
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import select
 from app.core import ratelimit
@@ -50,6 +50,16 @@ async def extract(request: Request, filename: str = ""):
     except Exception as e: raise HTTPException(400, f"could not read the file: {str(e)[:140]}")
 
 
+@router.post("/extract-text", dependencies=[Depends(guard)], summary="PDF/DOCX/text -> plain text (to import a cover letter)")
+async def extract_text(request: Request, filename: str = ""):
+    data = await request.body()
+    if not data: raise HTTPException(400, "empty file")
+    try: text = cvmod.clean_letter(cvmod.extract_text(data, filename)).strip()
+    except Exception as e: raise HTTPException(400, f"could not read the file: {str(e)[:140]}")
+    if not text: raise HTTPException(400, "no text found in the file (a scanned image PDF cannot be read)")
+    return {"text": text[:8000]}
+
+
 @router.post("/parse", dependencies=[Depends(guard)])
 def parse(body: dict):
     if body.get("latex"):
@@ -58,6 +68,24 @@ def parse(body: dict):
         return {"cv": latexcv.parse_latex(src), "latex": src, "source": "latex"}
     c = cvmod.parse_cv(str(body.get("text", ""))[:60000])
     return {"cv": c, "latex": latexcv.to_latex(c), "source": "text"}
+
+
+class LetterPdfReq(BaseModel):
+    text: str = Field(..., min_length=1, max_length=8000)
+    cv: dict
+    job_id: int | None = None
+    paper: str = "a4"
+
+
+@router.post("/letter-pdf", dependencies=[Depends(guard)], summary="A cover letter as a PDF in the same look as the CV (local compiler only)")
+def letter_pdf(req: LetterPdfReq, db: Session = Depends(get_db)):
+    if not latexcv.compiler(): raise HTTPException(503, "building a letter PDF needs a LaTeX compiler on this server")
+    job = _job(db, req.job_id) if req.job_id else None
+    src = latexcv.letter_latex(req.text, req.cv, job, req.paper)[:200000]
+    if not latexcv.is_safe(src): raise HTTPException(400, "LaTeX contains disallowed commands")
+    pdf, err = latexcv.compile_pdf(src)
+    if not pdf: raise HTTPException(422, {"error": err or "compilation failed"})
+    return {"pdf_b64": base64.b64encode(pdf).decode(), "engine": "local", "bytes": len(pdf)}
 
 
 class PdfReq(BaseModel):
@@ -118,7 +146,7 @@ def latex(body: dict): return {"latex": latexcv.render(body.get("cv") or {}, bod
 
 
 @router.get("/templates", summary="Available layouts and paper sizes")
-def templates(): return {"templates": [{"id": "classic", "label": "Classic"}, {"id": "compact", "label": "Compact"}, {"id": "modern", "label": "Modern"}], "papers": list(latexcv.PAPERS)}
+def templates(): return {"templates": [{"id": "mine", "label": "My CV"}, {"id": "classic", "label": "Classic"}, {"id": "compact", "label": "Compact"}, {"id": "modern", "label": "Modern"}], "papers": list(latexcv.PAPERS)}
 
 
 @router.post("/rx/export", dependencies=[Depends(guard)], summary="Export the CV as Reactive Resume v5 JSON")

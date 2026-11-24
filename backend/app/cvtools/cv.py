@@ -214,7 +214,7 @@ def _skill_groups(lines: list[str]) -> list[dict]:
     for l in lines:
         raw = l.strip()
         if not raw: continue
-        m = re.match(r"^(?:[-*]\s*)?([A-Za-z][A-Za-z /&+.-]{1,32}):\s*(.+)$", raw.lstrip("\x01\x02"))
+        m = re.match(r"^(?:[-*]\s*)?([A-Za-z][A-Za-z /&+.-]{1,32}):\s*(.+)$", re.sub(r"^(?:[-*]\s*)?\*\*([^*]+?)\*\*", r"\1", raw.lstrip("\x01\x02")))   # '**Mobile:** Flutter' (bold label from a layout-aware read) too
         lay = re.match(r"^\x01(.+?)\s{2,}(.+)$", raw)
         if lay: groups.append({"label": plain(lay.group(1)).strip(": "), "items": _items(lay.group(2)), "_cont": not raw.rstrip().endswith(",")})
         elif m: groups.append({"label": m.group(1).strip(), "items": _items(m.group(2))})
@@ -598,3 +598,30 @@ def ai_tailor_with(cv: dict, job: dict, ask, guard=None) -> dict:
         except Exception: pass
     fit = str(out.get("fit") or "").lower(); fit = fit if fit in ("strong", "partial", "poor") else ""
     return {"cv": new, "changes": changes, "rejected": rejected, "gaps": [str(x) for x in (out.get("gaps") or [])][:12], "notes": str(out.get("notes") or "")[:400], "fit": fit}
+
+
+def clean_letter(text: str) -> str:
+    """A cover letter read from a PDF: drop the letterhead (the app adds its own from your CV), join hard-wrapped lines and
+    hyphenated line ends, and restore paragraphs and bullet lists."""
+    lines = [l.strip() for l in text.replace("\r", "").split("\n")]; lines = [l for l in lines if l]
+    start = next((i for i, l in enumerate(lines) if re.match(r"(?i)^(dear|hi|hello|to whom|geachte|beste)\b", l)), None)
+    if start is None:                                                  # no salutation: skip contact lines at the top only
+        start = 0
+        while start < len(lines) and start < 6 and ("@" in lines[start] or "|" in lines[start] or re.match(r"^\d{1,2} \w+ \d{4}$", lines[start])): start += 1
+    lines = lines[start:]
+    if not lines: return ""
+    longest = max(len(l) for l in lines); paras: list[str] = []; cur = ""
+    def flush():
+        nonlocal cur
+        if cur: paras.append(cur); cur = ""
+    for l in lines:
+        bullet = re.match(r"^[-•*]\s+", l)
+        head = len(l) < 40 and not re.search(r"[.!?:,]$", l) and not bullet and (not cur or re.search(r"[.!?:]$", cur))
+        if bullet or head or re.match(r"(?i)^dear\b", l): flush()
+        if cur and cur.endswith("-") and l[:1].islower(): cur = cur[:-1] + l
+        else: cur = f"{cur} {l}" if cur else l
+        if head or (re.search(r"[.!?:]$", l) and len(l) < 0.8 * longest) or (l.endswith(",") and len(l) < 40): flush()
+    flush()
+    out = ""
+    for i, p in enumerate(paras): out += ("" if i == 0 else ("\n" if p.startswith(("-", "•", "*")) and paras[i - 1].startswith(("-", "•", "*")) else "\n\n")) + p
+    return out

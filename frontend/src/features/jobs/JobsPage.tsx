@@ -5,7 +5,8 @@ import { api, ApiError } from "@/shared/api/client";
 import type { SearchParams, SearchResult } from "@/shared/api/types";
 import { label, parseQs, qs } from "@/shared/lib/format";
 import { SaveSearchButton } from "@/features/alerts/SaveSearchButton";
-import { getConsent, runBatch, useStoredCv } from "@/features/fit/api";
+import { getConsent, getScoringCv, runBatch, useDocs, useStoredCv } from "@/features/fit/api";
+import { CvPicker } from "@/features/cv/CvPicker";
 import { isExternalAi, useAiSettings } from "@/features/ai/AiPanel";
 import { toast } from "sonner";
 import { useShortcuts } from "@/shared/lib/useShortcuts";
@@ -67,7 +68,7 @@ export function JobsPage({ internships = false }: { internships?: boolean }) {
     ...(params.remote ? [{ key: "remote", text: "Remote", clear: () => update({ remote: undefined }) }] : []), ...(params.sponsor ? [{ key: "sponsor", text: "Visa sponsor", clear: () => update({ sponsor: undefined }) }] : []),
     ...(params.days ? [{ key: "days", text: `Last ${params.days}d`, clear: () => update({ days: undefined }) }] : []), ...(params.min_salary ? [{ key: "sal", text: `≥ €${params.min_salary}`, clear: () => update({ min_salary: undefined }) }] : []),
     ...(params.near && params.radius_km ? [{ key: "near", text: `${params.radius_km} km of ${params.near}`, clear: () => update({ near: undefined, radius_km: undefined }) }] : [])];
-  const cvSaved = useStoredCv(!!user); const aiSet = useAiSettings(); const [batch, setBatch] = useState("");
+  const cvSaved = useStoredCv(!!user); const aiSet = useAiSettings(); const [batch, setBatch] = useState(""); const [scoreCv, setScoreCv] = useState<number | null>(getScoringCv()); const cvDocs = useDocs("cv", !!user);
   const canScore = !!user && !!cvSaved.data && !!aiSet.data?.provider;
   /** Only when asked: the AI reads your CV against the 60 most promising jobs of the current view (the whole filtered feed, best guess first). */
   async function scoreTop() {
@@ -75,10 +76,11 @@ export function JobsPage({ internships = false }: { internships?: boolean }) {
     try {
       setBatch("Choosing the best 60 jobs in this view…");
       const r0 = await api.get<SearchResult>("/jobs", { ...feed, sort: "fit", limit: 60, page: 1 } as Record<string, unknown>);
-      const ids = r0.items.filter((j) => !j.ai).map((j) => j.id);
+      const want = (cvDocs.data ?? []).find((d) => (scoreCv !== null ? d.id === scoreCv : d.is_default))?.name;   // jobs scored with another CV are scored again with the chosen one
+      const ids = r0.items.filter((j) => !j.ai || (!!want && !!j.ai.cv_name && j.ai.cv_name !== want)).map((j) => j.id);
       if (!ids.length) { setBatch("The best 60 jobs in this view are already scored."); return; }
       setBatch(`AI scoring ${ids.length} jobs…`);
-      const r = await runBatch(ids, getConsent(), (t) => setBatch(`AI scoring ${t.progress?.done ?? 0} / ${t.progress?.total ?? ids.length}`));
+      const r = await runBatch(ids, getConsent(), (t) => setBatch(`AI scoring ${t.progress?.done ?? 0} / ${t.progress?.total ?? ids.length}`), scoreCv);
       setBatch(r.status === "done" ? `Scored ${r.progress?.scored ?? 0}${r.progress?.failed ? `, ${r.progress.failed} failed` : ""}. Sort by AI score to see them first.` : `Stopped: ${r.error ?? r.progress?.error ?? "unknown error"}`);
       qc.invalidateQueries({ queryKey: ["jobs"] });
     } catch (e) { setBatch(e instanceof ApiError ? e.message : (e as Error).message); }
@@ -135,6 +137,7 @@ export function JobsPage({ internships = false }: { internships?: boolean }) {
         <div className="jb2r">
           <span className="jcount"><strong>{data ? `${data.total.toLocaleString()} ${internships ? "internship" : "job"}${data.total === 1 ? "" : "s"}` : "…"}</strong>{isFetching && <em>updating…</em>}{batch && <em>{batch}</em>}{live && <em>{live}</em>}</span>
           <select className="jsort" value={params.sort ?? ""} onChange={(e) => update({ sort: e.target.value || undefined })} aria-label="Order">{sorts.map(([v, name]) => <option key={v || "default"} value={v}>{name}</option>)}</select>
+          {canScore && <CvPicker value={scoreCv} onChange={setScoreCv} label="with CV" />}
           {canScore && <button type="button" className="btn small" onClick={scoreTop} disabled={batch.startsWith("AI scoring") || batch.startsWith("Choosing")} title="The AI reads your CV against the 60 most promising jobs in this view">✦ AI score best 60</button>}
         </div>
       </div>

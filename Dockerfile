@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends libatomic1 && r
  && if [ "$WITH_BROWSER" = "1" ]; then playwright install --with-deps chromium; fi \
  && useradd -m app && mkdir -p /data && chown app /data
 COPY backend backend
+COPY CHANGELOG.md CHANGELOG.md
 COPY --from=web /web/dist frontend/dist
 USER app
 WORKDIR /app/backend

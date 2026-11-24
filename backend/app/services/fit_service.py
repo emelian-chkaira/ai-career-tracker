@@ -48,11 +48,15 @@ def ensure_match(db: Session, user: User):
     remember_skills(user, cv); db.commit()
 
 
-def put_cv(db: Session, user: User, cv: dict) -> UserCv:
+def put_cv(db: Session, user: User, cv: dict, sync_docs: bool = True) -> UserCv:
     raw = json.dumps(cv, ensure_ascii=False)
     if len(raw) > 200_000: raise ValueError("CV is too large")
     r = db.get(UserCv, user.id) or UserCv(user_id=user.id)
-    r.data_enc, r.text_hash = seal(raw), cv_hash(cv); db.add(r); remember_skills(user, cv); db.commit(); return r
+    r.data_enc, r.text_hash = seal(raw), cv_hash(cv); db.add(r); remember_skills(user, cv)
+    if sync_docs:
+        from . import docs_service
+        docs_service.refresh_default(db, user, cv)      # the CV Studio library's default CV follows every save of the stored CV
+    db.commit(); return r
 
 
 # ------------------------------------------------------------------ CV Studio working copy (per user, never shared through the browser)
@@ -160,11 +164,13 @@ def _basis(cv_h: str, j: Job, model: str) -> str:
 def _clip_list(v, n=4, w=200) -> list[str]: return [str(x).strip()[:w] for x in (v if isinstance(v, list) else [])[:n] if str(x).strip()]
 
 
-def score_job(db: Session, user: User, j: Job, cfg: llm.Cfg, cv: dict, force: bool = False) -> JobScore:
+def score_job(db: Session, user: User, j: Job, cfg: llm.Cfg, cv: dict, force: bool = False, cv_name: str | None = None) -> JobScore:
     """Score one job (cached). Raises llm.LlmError when the model fails."""
     model = cfg.label; ch = cv_hash(cv); basis = _basis(ch, j, model)
     row = db.get(JobScore, (user.id, j.id))
-    if row and row.basis_hash == basis and not force: return row
+    if row and row.basis_hash == basis and not force:
+        if cv_name and row.cv_name != cv_name: row.cv_name = cv_name; db.commit()
+        return row
     user_msg = (f"<cv>\n{cv_digest(cv, user.profile)}\n</cv>\n\n<job>\n{job_facts(j)}\n\nDescription:\n{(j.description or '(no description available)')[:MAX_DESC_CHARS]}\n</job>")
     d = llm.complete_json(cfg, SYSTEM, user_msg, max_tokens=700, timeout=90)
     try: score = int(round(float(d.get("score"))))
@@ -178,12 +184,13 @@ def score_job(db: Session, user: User, j: Job, cfg: llm.Cfg, cv: dict, force: bo
     row.strengths, row.gaps = _clip_list(d.get("strengths")), _clip_list(d.get("gaps"))
     row.flags = list(dict.fromkeys(flags + _clip_list(d.get("flags"), 3, 120)))
     row.summary = (str(d.get("summary") or "").strip()[:300] or None)
+    row.cv_name = (cv_name or None)
     row.model, row.basis_hash, row.created_at = model, basis, dt.datetime.now(dt.timezone.utc)
     db.add(row); db.commit(); return row
 
 
 def out(r: JobScore | None) -> dict | None:
-    return None if r is None else {"score": r.score, "verdict": r.verdict, "reason": r.reason, "strengths": r.strengths, "gaps": r.gaps, "flags": r.flags, "summary": r.summary, "model": r.model, "at": r.created_at}
+    return None if r is None else {"score": r.score, "verdict": r.verdict, "reason": r.reason, "strengths": r.strengths, "gaps": r.gaps, "flags": r.flags, "summary": r.summary, "cv_name": r.cv_name, "model": r.model, "at": r.created_at}
 
 
 def scores_for(db: Session, user_id, job_ids: list[int]) -> dict[int, JobScore]:

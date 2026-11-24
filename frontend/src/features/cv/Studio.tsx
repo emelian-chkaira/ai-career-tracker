@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal, Switch } from "@/shared/ui/kit";
 import { Field, Tags } from "./bits";
 import { RichField, Rich } from "./RichField";
@@ -39,9 +39,9 @@ function ItemList({ kind, list, onChange, aiReady, label }: { kind: string; list
     <ul className="plain stack" style={{ gap: 8 }}>{list.map((b, i) => <li key={i} className={"irow" + (b.hidden ? " off" : "")} draggable onDragStart={() => setDrag(i)} onDragOver={(e) => drag !== null && e.preventDefault()}
       onDrop={(e) => { e.preventDefault(); if (drag !== null && drag !== i) onChange(move(list, drag, i)); setDrag(null); }}>
       <span className="grip" aria-hidden title="Drag to reorder">⋮⋮</span>
-      <div className="irow-main"><b>{titleOf(b) || `New ${label.toLowerCase()} entry`}</b><div className="small muted">{[b.place, b.date].filter(Boolean).join(" · ") || "No details yet"}</div>
+      <div className="irow-main"><b>{titleOf(b) || `New ${label.toLowerCase()} entry`}</b><div className="small muted">{[b.place?.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1"), b.date].filter(Boolean).join(" · ") || "No details yet"}</div>
         {b.desc && <div className="small irow-d"><Rich text={b.desc} /></div>}</div>
-      <span className={"chip " + (b.hidden ? "plain" : "ok")} style={{ margin: 0 }}>{b.hidden ? "Hidden" : "Visible"}</span>
+      {b.hidden ? <span className="chip plain" style={{ margin: 0 }}>Hidden in PDF</span> : null}
       {kind === "projects" && b.use && b.use !== "ai" && <span className="chip plain" style={{ margin: 0 }}>{USE[b.use]}</span>}
       <span className="eblock-acts"><button className="kicon" onClick={() => setEditing(i)} aria-label="Edit" title="Edit">✎</button>
         <button className="kicon" onClick={() => onChange(list.map((x, j) => (j === i ? { ...x, hidden: !x.hidden } : x)))} aria-label={b.hidden ? "Show" : "Hide"} title={b.hidden ? "Show in PDF" : "Hide from PDF"}>{b.hidden ? "🙈" : "👁"}</button>
@@ -52,8 +52,9 @@ function ItemList({ kind, list, onChange, aiReady, label }: { kind: string; list
 }
 
 /** One section at a time, picked from an icon rail. Entries are edited in a dialog with rich text and per-field AI. */
-export function Studio({ cv, edit, setSkills, aiReady, tools }: { cv: Cv; edit(p: Record<string, unknown>): void; setSkills(v: string[]): void; aiReady: boolean; tools: ToolTab[] }) {
-  const [tab, setTab] = useState("experience"); const all = [...RAIL, ...tools.map((t) => ({ id: "t:" + t.id, label: t.label, icon: t.icon }))];
+export function Studio({ cv, edit, setSkills, aiReady, tools, startTab, focus }: { cv: Cv; edit(p: Record<string, unknown>): void; setSkills(v: string[]): void; aiReady: boolean; tools: ToolTab[]; startTab?: string; focus?: { tab: string; n: number } }) {
+  const [tab, setTab] = useState(startTab ?? "experience"); useEffect(() => { if (focus && focus.n > 0) setTab(focus.tab); }, [focus?.n]);   // eslint-disable-line react-hooks/exhaustive-deps
+   const all = [...RAIL, ...tools.map((t) => ({ id: "t:" + t.id, label: t.label, icon: t.icon }))];
   const ensure = (k: string) => ({ order: [...new Set([...(cv.order ?? []), k])] });
   const list = (k: string) => (cv[k] as Block[] | undefined) ?? [];
   const extras: { title: string; blocks: Block[] }[] = cv.extras ?? [];

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.db import get_db
 from app.core.deps import current_user
 from app.models import User, Job, Task
-from app.services import fit_service as fs, llm_service as llm, task_service
+from app.services import docs_service as ds, fit_service as fs, llm_service as llm, task_service
 from app.services.ai_cfg import require, http_error
 
 router = APIRouter(prefix="/me", tags=["fit"])
@@ -60,10 +60,11 @@ def delete_draft(user: User = Depends(current_user), db: Session = Depends(get_d
 
 
 # ------------------------------------------------------------------ scores
-def _need_cv(db: Session, user: User) -> dict:
-    cv = fs.get_cv(db, user)
+def _need_cv(db: Session, user: User, cv_id: int | None = None) -> tuple[dict, str | None]:
+    try: cv, name = ds.cv_for_scoring(db, user, cv_id)
+    except ds.DocError as e: raise HTTPException(404, str(e))
     if not cv: raise HTTPException(409, "Save your CV first (CV Studio, “Use for AI scoring”).")
-    return cv
+    return cv, name
 
 
 def _job(db: Session, jid: int) -> Job:
@@ -75,6 +76,7 @@ def _job(db: Session, jid: int) -> Job:
 class ScoreOne(BaseModel):
     consent: bool = False
     force: bool = False
+    cv_id: int | None = None      # a CV of the CV Studio library; none = the default one
 
 
 @router.get("/fit/{job_id}", summary="The cached score of one job (404 when not scored yet)")
@@ -86,14 +88,15 @@ def get_score(job_id: int, user: User = Depends(current_user), db: Session = Dep
 
 @router.post("/fit/{job_id}", summary="Score one job against the saved CV (waits for the model, usually a few seconds)")
 def score_one(job_id: int, body: ScoreOne, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    cv = _need_cv(db, user); cfg = require(db, user, body.consent, "Your CV and the job posting", "scoring"); j = _job(db, job_id)
-    try: return fs.out(fs.score_job(db, user, j, cfg, cv, force=body.force))
+    cv, name = _need_cv(db, user, body.cv_id); cfg = require(db, user, body.consent, "Your CV and the job posting", "scoring"); j = _job(db, job_id)
+    try: return fs.out(fs.score_job(db, user, j, cfg, cv, force=body.force, cv_name=name))
     except llm.LlmError as e: raise http_error(e, "The AI model failed")
 
 
 class ScoreMany(BaseModel):
     job_ids: list[int] = Field(min_length=1, max_length=60)
     consent: bool = False
+    cv_id: int | None = None
 
 
 def _run(tid: int):
@@ -102,7 +105,7 @@ def _run(tid: int):
     with SessionLocal() as db:
         t = db.get(Task, tid); p = t.payload or {}
         try:
-            user = db.get(User, __import__("uuid").UUID(p["user_id"])); cfg = require(db, user, True, "x", "scoring"); cv = fs.get_cv(db, user) or {}
+            user = db.get(User, __import__("uuid").UUID(p["user_id"])); cfg = require(db, user, True, "x", "scoring"); cv, cv_name = ds.cv_for_scoring(db, user, p.get("cv_id")); cv = cv or {}
             ids = p["job_ids"]; st = dict(total=len(ids), done=0, scored=0, cached=0, failed=0)
             task_service.progress(db, t, **st); fails = 0
             known = fs.scores_for(db, user.id, ids)
@@ -111,7 +114,7 @@ def _run(tid: int):
                 if not j: st["done"] += 1; continue
                 before = known[jid].created_at if jid in known else None
                 try:
-                    r = fs.score_job(db, user, j, cfg, cv)
+                    r = fs.score_job(db, user, j, cfg, cv, cv_name=cv_name)
                     st["cached" if before is not None and before == r.created_at else "scored"] += 1; fails = 0
                 except llm.LlmError as e:
                     st["failed"] += 1; st["error"] = str(e)[:200]; fails += 1
@@ -124,9 +127,9 @@ def _run(tid: int):
 
 @router.post("/fit-batch", status_code=202, summary="Score several jobs in the background (cached ones are skipped)")
 def score_many(body: ScoreMany, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    _need_cv(db, user); require(db, user, body.consent, "Your CV and the job postings", "scoring")
+    _need_cv(db, user, body.cv_id); require(db, user, body.consent, "Your CV and the job postings", "scoring")
     ids = list(dict.fromkeys(body.job_ids))
-    t = Task(kind="fit_score", status="running", payload={"user_id": str(user.id), "job_ids": ids}); db.add(t); db.commit()
+    t = Task(kind="fit_score", status="running", payload={"user_id": str(user.id), "job_ids": ids, "cv_id": body.cv_id}); db.add(t); db.commit()
     threading.Thread(target=_run, args=(t.id,), daemon=True).start(); return {"task_id": t.id}
 
 

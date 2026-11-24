@@ -65,7 +65,7 @@ def test_layouts_and_paper_sizes():
 
 def test_endpoints_export_preview_and_import(client):
     r = client.post("/api/v1/cv/rx/export", json={"cv": CV}); assert r.status_code == 200 and r.json()["basics"]["name"] == "Sam Doe"
-    assert [t["id"] for t in client.get("/api/v1/cv/templates").json()["templates"]] == ["classic", "compact", "modern"]
+    assert [t["id"] for t in client.get("/api/v1/cv/templates").json()["templates"]] == ["mine", "classic", "compact", "modern"]
     r = client.post("/api/v1/cv/extract?filename=resume.json", content=json.dumps(r.json()).encode(), headers={"Content-Type": "application/octet-stream"})
     assert r.status_code == 200 and r.json()["source"] == "rxresume"
     p = client.post("/api/v1/cv/preview", json={"cv": CV, "template": "modern", "paper": "letter"}); assert p.status_code == 200 and p.json()["bytes"] > 1000

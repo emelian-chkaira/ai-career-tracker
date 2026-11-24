@@ -40,3 +40,12 @@ def test_accepted_additions_reach_the_stored_cv_and_the_match(client, make_user,
 def test_needs_a_saved_cv(client, make_user):
     h, _ = make_user()
     assert client.post(C, json={"message": "hi"}, headers=h).status_code == 400
+
+
+def test_adding_a_skill_by_name_is_never_blocked_by_questions(client, make_user, db, monkeypatch):
+    h, j = _setup(client, make_user, db)
+    _say(monkeypatch, {"reply": "Could you share a public project?", "proposals": []})        # the model keeps asking
+    r = client.post(C, json={"message": "add a skills of image processing", "job_id": j.id, "history": []}, headers=h).json()
+    assert [(p["kind"], p["text"]) for p in r["proposals"]] == [("skill", "Image processing")]
+    r2 = client.post(C, json={"message": "how are you", "history": []}, headers=h).json()
+    assert r2["proposals"] == []

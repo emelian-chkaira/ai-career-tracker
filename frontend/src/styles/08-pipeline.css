@@ -9,6 +9,6 @@
 .kcol.over{outline:2px dashed var(--st);outline-offset:-2px}
 .pcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;cursor:grab;transition:box-shadow .15s,transform .15s}.pcard:hover{box-shadow:0 6px 20px rgba(0,0,0,.18);transform:translateY(-1px)}
 .pcard .logo{width:32px;height:32px;font-size:13px;border-radius:8px}.pcard .pt{font-weight:650;font-size:14px;color:var(--text);display:block;line-height:1.3}.pcard .pt:hover{color:var(--brand)}
-.pcard .btn.small{padding:2px 8px}
+
 .kpanel-body h2{display:none}.kpanel-body>.stack{gap:12px}
 

@@ -65,7 +65,7 @@ export function TailorPanel({ jobId, title }: { jobId: number; title: string }) 
           <div className="row"><button className="btn ghost small" onClick={() => navigator.clipboard.writeText(letter ?? t.cover_letter ?? "")}>Copy</button><button className="btn ghost small" onClick={() => download("cover-letter.txt", letter ?? t.cover_letter ?? "", "text/plain")}>Download</button>
             {letter != null && letter !== t.cover_letter && <button className="btn small" disabled={!!busy} onClick={saveLetter}>Save edits</button>}<button className="btn ghost small right" disabled={!ready || !!busy} onClick={writeLetter}>Rewrite</button></div></>}</details>
       <details className="fold"><summary>More options</summary>
-        <div className="row"><select value={t.template} onChange={(e) => setTemplate(e.target.value)} title="Layout"><option value="classic">Classic layout</option><option value="compact">Compact layout</option></select>
+        <div className="row"><select value={t.template} onChange={(e) => setTemplate(e.target.value)} title="Layout"><option value="mine">My CV layout</option><option value="classic">Classic layout</option><option value="compact">Compact layout</option></select>
           <button className="btn ghost small" onClick={() => download(`cv-${jobId}.tex`, t.latex, "text/x-tex")}>Get .tex</button>
           <button className="btn ghost small" disabled={!ready || !!busy} onClick={go}>{busy === "tailor" || busy === "rebuild" ? "Tailoring…" : "Redo tailoring"}</button></div>
         <label className="small"><input type="checkbox" checked={pubOk} onChange={(e) => setPubOk(e.target.checked)} /> If this server has no LaTeX compiler, allow a public one (sends the CV to a third party).</label>
