@@ -16,7 +16,7 @@ export function CompaniesPage({ sponsors = false }: { sponsors?: boolean }) {
   const data = cq.data && { ...cq.data.pages[0], items: cq.data.pages.flatMap((p) => p.items) };
   const sentinel = useSentinel(() => { if (cq.hasNextPage && !cq.isFetching) cq.fetchNextPage(); }, !!cq.hasNextPage);
   return (<div className="stack"><PageHeader eyebrow={sponsors ? "NL IND register" : "Employers"} icon={<Icon name="company" size={17} />} title={sponsors ? "Visa sponsor lookup" : "Companies"} subtitle={<>{data ? `${data.total.toLocaleString()} ${hiring ? "companies hiring right now" : "tech companies"}, each one read from its own careers page.${sponsors ? " Sponsor status comes from the public NL IND register of recognised sponsors; always confirm with the employer." : ""}` : "Loading…"}</>} />
-    <div className="row"><input type="search" className="grow tool" placeholder="Search by company name" value={q} onChange={(e) => { setQ(e.target.value); }} />
+    <div className="row csearch"><input type="search" className="grow tool" placeholder="Search by company name" value={q} onChange={(e) => { setQ(e.target.value); }} />
       <label className="row small"><input type="checkbox" checked={hiring} onChange={(e) => { setHiring(e.target.checked); }} />Only companies hiring now</label></div>
     <div className="cgrid">{data?.items.map((c) => <div key={c.id} className="ccard">
       {c.logo ? <img className="logo" src={c.logo.startsWith("/") || c.logo.startsWith("http") ? c.logo : `/logos/${c.logo}`} alt="" /> : <div className="logo">{c.name[0]}</div>}

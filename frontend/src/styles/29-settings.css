@@ -1,0 +1,26 @@
+/* Settings: one column of equal-width sections with the same heading layout. */
+.settings{max-width:1100px}
+.settings .ktabs.v{max-width:none}
+.set-col{display:flex;flex-direction:column;gap:16px;max-width:860px;width:100%;min-width:0}
+.set-card,.set-wrap>.card{padding:22px 24px;border-radius:14px;margin:0;min-width:0}
+.set-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.set-head>div{flex:1 1 260px;min-width:0}
+.set-head h2,.set-card h2,.set-wrap h2{font-size:17px;margin:0;letter-spacing:-.01em}
+.set-head p{margin:4px 0 0;font-size:13.5px;color:var(--muted);line-height:1.5}
+.set-body{margin-top:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.set-body>.stack{gap:20px}
+.set-body>.stack>.muted:first-child{display:none}            /* the setup dialog's intro: the section heading already says it */
+.set-body .cpick{gap:8px}.set-body .cpick-row{gap:8px}
+.set-body .kswitch{align-items:center;line-height:1.45}
+.set-body .seg{align-self:flex-start}
+.set-card.danger{border-color:color-mix(in srgb,var(--bad) 35%,var(--line))}
+.set-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:10px}
+.set-form input{height:var(--btn-h);box-sizing:border-box}
+.set-body .row>input{height:var(--btn-h);box-sizing:border-box}
+.set-body ul.plain{display:flex;flex-direction:column;margin:0}
+.set-body ul.plain li{padding:10px 0;border-top:1px solid var(--line)}.set-body ul.plain li:first-child{border-top:0;padding-top:0}
+.set-save{position:sticky;bottom:12px;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:0 10px 30px -12px rgba(0,0,0,.35)}
+@media(max-width:800px){.settings .ktabs.v{grid-template-columns:minmax(0,1fr)}.ktabs.v .ktabs-list,.ktabs.v .ktabs-body{min-width:0;max-width:100%}
+  .set-card,.set-wrap>.card{padding:18px 16px}.set-form{grid-template-columns:minmax(0,1fr)}.set-save{flex-wrap:wrap}.set-save .btn{width:100%}}
+.set-body li.sess{display:flex;align-items:center;justify-content:space-between;gap:12px}
+@media(max-width:600px){.set-body .delrow>*{flex:1 1 100%!important}}
