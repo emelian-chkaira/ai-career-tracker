@@ -71,3 +71,9 @@
 @keyframes tour-fade{from{opacity:0}}
 @keyframes tour-in{from{opacity:0;transform:translateY(8px)}}
 @media (prefers-reduced-motion:reduce){.tour,.tour *,.tour-scrim{animation:none!important}}
+/* the dummy Crawler page says so before anything else */
+.demo-sample{display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px dashed #d99a08;border-radius:14px;background:color-mix(in srgb,#d99a08 12%,var(--panel));line-height:1.5;font-size:13.5px}
+.demo-sample>div{flex:1;min-width:0}
+.demo-sample-tag{flex:0 0 auto;padding:4px 10px;border-radius:999px;background:#d99a08;color:#1d1503;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.demo-sample .btn{flex:0 0 auto}
+@media(max-width:700px){.demo-sample{flex-direction:column;align-items:flex-start;gap:10px}}

@@ -11,6 +11,11 @@ export const setAuthLostHandler = (fn: () => void) => { onAuthLost = fn; };
 
 const BASE = "/api/v1";
 
+/** Lets a demo page answer some calls itself (see features/demo). `undefined` means: send the request as usual. */
+type Sample = (method: string, path: string, query?: Record<string, unknown>) => unknown;
+let sample: Sample | null = null;
+export const setSample = (fn: Sample | null) => { sample = fn; };
+
 async function refresh(): Promise<string | null> {
   refreshing ??= fetch(`${BASE}/auth/refresh`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: "{}" })
     .then(async (r) => (r.ok ? ((await r.json()) as { access_token: string }).access_token : null))
@@ -28,6 +33,8 @@ function detail(body: unknown, fallback: string): string {
 }
 
 export async function request<T = unknown>(method: string, path: string, opts: { body?: unknown; raw?: BodyInit; query?: Record<string, unknown>; retry?: boolean } = {}): Promise<T> {
+  const made = sample?.(method, path, opts.query);
+  if (made !== undefined) return made as T;
   const url = new URL(BASE + path, window.location.origin);
   for (const [k, v] of Object.entries(opts.query ?? {})) {
     if (v === undefined || v === null || v === "") continue;

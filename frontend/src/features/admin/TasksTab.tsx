@@ -33,9 +33,9 @@ function progressText(t: Task) {
 }
 
 /** All the things you can start by hand, in one place, with a search; then the history. */
-export function TasksPanel() {
+export function TasksPanel({ preview = false }: { preview?: boolean }) {
   const qc = useQueryClient(); const notify = useNotify(); const [all, setAll] = useState(false); const [find, setFind] = useState(""); const [group, setGroup] = useState("");
-  const isAdmin = useAuth().user?.role === "admin";
+  const isAdmin = useAuth().user?.role === "admin" || preview;
   const tasks = useQuery({ queryKey: ["admin-tasks"], refetchInterval: 4000, queryFn: () => api.get<Task[]>("/admin/tasks") });
   const run = async (t: Def) => { const r = await api.post<{ id: number }>("/admin/tasks", { kind: t.kind }); notify(`Queued “${t.title}” (#${r.id}). The worker starts it within seconds.`, "ok"); qc.invalidateQueries({ queryKey: ["admin-tasks"] }); };
   const items = tasks.data ?? []; const shown = all ? items : items.slice(0, 8);

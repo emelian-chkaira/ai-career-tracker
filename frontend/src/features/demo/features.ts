@@ -26,13 +26,13 @@ export const FEATURES: Feature[] = [
     text: "Reads Gmail with read-only access and moves a role when a test, interview, offer or rejection arrives.", note: "Needs your own Google setup. Not connected online.",
     rows: [{ title: "Interview invitation", sub: "Moved to Interview", tag: "Detected" }, { title: "Online assessment", sub: "Moved to Assessment", tag: "Detected" }, { title: "Application received", sub: "Added to Applied", tag: "Detected" }] },
   { key: "crawler", icon: "crawler", name: "Crawler", headline: "Fresh jobs from the source", status: "local",
-    text: "Reads company career pages and job boards on a schedule, following your fields and countries.", note: "Needs a lot of storage and memory. Online it would need paid hosting.",
+    text: "Reads company career pages and job boards on a schedule, following your fields and countries.", note: "Online you see a dummy page with made-up data. The real one needs a lot of storage and memory, so paid hosting.",
     rows: [{ title: "Career pages", sub: "Read on a schedule", tag: "Worker" }, { title: "Job boards", sub: "Searched with your titles", tag: "Worker" }, { title: "Old postings", sub: "Removed automatically", tag: "Worker" }] },
 ];
 
 export const COMPARE: [string, string, string][] = [
   ["Job data", "A saved snapshot, not updated in real time", "Updated as your crawler runs"],
-  ["Crawler", "Off: needs more storage and RAM, so paid hosting", "Runs on your machine"],
+  ["Crawler", "A dummy page with sample data: the real one needs more RAM and paid hosting", "Runs on your machine"],
   ["Gmail inbox", "Not connected", "Connect with your Google setup"],
   ["Semantic search and PDF export", "Switched off to fit free hosting", "Available"],
   ["Your account", "A guest account, removed after about {days} days", "Yours to keep"],

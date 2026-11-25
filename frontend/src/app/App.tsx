@@ -22,6 +22,7 @@ import { SetupWizard } from "@/features/onboarding/SetupWizard";
 import { DemoTour } from "@/features/demo/DemoTour";
 import { DemoBar } from "@/features/demo/DemoBar";
 import { useNoCrawler } from "@/features/demo/useDemo";
+import { CrawlerDemo } from "@/features/demo/CrawlerDemo";
 import { ChangelogPage, useVersion } from "@/features/about/ChangelogPage";
 
 const NAV: { group: string; items: { to: string; text: string; icon: string; auth?: boolean; match?: string[] }[] }[] = [
@@ -31,8 +32,8 @@ const NAV: { group: string; items: { to: string; text: string; icon: string; aut
 const TITLES: Record<string, string> = { "/": "Jobs", "/internships": "Internships", "/companies": "Companies", "/pipeline": "Pipeline", "/inbox": "Inbox", "/cv": "CV Studio", "/crawler": "Crawler", "/profile": "Settings", "/sponsors": "Visa sponsors", "/watchlist": "Watchlist" };
 
 function SideNav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
-  const { user } = useAuth(); const n = useNotifications(!!user); const loc = useLocation(); const noCrawler = useNoCrawler();
-  return (<nav className="snav" aria-label="Main">{NAV.map((g) => { const items = g.items.filter((i) => (!i.auth || user) && !(noCrawler && i.to === "/crawler")); if (!items.length) return null; return (
+  const { user } = useAuth(); const n = useNotifications(!!user); const loc = useLocation();
+  return (<nav className="snav" aria-label="Main">{NAV.map((g) => { const items = g.items.filter((i) => !i.auth || user); if (!items.length) return null; return (
     <div key={g.group} className="sgroup">{!collapsed && <div className="sgroup-t">{g.group}</div>}
       {items.map((i) => { const active = i.to === "/" ? loc.pathname === "/" : loc.pathname.startsWith(i.to); return (
         <Link key={i.to} to={i.to} onClick={onNavigate} className={`sitem${active ? " active" : ""}`} title={collapsed ? i.text : undefined} aria-current={active ? "page" : undefined}>
@@ -67,7 +68,7 @@ function Layout() {
       <main className="main"><DemoBar /><VerifyBanner /><Outlet /></main></div>
     <CommandBar /><SetupWizard /></div>);
 }
-function CrawlerRoute() { return useNoCrawler() ? <Navigate to="/" replace /> : <CrawlerPage />; }
+function CrawlerRoute() { return useNoCrawler() ? <CrawlerDemo /> : <CrawlerPage />; }
 function Protected({ admin = false }: { admin?: boolean }) {
   const { user, ready } = useAuth(); const loc = useLocation();
   if (!ready) return <p className="muted">Loading…</p>;

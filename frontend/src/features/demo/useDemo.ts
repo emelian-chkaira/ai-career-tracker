@@ -9,7 +9,7 @@ export function useDemo() {
   return { demo: !!q.data?.demo, guestDays: q.data?.guest_days ?? 7 };
 }
 
-/** The crawler does not run online, so demo visitors get no menu entry or page for it. */
+/** The crawler does not run online, so demo visitors see a dummy Crawler page with invented data. */
 export function useNoCrawler() { const { demo } = useDemo(); const { user } = useAuth(); return demo && user?.role !== "admin"; }
 
 export const openTour = () => window.dispatchEvent(new Event("open-tour"));

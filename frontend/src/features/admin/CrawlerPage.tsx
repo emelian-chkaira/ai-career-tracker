@@ -32,8 +32,9 @@ const BLURB: Record<Main, string> = {
 /** Older tab names still work (bookmarks, step buttons): they open a section of Settings or Data. */
 const ALIAS: Record<string, [Main, string?]> = { setup: ["settings"], storage: ["settings", "storage"], companies: ["data", "companies"], jobs: ["data", "jobs"] };
 
-export function CrawlerPage() {
-  const isAdmin = useAuth().user?.role === "admin";
+/** `preview` shows every control (the demo page, which answers all calls itself). */
+export function CrawlerPage({ preview = false }: { preview?: boolean }) {
+  const isAdmin = useAuth().user?.role === "admin" || preview;
   const [sp, setSp] = useSearchParams(); const raw = sp.get("tab") ?? "overview";
   const [tab, aliasView] = (ALIAS[raw] ?? [TABS.find((t) => t[0] === raw)?.[0] ?? "overview"]) as [Main, string?];
   const view = (sp.get("view") ?? aliasView) === "jobs" ? "jobs" : "companies"; const openStorage = aliasView === "storage";
@@ -69,7 +70,7 @@ export function CrawlerPage() {
               <button role="tab" aria-selected={view === "jobs"} className={view === "jobs" ? "on" : ""} onClick={() => go("data", "jobs")}>Jobs {s && <span className="count">{num(s.open_jobs)}</span>}</button></div>
             {view === "companies" ? <CompaniesTab isAdmin={isAdmin} /> : <JobsTab isAdmin={isAdmin} />}
           </div>}
-          {tab === "tasks" && <TasksPanel />}
+          {tab === "tasks" && <TasksPanel preview={preview} />}
           {tab === "users" && isAdmin && <UsersTab />}
         </div>
       </div>

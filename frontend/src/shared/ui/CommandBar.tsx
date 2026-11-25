@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Command } from "cmdk";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
-import { useNoCrawler } from "@/features/demo/useDemo";
 import { useTheme } from "@/shared/lib/theme";
 
 const PAGES: [string, string, boolean][] = [["Jobs", "/", false], ["Internships", "/internships", false], ["Companies", "/companies", false], ["CV Studio", "/cv", false],
@@ -10,7 +9,7 @@ const PAGES: [string, string, boolean][] = [["Jobs", "/", false], ["Internships"
 
 /** ⌘K / Ctrl+K: jump anywhere, change theme, start a search. Opens with the keyboard or the "/" key is for the job search box. */
 export function CommandBar() {
-  const [open, setOpen] = useState(false); const nav = useNavigate(); const { user, logout } = useAuth(); const { next } = useTheme(); const [q, setQ] = useState(""); const noCrawler = useNoCrawler();
+  const [open, setOpen] = useState(false); const nav = useNavigate(); const { user, logout } = useAuth(); const { next } = useTheme(); const [q, setQ] = useState("");
   useEffect(() => {
     const f = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setOpen((o) => !o); } };
     window.addEventListener("keydown", f); return () => window.removeEventListener("keydown", f);
@@ -20,7 +19,7 @@ export function CommandBar() {
     <Command.Input value={q} onValueChange={setQ} placeholder="Go to a page, or search jobs…" />
     <Command.List>
       <Command.Empty>No match. Press Enter to search jobs for “{q}”.</Command.Empty>
-      <Command.Group heading="Go to">{PAGES.filter(([, to, auth]) => (!auth || user) && !(noCrawler && to === "/crawler")).map(([n, to]) => <Command.Item key={to} value={n} onSelect={() => go(to)}>{n}</Command.Item>)}</Command.Group>
+      <Command.Group heading="Go to">{PAGES.filter(([, to, auth]) => !auth || user).map(([n, to]) => <Command.Item key={to} value={n} onSelect={() => go(to)}>{n}</Command.Item>)}</Command.Group>
       <Command.Group heading="Actions">
         {q.trim() && <Command.Item value={`search ${q}`} onSelect={() => go(`/?q=${encodeURIComponent(q.trim())}`)}>Search jobs for “{q.trim()}”</Command.Item>}
         <Command.Item value="change theme" onSelect={() => { next(); setOpen(false); }}>Change theme</Command.Item>
