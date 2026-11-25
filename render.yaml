@@ -5,6 +5,7 @@ services:
     name: ai-career-tracker
     runtime: docker
     plan: free
+    region: frankfurt          # keep it next to the database (create the Neon project in Frankfurt too)
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /healthz

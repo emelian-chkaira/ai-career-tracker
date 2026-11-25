@@ -10,6 +10,8 @@ from pathlib import Path
 from sqlalchemy import select, func, text
 from sqlalchemy.orm import Session
 from app.models import Company, Job, JobSkill, Sponsor
+from app.crawler import sectors
+from . import ingest_service as ing
 
 DIR = Path(__file__).resolve().parents[2] / "seed"
 CO = ["name", "website", "careers_url", "ats", "ats_slug", "sponsor_status", "sponsor_match", "kvk", "city", "source"]
@@ -60,10 +62,15 @@ def load(db: Session, force: bool = False) -> dict:
     for r in _read("jobs.csv.gz"):
         cid = ids.get(r["company"])
         if not cid or r["url"] in known: continue
-        j = Job(company_id=cid, title=r["title"], location=r["location"] or None, city=r["city"] or None, url=r["url"], category=r["category"] or "other", domain=r["domain"] or None,
-                job_type=r["job_type"] or "job", language=r["language"] or "english_ok", remote=r["remote"] in ("True", "true", "1"),
+        # search filters on country, sector and work mode, which the CSV does not carry: work them out the same way the crawler does
+        pl = ing.place_of(r["location"] or r["city"], r["url"], "company-site", None, r["title"]); sec = sectors.classify(r["title"])
+        remote = r["remote"] in ("True", "true", "1")
+        j = Job(company_id=cid, title=r["title"], location=r["location"] or None, city=r["city"] or None, url=r["url"], category=sectors.category_of(sec), sector=sec, domain=r["domain"] or None,
+                country=pl.country or "NL", countries=pl.countries or ["NL"], work_mode="remote" if remote and pl.work_mode == "onsite" else pl.work_mode, remote_scope=pl.remote_scope,
+                dedupe_key=ing.dedupe_key(cid, r["title"]),
+                job_type=r["job_type"] or "job", language=r["language"] or "english_ok", remote=remote,
                 posted_at=dt.date.fromisoformat(r["posted_at"]) if r["posted_at"] else None, first_seen=now, last_seen=now, status="open")
-        db.add(j); db.flush()
-        for s in filter(None, (r["skills"] or "").split("|")): db.add(JobSkill(job_id=j.id, skill=s))
+        j.skills = [JobSkill(skill=s) for s in dict.fromkeys(filter(None, (r["skills"] or "").split("|")))]
+        db.add(j)                                                 # no flush per row: inserts go in batches, which matters when the database is across a network
         known.add(r["url"]); out["jobs"] += 1
     db.commit(); return out

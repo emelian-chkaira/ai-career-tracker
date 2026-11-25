@@ -3,11 +3,11 @@
 A public link to the real app with the ready-made starter data. About 15 minutes, no credit card.
 
 **What you get:** the full website and API with 6,583 companies, 11,000+ jobs and the NL IND sponsor register. Search (keyword), filters, Companies, Market, pipeline and alerts all work. Visitors can register and save jobs.
-**What is switched off:** the crawler worker (nothing is refreshed), semantic search, LaTeX export and Gmail connect, so it fits in free tiers. Job descriptions are empty in the starter data. The Crawler page is hidden from visitors.
+**What is switched off:** the crawler worker (nothing is refreshed), semantic search, LaTeX export and Gmail connect, so it fits in free tiers. Job descriptions are empty in the starter data, and search opens on tech jobs (change the field to see others). The Crawler page is hidden from visitors.
 **The catch:** Render's free service sleeps after ~15 minutes idle, so the first visit takes 30 to 60 seconds. Say so next to the link on your CV.
 
 ## 1. Database (Neon, free)
-1. Sign up at <https://neon.tech>, create a project (region: Frankfurt or closest to you).
+1. Sign up at <https://neon.tech>, create a project in the **Frankfurt** region (`render.yaml` puts the app there; a database far from the app makes the first load very slow).
 2. Open **Connect**, turn **Connection pooling off**, and copy the connection string (`postgresql://...?sslmode=require`).
 3. pgvector is available on Neon: the migrations create the extension themselves.
 
