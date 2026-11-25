@@ -124,7 +124,7 @@ def clean_title(title: str, url: str) -> str | None:
     return t
 
 
-def store_jobs(db: Session, company: Company, jobs: list[dict], source="company-site", expire=True, still_listed: set[str] = frozenset()) -> int:
+def store_jobs(db: Session, company: Company, jobs: list[dict], source="company-site", expire=True, still_listed: set[str] = frozenset(), stats: dict | None = None) -> int:
     """Store what one source lists for one employer. Returns the number of NEW roles.
     One role = one job: the same role from another city, link or source is folded into the existing job (see fold)."""
     seen, new = set(), 0
@@ -139,8 +139,14 @@ def store_jobs(db: Session, company: Company, jobs: list[dict], source="company-
         desc = j.get("description") or ""
         sk = skills_of(title, desc)
         domain = domains.classify(title, desc, sk)
-        keep = pol["keep_domains"]
-        if keep and domain not in keep: continue                            # storage policy: only the domains the operator asked for
+        keep, keep_sec = pol["keep_domains"], pol["keep_sectors"]
+        if keep or keep_sec:                                                # storage policy: only the fields people here look for (their profiles and CVs, or what the operator typed)
+            sec0 = sectors.classify(title)
+            if sec0 == "tech":
+                if keep_sec and "tech" not in keep_sec: continue
+                if keep and domain not in keep: continue
+            elif sec0 not in keep_sec: continue
+        if stats is not None: stats["kept"] = stats.get("kept", 0) + 1
         lang = scoring.language(title, desc)
         jt = "internship" if j.get("kind") == "internship" and scoring.job_type(title, j.get("location", "")) in ("job", "junior") else scoring.job_type(title, j.get("location", ""))
         lo, hi, per = money(desc)
@@ -207,7 +213,8 @@ def scan_company(db: Session, company_id: int) -> int:
     if not c or (c.ats or "").startswith("board:"): return 0
     cd = {k: getattr(c, k) for k in ("name", "website", "careers_url", "ats", "ats_slug", "resolved_via")}
     cd["memory"] = dict(c.scan_memory or {})                   # what earlier scans learned: dead links, real internship pages, fruitless ATS guesses
-    students = c.student_scan_at is None or now() - c.student_scan_at >= STUDENT_EVERY      # the internship pass is slow (up to 14 pages): weekly is enough
+    from . import perf_service
+    students = (c.student_scan_at is None or now() - c.student_scan_at >= STUDENT_EVERY) and perf_service.current()["internship_pass"] and (c.fail_count or 0) == 0     # the internship pass is slow (up to 14 pages): weekly, and never for employers that keep coming up empty
     try: r = discovery.scan_company(cd, students=students)
     except Exception as e: r = dict(jobs=[], note=f"error: {e}", website=c.website, careers_url=c.careers_url, ats=c.ats, ats_slug=c.ats_slug, resolved_via=c.resolved_via)
     c.website, c.careers_url, c.ats, c.ats_slug, c.resolved_via = r["website"], r["careers_url"], r["ats"], r["ats_slug"], r["resolved_via"]
@@ -225,7 +232,10 @@ def scan_company(db: Session, company_id: int) -> int:
     c.next_scan = now() + dt.timedelta(hours=hours)
     db.commit()
     ensure_logo(db, c); db.commit()
-    new = store_jobs(db, c, r["jobs"], still_listed=not_reread)
+    kept: dict = {}
+    new = store_jobs(db, c, r["jobs"], still_listed=not_reread, stats=kept)
+    if n and not kept.get("kept") and (policy_service.current()["keep_domains"] or policy_service.current()["keep_sectors"]):      # postings, but none in the fields you collect (e.g. an accountancy firm): visit rarely
+        c.fail_count = min((c.fail_count or 0) + 1, 6); c.next_scan = now() + dt.timedelta(hours=168 * (1 + c.fail_count)); c.scan_note = f"{r['note']} ({n} postings, none in your fields)"; db.commit()
     drop_dead_links(db, c.id, r.get("dead_links") or []); db.commit()
     return new
 

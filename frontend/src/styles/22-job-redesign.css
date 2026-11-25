@@ -106,3 +106,10 @@ div.job{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;alig
 .facts span{font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}
 .facts b{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis}
 .jb2{align-items:flex-start}.jb2 .pills{flex:1;min-width:0}
+
+/* one height for every control in the top bar */
+.jb1 .seg,.jb1 .sbar,.jb1>.btn,.jb1 .menu>summary,.jb1 .jfield{box-sizing:border-box;height:var(--btn-h)}
+.jb1 .sbar{padding:0 3px 0 14px;align-items:stretch}
+.jb1 .sbar>svg{align-self:center}
+.jb1 .sbar input[type=search]{padding:0 4px;height:100%}
+.jb1 .sbar .btn{height:calc(var(--btn-h) - 8px);align-self:center;padding-top:0;padding-bottom:0;display:inline-flex;align-items:center}

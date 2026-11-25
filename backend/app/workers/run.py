@@ -16,7 +16,7 @@ for _n in ("httpx", "httpcore", "playwright"): logging.getLogger(_n).setLevel(lo
 log = logging.getLogger("worker")
 STOP = False
 HANDLERS = {
-    "scan_all": lambda t, db: tasks.scan_all(t, db), "scan_unscanned": lambda t, db: tasks.scan_all(t, db, unscanned=True), "scan_company": tasks.scan_company,
+    "scan_all": lambda t, db: tasks.scan_all(t, db), "scan_unscanned": lambda t, db: tasks.scan_all(t, db, unscanned=True), "scan_due": lambda t, db: tasks.scan_all(t, db, due=True), "scan_company": tasks.scan_company,
     "discover": tasks.discover, "discover_country": tasks.discover_country, "board_search": tasks.board_search, "dedupe_jobs": tasks.dedupe_jobs, "census": tasks.census, "internships": tasks.internships, "broad_sources": tasks.broad_sources, "logos": tasks.logos, "live_search": tasks.live_search,
     "sponsors_refresh": lambda t, db: (sponsor_service.refresh(db), sponsor_service.recheck_all(db)),
     "mail_sync": tasks.mail_sync, "tailor_cv": tasks.tailor_cv,
@@ -131,7 +131,7 @@ def _refresh(db):
                                  (Company.next_scan.is_(None)) | (Company.next_scan <= dt.datetime.now(dt.timezone.utc)))
     if _inflight: q = q.where(Company.id.not_in(list(_inflight)))
     fresh = list(db.scalars(q.where(Company.last_scan.is_(None)).order_by(Company.id.desc()).limit(max(1, free // 2))))     # half the slots: employers never read (new countries fill fast)
-    rest = list(db.scalars(q.where(Company.id.not_in(fresh or [-1])).order_by(has_open.desc(), Company.next_scan.asc().nullsfirst()).limit(free - len(fresh))))
+    rest = list(db.scalars(q.where(Company.id.not_in(fresh or [-1])).order_by(has_open.desc(), Company.ats_slug.is_(None), Company.next_scan.asc().nullsfirst()).limit(free - len(fresh))))
     for cid in fresh + rest:
         _inflight[cid] = time.time()
         _pool.submit(_run_scan, cid)

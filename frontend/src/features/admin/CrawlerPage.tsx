@@ -13,6 +13,7 @@ import { RunningNow } from "./RunningNow";
 import { CompaniesTab } from "./CompaniesTab";
 import { JobsTab } from "./JobsTab";
 import { StorageTab } from "./StorageTab";
+import { FocusCard, SpeedCard } from "./SpeedFocus";
 import { TasksPanel } from "./TasksTab";
 import { UsersTab } from "./UsersTab";
 import { Fold, NotifyProvider, num } from "./ui";
@@ -23,9 +24,9 @@ const TABS: [Main, string, string][] = [["overview", "crawler", "Overview"], ["b
 const BLURB: Record<Main, string> = {
   overview: "The crawler in six steps, with live numbers.",
   boards: "Optional searches on LinkedIn, Indeed, Glassdoor and Bayt.",
-  settings: "When it runs, how recent, which countries, what to keep.",
+  settings: "What to collect, how fast, when it runs, which countries.",
   data: "Every employer it watches and every stored posting.",
-  tasks: "One-off jobs you can start by hand, and their history.",
+  tasks: "Every job you can start by hand, in one place, and their history.",
   users: "Accounts and roles.",
 };
 /** Older tab names still work (bookmarks, step buttons): they open a section of Settings or Data. */
@@ -53,14 +54,14 @@ export function CrawlerPage() {
           <button key={k} role="tab" aria-selected={tab === k} className={`ctab${tab === k ? " on" : ""}`} onClick={() => go(k)}><Icon name={i} size={15} />{l}{count[k] && <span className="count">{count[k]}</span>}{k === "boards" && <span className="exp">beta</span>}</button>))}</nav>
         <div className="fadein" key={tab}>
           {tab === "overview" && <div className="stack">
-            <PipelineExplorer go={go} />
+            <PipelineExplorer />
             <Fold title="Live activity" hint="visits per minute, what is waiting, the latest scans"><WorkerPanel bare /></Fold>
             {!!s?.scan_outcomes?.length && <Fold title="How the last visits ended" hint="what happened on each employer's site"><Outcomes rows={s.scan_outcomes} /></Fold>}
             <Fold title="Source health" hint="failing and stale employers, coverage per job system"><SourceHealth bare /></Fold>
           </div>}
           {tab === "boards" && <BoardsTab />}
           {tab === "settings" && <div className="stack">
-            <div className="sgrid2"><div className="stack"><RecencyCard isAdmin={isAdmin} /><ScheduleCard isAdmin={isAdmin} /></div><CountriesCard isAdmin={isAdmin} /></div>
+            <div className="sgrid2"><div className="stack"><FocusCard isAdmin={isAdmin} /><CountriesCard isAdmin={isAdmin} /></div><div className="stack"><SpeedCard isAdmin={isAdmin} /><RecencyCard isAdmin={isAdmin} /><ScheduleCard isAdmin={isAdmin} /></div></div>
             <Fold title="Storage & clean-up" hint="which fields to keep, old jobs, housekeeping" open={openStorage}><StorageTab isAdmin={isAdmin} /></Fold>
           </div>}
           {tab === "data" && <div className="stack">

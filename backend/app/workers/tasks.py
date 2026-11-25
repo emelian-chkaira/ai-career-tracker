@@ -35,6 +35,11 @@ def _after_threads(t):
 
 def scan_ids(t: Task, db, ids: list[int]):
     state = {"done": 0, "new_jobs": 0}
+    from app.services import perf_service
+    perf = perf_service.current()
+    if perf["ats_first"] and ids:                                              # employers with a job-system feed answer in a second: do them first
+        fast = set(db.scalars(select(Company.id).where(Company.id.in_(ids), Company.ats_slug.is_not(None))))
+        ids = sorted(ids, key=lambda i: i not in fast)
     task_service.progress(db, t, total=len(ids), done=0, new_jobs=0)
     def one(cid):
         if state.get("stop"): return
@@ -46,14 +51,15 @@ def scan_ids(t: Task, db, ids: list[int]):
         if state["done"] % 10 == 0:
             with SessionLocal() as d2:
                 tt = d2.get(Task, t.id); tt.progress = {**(tt.progress or {}), **{k: v for k, v in state.items() if k != "stop"}}; d2.commit()
-    with ThreadPoolExecutor(settings.scan_threads) as ex: list(ex.map(one, ids))
+    with ThreadPoolExecutor(perf["scan_threads"]) as ex: list(ex.map(one, ids))
     if state.get("stop"): raise task_service.TaskStopped(task_service.STOPPED)
     task_service.progress(db, t, **{k: v for k, v in state.items() if k != "stop"})
 
 
-def scan_all(t, db, unscanned=False):
-    q = select(Company.id).where((Company.website.is_not(None)) | (Company.ats_slug.is_not(None)))
+def scan_all(t, db, unscanned=False, due=False):
+    q = select(Company.id).where((Company.website.is_not(None)) | (Company.ats_slug.is_not(None)), Company.ats.is_(None) | ~Company.ats.like("board:%"))
     if unscanned: q = q.where(Company.last_scan.is_(None))
+    if due: q = q.where(Company.next_scan.is_(None) | (Company.next_scan <= dt.datetime.now(dt.timezone.utc)))
     scan_ids(t, db, list(db.scalars(q)))
 
 
@@ -113,7 +119,7 @@ def discover_country(t, db):
 
 
 def board_search(t, db):
-    """EXPERIMENTAL: search LinkedIn / Indeed / Glassdoor / Google Jobs / Bayt (services/boards_service.py).
+    """EXPERIMENTAL: search LinkedIn / Indeed / Glassdoor / Bayt (services/boards_service.py).
     Payload (all optional): {"sites": [...], "terms": [...], "countries": [...]}; empty parts come from settings, users' preferences and the crawl countries."""
     from app.crawler import boards
     from app.services import boards_service as bs

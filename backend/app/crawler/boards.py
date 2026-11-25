@@ -1,4 +1,4 @@
-"""Job boards (LinkedIn, Indeed, Glassdoor, Google Jobs, Bayt) through the open-source JobSpy library (MIT, `pip install python-jobspy`).
+"""Job boards (LinkedIn, Indeed, Glassdoor, Bayt) through the open-source JobSpy library (MIT, `pip install python-jobspy`).
 
 EXPERIMENTAL and OFF by default (CAREERS_BOARD_SITES is empty). Unlike the rest of the crawler this does not read employers' own career
 pages: it queries the boards' public search pages, which their terms of use do not allow and which they rate-limit or block. Turn it on
@@ -13,12 +13,11 @@ When the board gives the employer's own apply link (job_url_direct), that link i
 import datetime as dt, logging, math, re, time
 
 log = logging.getLogger("boards")
-SITES = ("linkedin", "indeed", "glassdoor", "google", "bayt")
+SITES = ("linkedin", "indeed", "glassdoor", "bayt")
 INFO = {   # what each board is like, from JobSpy's README; shown on the Crawler page
     "linkedin": dict(label="LinkedIn", note="Blocks bursts of requests (HTTP 429) for about a minute; the strictest board.", spacing=4.0),
     "indeed": dict(label="Indeed", note="The most reliable board, rarely blocks.", spacing=1.0),
     "glassdoor": dict(label="Glassdoor", note="Limits above about 2 requests a second; searched by city, not country.", spacing=2.0),
-    "google": dict(label="Google Jobs", note="JobSpy reports Google Jobs as currently unavailable; expect empty results.", spacing=2.0),
     "bayt": dict(label="Bayt", note="Gulf and Middle East board; only searched for those countries.", spacing=2.0),
 }
 
@@ -117,7 +116,6 @@ def search_site(site: str, term: str, country: str, location: str = "", results:
     kw = dict(site_name=[site], search_term=term, location=where, results_wanted=results, hours_old=hours_old, description_format="markdown", verbose=0)
     if site in ("indeed", "glassdoor"): kw["country_indeed"] = INDEED_COUNTRY[country]
     if site == "linkedin": kw["fetch_description"] = True                     # without it LinkedIn rows have no description
-    if site == "google": kw["google_search_term"] = f"{term} jobs in {where} since last week"
     wait = INFO[site]["spacing"] - (time.monotonic() - _last_call.get(site, 0))
     if wait > 0: time.sleep(wait)                                             # space requests to the same board out
     try:

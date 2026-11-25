@@ -1,10 +1,10 @@
 import { Icon } from "@/shared/ui/Icon";
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { api } from "@/shared/api/client";
 import { flag } from "@/shared/lib/geo";
 import { useSectors } from "@/shared/api/meta";
-import { ActionButton, ago, num, useNotify } from "./ui";
+import { ago, num } from "./ui";
 
 /** Where a link or a step can send you. "setup", "storage", "companies" and "jobs" are older names that now open a section of Settings or Data. */
 export type CrawlTab = "overview" | "boards" | "settings" | "data" | "tasks" | "users" | "setup" | "storage" | "companies" | "jobs";
@@ -59,16 +59,15 @@ const STEPS: Step[] = [
 ];
 
 /** The crawler as six steps. Click one to see what it does, when it runs, what it did lately and what you can do about it. */
-export function PipelineExplorer({ go }: { go(t: CrawlTab): void }) {
+export function PipelineExplorer() {
   const q = useQuery({ queryKey: ["admin-pipeline"], refetchInterval: 15000, queryFn: () => api.get<Pipeline>("/admin/pipeline") });
   const sec = useSectors().data; const name = (k: string) => sec?.sectors.find((s) => s.key === k)?.label ?? k;
-  const [sel, setSel] = useState<Step["id"]>("read"); const qc = useQueryClient(); const notify = useNotify();
+  const [sel, setSel] = useState<Step["id"]>("read");
   const p = q.data;
   if (!p) return <div className="card muted">Loading the crawler's steps…</div>;
   const st = STEPS.find((s) => s.id === sel) ?? STEPS[2];
-  const run = async (task: string, label: string) => { const r = await api.post<{ id: number }>("/admin/tasks", { kind: task }); notify(`Started “${label}” (task #${r.id}). Follow it in Tasks.`, "ok"); qc.invalidateQueries({ queryKey: ["admin-tasks"] }); };
   return (<div className="card stack pipe">
-    <div className="row"><h2 style={{ margin: 0 }}>How the crawler works</h2><span className="small muted">Click a step to see what it does, when, and what it did lately.</span></div>
+    <div className="row"><h2 style={{ margin: 0 }}>How the crawler works</h2><span className="small muted">Click a step to see what it does, when, and what it did lately. Everything you can start by hand is on the Tasks tab.</span></div>
     <ol className="psteps" role="tablist" aria-label="Crawler steps">{STEPS.map((s, i) => (
       <li key={s.id}><button role="tab" aria-selected={sel === s.id} className={`pstep${sel === s.id ? " on" : ""}`} onClick={() => setSel(s.id)} style={{ animationDelay: `${i * 50}ms` }}>
         <span className="pnum">{i + 1}</span><span className="picon" aria-hidden>{s.icon}</span><b>{s.title}</b><span className="small muted">{s.short}</span><span className="pmetric">{s.metric(p)}</span></button></li>))}</ol>
@@ -76,14 +75,11 @@ export function PipelineExplorer({ go }: { go(t: CrawlTab): void }) {
       <div className="stack" style={{ gap: 10 }}>
         <div><div className="plabel">What it does</div><div>{st.what}</div></div>
         <div><div className="plabel">When it happens</div><div>{st.when(p)}</div></div>
-        {st.actions.length > 0 && <div><div className="plabel">What you can do</div><div className="row">{st.actions.map((a) => a.task
-          ? <ActionButton key={a.label} className="btn small" title={a.hint} run={() => run(a.task!, a.label)}>▶ {a.label}</ActionButton>
-          : <button key={a.label} className="btn ghost small" title={a.hint} onClick={() => go(a.tab!)}>{a.label} →</button>)}</div></div>}
       </div>
       <div><div className="plabel">Right now</div><dl className="pnow">{st.now(p, name).map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl></div>
     </div>
-    <button className={`pboards${p.boards.enabled ? " on" : ""}`} onClick={() => go("boards")}>
+    <div className={`pboards${p.boards.enabled ? " on" : ""}`}>
       <span aria-hidden className="ph-icon"><Icon name="search" size={16} /></span><span><b>Side road: job boards</b> <span className="chip warn" style={{ margin: 0 }}>experimental</span><br /><span className="small muted">
-        {p.boards.enabled ? `LinkedIn, Indeed and others every ${p.boards.every_hours} h · ${num(p.boards.jobs)} open jobs found there · last run: ${lastText(p.boards.last)}` : "Switched off. Searches LinkedIn, Indeed, Glassdoor and Bayt for users' job titles when turned on."}</span></span><span className="right">Open →</span></button>
+        {p.boards.enabled ? `LinkedIn, Indeed and others every ${p.boards.every_hours} h · ${num(p.boards.jobs)} open jobs found there · last run: ${lastText(p.boards.last)}` : "Switched off. Searches LinkedIn, Indeed, Glassdoor and Bayt for users' job titles when turned on."}</span></span></div>
   </div>);
 }

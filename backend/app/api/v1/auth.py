@@ -77,6 +77,8 @@ def update_profile(body: ProfileIn, user: User = Depends(current_user), db: Sess
     if "prefs" in d: d["prefs"] = {**(user.profile or {}).get("prefs", {}), **{k: v for k, v in d["prefs"].items() if isinstance(k, str) and len(k) <= 40}}
     if len(str(d.get("prefs", ""))) > 4000: raise HTTPException(400, "preferences are too large")
     user.profile = {**(user.profile or {}), **d}; db.commit()
+    from app.services import focus_service, policy_service
+    focus_service.reset(); policy_service._cache["v"] = None                      # what the crawler collects follows your choices
     out = UserOut.model_validate(user)
     if "countries" in d or "regions" in d:                                         # your places drive the crawler
         from app.services import coverage_service

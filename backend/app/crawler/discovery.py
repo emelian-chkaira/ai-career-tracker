@@ -366,7 +366,22 @@ def _find_job_arrays(node, out, depth=0):
 # Headless browsers live in a fixed pool of BROWSER_SLOTS + 1 threads. Each thread starts Chromium once and reuses it for many pages
 # (a fresh, isolated context per page), instead of launching a whole browser for every scan. Playwright's sync API belongs to the
 # thread that started it, so a page is always rendered on the browser thread that owns the browser.
-_browsers = ThreadPoolExecutor(max(1, BROWSER_SLOTS + 1), thread_name_prefix="browser")
+_browsers = ThreadPoolExecutor(13, thread_name_prefix="browser")      # the most windows that can ever be open; how many may run at once is set in the Crawler page (perf_service)
+
+
+class _Gate:
+    """At most `browser_slots` pages render at once; the number is re-read every few seconds, so it can be changed while the worker runs."""
+    def __init__(self): self.c = threading.Condition(); self.n = 0
+    def __enter__(self):
+        from app.services import perf_service
+        with self.c:
+            while self.n >= perf_service.current()["browser_slots"]: self.c.wait(2)
+            self.n += 1
+    def __exit__(self, *a):
+        with self.c: self.n -= 1; self.c.notify_all()
+
+
+_gate = _Gate()
 _tl = threading.local()
 RECYCLE_AFTER = 50                                       # pages per browser before a clean restart (keeps memory in check)
 BLOCKED = {"image", "media", "font"}                     # never needed to find job links; skipping them makes pages load much faster
@@ -400,7 +415,8 @@ def render_scan(url, click=()):
     """Render one page on a pooled headless browser. -> (jobs, html + the JSON URLs the page called, for ATS detection)"""
     try: import playwright  # noqa: F401
     except ImportError: return [], ""
-    try: return _browsers.submit(_render_scan, url, click).result(timeout=300)
+    try:
+        with _gate: return _browsers.submit(_render_scan, url, click).result(timeout=300)
     except Exception: return [], ""
 
 
@@ -419,7 +435,7 @@ def _render_scan(url, click=()):
             except Exception: pass
         pg.on("response", on_resp)
         pg.goto(url, wait_until="domcontentloaded", timeout=20000)
-        try: pg.wait_for_load_state("networkidle", timeout=6000)      # most job lists arrive within a few seconds; pages with endless analytics never go quiet
+        try: pg.wait_for_load_state("networkidle", timeout=__import__("app.services.perf_service", fromlist=["x"]).current()["page_wait_ms"])      # most job lists arrive within a few seconds; pages with endless analytics never go quiet
         except Exception: pass
         try: pg.get_by_role("button", name="Accept all cookies").click(timeout=1500)
         except Exception: pass

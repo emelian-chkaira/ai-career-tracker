@@ -7,7 +7,7 @@ DB = "careers_test"
 with psycopg.connect(ADMIN, autocommit=True) as c:
     c.execute(f"DROP DATABASE IF EXISTS {DB} WITH (FORCE)"); c.execute(f"CREATE DATABASE {DB}")
 os.environ["DATABASE_URL"] = f"postgresql+psycopg://careers:careers@localhost:5433/{DB}"
-os.environ.update(CAREERS_DATA_DIR=os.path.join(os.path.dirname(__file__), ".tmp-data"), CAREERS_ADMIN_EMAILS="admin@example.com", CAREERS_FIRST_USER_ADMIN="0", CAREERS_RATE_LIMIT_PER_MIN="0", CAREERS_AUTH_RATE_LIMIT_PER_MIN="0")
+os.environ.update(CAREERS_DATA_DIR=os.path.join(os.path.dirname(__file__), ".tmp-data"), CAREERS_KEEP_DOMAINS="", CAREERS_FIELDS_MODE="all", CAREERS_ADMIN_EMAILS="admin@example.com", CAREERS_FIRST_USER_ADMIN="0", CAREERS_RATE_LIMIT_PER_MIN="0", CAREERS_AUTH_RATE_LIMIT_PER_MIN="0")
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest

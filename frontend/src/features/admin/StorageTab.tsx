@@ -4,8 +4,7 @@ import { api } from "@/shared/api/client";
 import { label } from "@/shared/lib/format";
 import { ActionButton, Modal, Spinner, num, useNotify } from "./ui";
 
-type Policy = { keep_domains: string[]; max_job_age_days: number; delete_expired_after_days: number; by_domain: Record<string, number>; defaults: { keep_domains: string[]; max_job_age_days: number; delete_expired_after_days: number } };
-const DOMAINS = ["mobile", "frontend", "backend", "fullstack", "software", "data", "devops", "security", "qa", "embedded", "design", "product", "other"];
+type Policy = { keep_domains: string[]; saved_domains?: string[]; max_job_age_days: number; delete_expired_after_days: number; by_domain: Record<string, number>; defaults: { keep_domains: string[]; max_job_age_days: number; delete_expired_after_days: number } };
 
 const ACTIONS: { id: string; title: string; what: string; danger?: boolean }[] = [
   { id: "backfill_domains", title: "Classify jobs", what: "Give every job that has no domain one (mobile, backend, data …). Safe — nothing is deleted." },
@@ -21,10 +20,8 @@ export function StorageTab({ isAdmin }: { isAdmin: boolean }) {
   const q = useQuery({ queryKey: ["admin-policy"], queryFn: () => api.get<Policy>("/admin/policy") });
   const p = q.data;
   const [keep, setKeep] = useState<string[]>([]); const [age, setAge] = useState(0); const [exp, setExp] = useState(0);
-  useEffect(() => { if (p) { setKeep(p.keep_domains); setAge(p.max_job_age_days); setExp(p.delete_expired_after_days); } }, [p]);
+  useEffect(() => { if (p) { setKeep(p.saved_domains ?? p.keep_domains); setAge(p.max_job_age_days); setExp(p.delete_expired_after_days); } }, [p]);
   const dirty = !!p && (JSON.stringify([...keep].sort()) !== JSON.stringify(p.keep_domains) || age !== p.max_job_age_days || exp !== p.delete_expired_after_days);
-  const [log, setLog] = useState<{ at: string; title: string; text: string; ok: boolean }[]>([]);
-  const [ask, setAsk] = useState<(typeof ACTIONS)[number] | null>(null);
   if (!p) return <div className="card muted">Loading…</div>;
   const max = Math.max(1, ...Object.values(p.by_domain)); const total = Object.values(p.by_domain).reduce((a, b) => a + b, 0);
   const save = async () => { try { await api.put("/admin/policy", { keep_domains: keep, max_job_age_days: age, delete_expired_after_days: exp }); await qc.invalidateQueries({ queryKey: ["admin-policy"] }); notify("Storage policy saved. New scans use it right away; run “Apply storage policy” to clean what is already stored.", "ok"); } catch (e) { notify((e as Error).message, "bad"); } };
@@ -32,14 +29,13 @@ export function StorageTab({ isAdmin }: { isAdmin: boolean }) {
     <div className="stack">
       <div className="card stack">
         <div className="row" style={{ justifyContent: "space-between" }}><h2 style={{ margin: 0 }}>What should be stored?</h2>{!isAdmin && <span className="badge">view only — ask an admin to change</span>}</div>
-        <div><div className="small" style={{ marginBottom: 6 }}><b>Job domains to keep</b> <span className="muted">— {keep.length ? `only ${keep.length} selected` : "none selected = keep every domain"}</span></div>
-          <div className="domgrid">{DOMAINS.map((d) => <label key={d} className={keep.includes(d) ? "on" : ""}><input type="checkbox" disabled={!isAdmin} checked={keep.includes(d)} onChange={() => setKeep((k) => (k.includes(d) ? k.filter((x) => x !== d) : [...k, d]))} />{label(d)}{p.by_domain[d] ? <span className="muted small">{num(p.by_domain[d])}</span> : null}</label>)}</div></div>
+        <div className="small muted">Which fields of work to collect (IT only, for example) is set in <b>Settings → What to collect</b>.</div>
         <div className="row" style={{ gap: 18, alignItems: "flex-end" }}>
           <div className="field"><label>Don't store jobs older than (days)</label><input type="number" min={0} disabled={!isAdmin} value={age} onChange={(e) => setAge(Math.max(0, +e.target.value))} style={{ width: 130 }} /><div className="small muted">0 = no limit</div></div>
           <div className="field"><label>Delete vanished jobs after (days)</label><input type="number" min={0} disabled={!isAdmin} value={exp} onChange={(e) => setExp(Math.max(0, +e.target.value))} style={{ width: 130 }} /><div className="small muted">0 = keep forever</div></div>
         </div>
         {isAdmin && <div className="row"><ActionButton className="btn" disabled={!dirty} run={save}>Save policy</ActionButton>
-          <button className="btn ghost" disabled={!dirty} onClick={() => { setKeep(p.keep_domains); setAge(p.max_job_age_days); setExp(p.delete_expired_after_days); }}>Undo changes</button>
+          <button className="btn ghost" disabled={!dirty} onClick={() => { setKeep(p.saved_domains ?? p.keep_domains); setAge(p.max_job_age_days); setExp(p.delete_expired_after_days); }}>Undo changes</button>
           <ActionButton className="btn ghost" run={async () => { await api.del("/admin/policy"); await qc.invalidateQueries({ queryKey: ["admin-policy"] }); notify("Back to the defaults from .env.", "ok"); }}>Reset to .env defaults</ActionButton>
           {dirty && <span className="small warn">unsaved changes</span>}</div>}
         <div className="small muted">Saved in the database and applied to every new scan within seconds. Defaults come from <code>.env</code> ({p.defaults.keep_domains.join(", ") || "all domains"}, {p.defaults.max_job_age_days || "no"} day limit).</div>
@@ -50,15 +46,9 @@ export function StorageTab({ isAdmin }: { isAdmin: boolean }) {
         {Object.entries(p.by_domain).map(([d, n]) => <div key={d} className="row" style={{ gap: 8, margin: "2px 0" }}>
           <span style={{ width: 110 }} className="small">{label(d)}</span><div style={{ flex: 1, height: 8, borderRadius: 999, background: "var(--panel2)" }}><div style={{ width: `${(n / max) * 100}%`, height: "100%", borderRadius: 999, background: p.keep_domains.length && !p.keep_domains.includes(d) ? "var(--warn)" : "var(--brand)" }} /></div>
           <span className="small muted" style={{ width: 60, textAlign: "right" }}>{num(n)}</span></div>)}
-        {p.keep_domains.length > 0 && <div className="small muted">Orange bars are outside the domains you keep — “Apply storage policy” removes them.</div>}
+        {(p.saved_domains ?? p.keep_domains).length > 0 && <div className="small muted">Orange bars are outside the domains you keep — “Apply storage policy” removes them.</div>}
       </div>
 
-      {isAdmin ? <div className="card stack">
-        <h2 style={{ margin: 0 }}>Housekeeping</h2>
-        {ACTIONS.map((a) => <ActionRow key={a.id} a={a} onAsk={() => setAsk(a)} />)}
-        {!!log.length && <div className="stack" style={{ gap: 4 }}><div className="small muted">Results (this session)</div>{log.map((l, i) => <div key={i} className={`small ${l.ok ? "" : "err"}`}>{l.at} · <b>{l.title}</b> — {l.text}</div>)}</div>}
-      </div> : <div className="card small muted">Housekeeping (purge, clear, apply policy) is available to admins.</div>}
-      {ask && <RunModal a={ask} onClose={() => setAsk(null)} onResult={(r, ok) => { setLog((l) => [{ at: new Date().toLocaleTimeString(), title: ask.title, text: r, ok }, ...l].slice(0, 8)); notify(`${ask.title}: ${r}`, ok ? "ok" : "bad"); setAsk(null); ["admin-policy", "admin-stats", "admin-worker", "co", "jobs-admin"].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); }} />}
     </div>
   );
 }
@@ -68,9 +58,12 @@ const sum = (o?: Record<string, number>) => Object.entries(o ?? {}).filter(([k])
 
 function ActionRow({ a, onAsk }: { a: (typeof ACTIONS)[number]; onAsk(): void }) {
   const pv = usePreview(a.id); const n = sum(pv.data);
-  return <div className="opt"><div><b>{a.title}</b><div className="small muted">{a.what}</div>
-    <div className="small" style={{ marginTop: 4 }}>{pv.isLoading ? <Spinner /> : n ? <span className={a.danger ? "err" : "warn"}>Right now this would affect <b>{num(n)}</b> row(s): {Object.entries(pv.data ?? {}).map(([k, v]) => `${num(v)} ${nice(k)}`).join(", ")}.</span> : <span className="ok">Nothing to do right now.</span>}</div></div>
-    <button className={`btn small ${a.danger ? "danger" : ""}`} disabled={!n && !a.danger} onClick={onAsk}>{a.title}…</button></div>;
+  const rows = Object.entries(pv.data ?? {}).filter(([k, v]) => v && k !== "nothing_to_do");
+  return <div className={"tcard" + (a.danger ? " danger" : "")}>
+    <div className="tcard-h"><span className="tcard-i" aria-hidden>{a.danger ? "⚠" : "🧹"}</span><b>{a.title}</b></div>
+    <div className="small muted tcard-d">{a.what}</div>
+    <div className="tcard-s small">{pv.isLoading ? <Spinner /> : n ? <span className={a.danger ? "err" : "warn"}><b>{num(n)}</b> row(s) affected{rows.length > 1 ? `: ${rows.map(([k, v]) => `${num(v)} ${nice(k)}`).join(", ")}` : ""}</span> : <span className="ok">✓ Nothing to do right now</span>}</div>
+    <button className={`btn small ${a.danger ? "danger" : "ghost"}`} disabled={!n && !a.danger} onClick={onAsk}>{a.danger ? "Review and clear…" : n ? "Review and run…" : "Nothing to do"}</button></div>;
 }
 
 function RunModal({ a, onClose, onResult }: { a: (typeof ACTIONS)[number]; onClose(): void; onResult(text: string, ok: boolean): void }) {
@@ -83,4 +76,19 @@ function RunModal({ a, onClose, onResult }: { a: (typeof ACTIONS)[number]; onClo
       <ActionButton className={`btn ${a.danger ? "danger" : ""}`} disabled={a.danger && !sure} run={async () => {
         try { const r = await api.post<Record<string, number>>(`/admin/maintenance/${a.id}`, a.danger ? { confirm: true } : {}); const e = Object.entries(r); onResult(e.length ? e.map(([k, v]) => `${num(v)} ${nice(k)}`).join(", ") : "done", true); }
         catch (e) { onResult((e as Error).message, false); } }}>Run now</ActionButton></div></Modal>;
+}
+
+
+/** The clean-up actions (classify, purge, apply the storage policy, clear). They live on the Tasks page with every other thing you can start by hand. */
+export function Housekeeping({ isAdmin }: { isAdmin: boolean }) {
+  const qc = useQueryClient(); const notify = useNotify();
+  const [log, setLog] = useState<{ at: string; title: string; text: string; ok: boolean }[]>([]);
+  const [ask, setAsk] = useState<(typeof ACTIONS)[number] | null>(null);
+  return (<>
+      {isAdmin ? <div className="stack">
+        <div className="tcards">{ACTIONS.map((a) => <ActionRow key={a.id} a={a} onAsk={() => setAsk(a)} />)}</div>
+        {!!log.length && <div className="stack" style={{ gap: 4 }}><div className="small muted">Results (this session)</div>{log.map((l, i) => <div key={i} className={`small ${l.ok ? "" : "err"}`}>{l.at} · <b>{l.title}</b> — {l.text}</div>)}</div>}
+      </div> : <div className="card small muted">Housekeeping (purge, clear, apply policy) is available to admins.</div>}
+      {ask && <RunModal a={ask} onClose={() => setAsk(null)} onResult={(r, ok) => { setLog((l) => [{ at: new Date().toLocaleTimeString(), title: ask.title, text: r, ok }, ...l].slice(0, 8)); notify(`${ask.title}: ${r}`, ok ? "ok" : "bad"); setAsk(null); ["admin-policy", "admin-stats", "admin-worker", "co", "jobs-admin"].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); }} />}
+  </>);
 }

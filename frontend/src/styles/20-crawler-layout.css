@@ -89,3 +89,19 @@
 /* ---------- companies / jobs switch ---------- */
 .seg .count{margin-left:6px;font-size:11px;opacity:.75}
 .cchip.on .muted{color:inherit;opacity:.85}
+.tgroups.flat{border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
+.tgroups.flat section:nth-child(n+4){border-top:1px solid var(--line)}
+.tgroups.flat .opt{padding:8px 0;border-top:1px solid var(--line)}
+
+/* Tasks: cards in a responsive grid */
+.tsec{margin:0 0 8px;font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.tcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.tcard{display:flex;flex-direction:column;gap:8px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);transition:border-color .15s,transform .15s,box-shadow .15s}
+.tcard:hover{border-color:var(--brand);transform:translateY(-1px);box-shadow:0 6px 18px #0002}
+.tcard.busy{border-color:var(--warn,#d9a441)}
+.tcard.danger{border-color:color-mix(in srgb,#e5484d 45%,var(--line))}
+.tcard-h{display:flex;align-items:center;gap:8px;width:100%}
+.tcard-i{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:color-mix(in srgb,var(--brand) 16%,transparent);font-size:15px;flex:none}
+.tcard-d{flex:1}.tcard-s{min-height:20px}
+.tcard .btn{margin-top:2px}
+@media(prefers-reduced-motion:reduce){.tcard{transition:none}.tcard:hover{transform:none}}

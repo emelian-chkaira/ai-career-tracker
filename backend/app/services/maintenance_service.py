@@ -21,8 +21,11 @@ def _purge_clauses(p: dict) -> dict[str, tuple[str, dict]]:
 
 
 def _prune_clause(p: dict) -> tuple[str, dict] | None:
-    if not p["keep_domains"]: return None
-    return (f"domain IS NOT NULL AND domain <> ALL(:k) AND {SAVED}", {"k": p["keep_domains"]})
+    """Jobs outside the fields collected: a tech job whose domain is not kept, or a job of a sector nobody here looks for."""
+    if not p["keep_domains"] and not p["keep_sectors"]: return None
+    sql = ("domain IS NOT NULL AND NOT ((sector = 'tech' AND (coalesce(array_length(CAST(:s AS text[]), 1), 0) = 0 OR 'tech' = ANY(CAST(:s AS text[]))) "
+           "AND (coalesce(array_length(CAST(:k AS text[]), 1), 0) = 0 OR domain = ANY(CAST(:k AS text[])))) OR (sector <> 'tech' AND sector = ANY(CAST(:s AS text[])))) AND " + SAVED)
+    return (sql, {"k": list(p["keep_domains"]), "s": list(p["keep_sectors"])})
 
 
 def backfill_domains(db: Session, only_missing: bool = True) -> int:

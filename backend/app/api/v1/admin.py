@@ -9,7 +9,7 @@ from app.models import Task, Company, Job, User, Sponsor, EmailOutbox
 from app.services import task_service, maintenance_service, policy_service
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(operator_user)])
-KINDS = {"dedupe_jobs", "board_search", "discover_country", "scan_all", "scan_unscanned", "scan_company", "discover", "census", "internships", "broad_sources", "logos", "sponsors_refresh", "embed", "live_search"}
+KINDS = {"dedupe_jobs", "board_search", "discover_country", "scan_all", "scan_due", "scan_unscanned", "scan_company", "discover", "census", "internships", "broad_sources", "logos", "sponsors_refresh", "embed", "live_search"}
 
 
 class TaskIn(BaseModel):
@@ -96,7 +96,9 @@ def worker(db: Session = Depends(get_db)):
 @router.get("/policy", summary="The storage policy in effect (env defaults + overrides saved from the Crawler page)")
 def policy(db: Session = Depends(get_db)):
     from app.crawler import places
-    return {**policy_service.current(), "defaults": policy_service.defaults(), "places": places.public(),
+    from app.services import focus_service
+    return {**policy_service.current(), "defaults": policy_service.defaults(), "places": places.public(), "derived": focus_service.derive(),
+            "by_sector": dict(db.execute(text("SELECT sector, count(*) FROM jobs WHERE status='open' GROUP BY 1 ORDER BY 2 DESC")).all()),
             "by_country": dict(db.execute(text("SELECT cc, count(*) FROM jobs, unnest(countries) cc WHERE status='open' GROUP BY 1 ORDER BY 2 DESC")).all()),
             "by_age": dict(zip(("older_10", "older_30", "older_90", "older_180", "undated", "open"), db.execute(text(      # for the "How recent" choice: what each limit would remove
                 "SELECT " + ", ".join(f"count(*) FILTER (WHERE COALESCE(posted_at, first_seen::date) < current_date - {d})" for d in (10, 30, 90, 180)) + ", count(*) FILTER (WHERE posted_at IS NULL), count(*) FROM jobs WHERE status='open'")).one())), "by_domain": {(r[0] or "unclassified"): r[1] for r in db.execute(text("SELECT domain, count(*) FROM jobs WHERE status='open' GROUP BY 1 ORDER BY 2 DESC"))}}
@@ -148,17 +150,51 @@ def put_schedule(body: ScheduleIn, db: Session = Depends(get_db)):
     ok, why, nxt = sch.window(v); return {**v, "allowed_now": ok, "why": why, "next_start": nxt}
 
 
+class PerfIn(BaseModel):
+    browser_slots: int = 5
+    scan_threads: int = 16
+    page_wait_ms: int = 3000
+    ats_first: bool = True
+    internship_pass: bool = True
+
+
+def _perf(db: Session):
+    from app.services import perf_service as pf
+    from app.services import schedule_service as sch
+    return {**pf.current(), "parallel": sch.current(db)["parallel"], "defaults": pf.defaults(), "limits": {**pf.LIMITS, "parallel": (1, 40)}}
+
+
+@router.get("/perf", summary="How hard the crawler works: browser slots, scan threads, page wait, shortcuts")
+def get_perf(db: Session = Depends(get_db)): return _perf(db)
+
+
+@router.put("/perf", dependencies=[Depends(admin_user)], summary="Save the crawler's speed settings (the worker follows within seconds)")
+def put_perf(body: PerfIn, db: Session = Depends(get_db)):
+    from app.services import perf_service as pf
+    try: pf.save(db, body.model_dump())
+    except ValueError as e: raise HTTPException(400, str(e))
+    return _perf(db)
+
+
+@router.delete("/perf", dependencies=[Depends(admin_user)], summary="Back to the default speed settings")
+def reset_perf(db: Session = Depends(get_db)):
+    from app.services import perf_service as pf
+    pf.reset(db); return _perf(db)
+
+
 class PolicyIn(BaseModel):
     countries: list[str] | None = None            # ISO codes to store jobs for; None = keep the current list
     keep_remote: bool | None = None
     keep_domains: list[str] = []
+    keep_sectors: list[str] | None = None
+    fields_mode: str | None = None                 # auto (from accounts' profiles and CVs) | manual | all
     max_job_age_days: int = 0
     delete_expired_after_days: int = 0
 
 
 @router.put("/policy", dependencies=[Depends(admin_user)], summary="Save the storage policy (takes effect for the API and the worker within seconds)")
 def set_policy(body: PolicyIn, db: Session = Depends(get_db)):
-    try: policy_service.save(db, body.keep_domains, body.max_job_age_days, body.delete_expired_after_days, body.countries, body.keep_remote)
+    try: policy_service.save(db, body.keep_domains, body.max_job_age_days, body.delete_expired_after_days, body.countries, body.keep_remote, body.keep_sectors, body.fields_mode)
     except ValueError as e: raise HTTPException(400, str(e))
     return policy(db)
 

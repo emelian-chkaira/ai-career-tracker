@@ -19,7 +19,7 @@ def test_policy_is_editable_saved_and_used_by_ingest(client, make_user, db, monk
     ha, h = admin(make_user), make_user()[0]
     assert client.get(f"{A}/policy", headers=ha).json()["keep_domains"] == []
     assert client.put(f"{A}/policy", json={"keep_domains": ["mobile"], "max_job_age_days": 0, "delete_expired_after_days": 30}, headers=h).status_code == 403
-    r = client.put(f"{A}/policy", json={"keep_domains": ["mobile"], "max_job_age_days": 0, "delete_expired_after_days": 30}, headers=ha).json()
+    r = client.put(f"{A}/policy", json={"keep_domains": ["mobile"], "fields_mode": "manual", "max_job_age_days": 0, "delete_expired_after_days": 30}, headers=ha).json()
     assert r["keep_domains"] == ["mobile"] and r["delete_expired_after_days"] == 30 and r["defaults"]["keep_domains"] == []
     c = ing.add_company(db, "Acme"); assert ing.store_jobs(db, c, [J("Flutter Developer"), J("Backend Engineer")]) == 1
     assert client.put(f"{A}/policy", json={"keep_domains": ["nonsense"]}, headers=ha).status_code == 400

@@ -26,7 +26,7 @@ def test_classify_titles_and_descriptions():
 
 
 def test_only_configured_domains_are_stored(db, monkeypatch):
-    c = ing.add_company(db, "Acme"); monkeypatch.setattr(settings, "keep_domains", "mobile")
+    c = ing.add_company(db, "Acme"); monkeypatch.setattr(settings, "keep_domains", "mobile"); monkeypatch.setattr(settings, "fields_mode", "manual")
     n = ing.store_jobs(db, c, [J("Flutter Developer"), J("Backend Engineer"), J("Data Engineer"), J("iOS Developer")]); db.commit()
     assert n == 2
     assert {j.domain for j in db.scalars(select(Job))} == {"mobile"}
@@ -59,7 +59,7 @@ def test_purge_deletes_old_and_long_expired_but_never_saved(db, make_user, monke
 
 def test_prune_applies_current_policy_to_stored_jobs(db, monkeypatch):
     c = ing.add_company(db, "Acme"); monkeypatch.setattr(settings, "keep_domains", ""); ing.store_jobs(db, c, [J("Flutter Developer"), J("Backend Engineer"), J("Data Engineer")]); db.commit()
-    monkeypatch.setattr(settings, "keep_domains", "mobile,backend")
+    monkeypatch.setattr(settings, "keep_domains", "mobile,backend"); monkeypatch.setattr(settings, "fields_mode", "manual")
     assert maint.prune_to_policy(db)["other_domains_deleted"] == 1
     assert sorted(j.domain for j in db.scalars(select(Job))) == ["backend", "mobile"]
 

@@ -32,11 +32,12 @@ class Settings(BaseSettings):
     crawl_countries: str = "NL"                   # comma list of ISO codes to store jobs for (NL, BE, DE, AE ...), or region keys (benelux, dach, europe, gcc, emea). Empty = everywhere
     keep_remote: bool = True
     # EXPERIMENTAL job boards through JobSpy (crawler/boards.py). Off unless sites are listed. Against those sites' terms: personal use only.
-    board_sites: str = ""                         # comma list of: linkedin, indeed, glassdoor, google, bayt
+    board_sites: str = ""                         # comma list of: linkedin, indeed, glassdoor, bayt
     board_every_hours: int = 12                   # automatic board search interval (inside the crawl schedule); 0 = only when started by hand
     board_results: int = 30                       # postings per site per search
     board_max_searches: int = 24                  # term x country searches per run (keeps the volume low)                      # also store remote jobs that are open to those countries ("Remote - Europe", "Anywhere")
-    keep_domains: str = ""                        # comma list of: mobile, frontend, backend, fullstack, software, data, devops, security, qa, embedded, design, product, other. Empty = store every domain
+    keep_domains: str = ""                        # manual mode only: comma list of: mobile, frontend, backend, fullstack, software, data, devops, security, qa, embedded, design, product, other. Empty = store every domain
+    fields_mode: str = "auto"                     # auto = collect what the accounts' profiles and CVs ask for (default) | manual = the lists in the Crawler page | all = every field
     max_job_age_days: int = 0                     # 0 = no limit. Otherwise skip jobs posted longer ago than this, and delete stored ones that got older
     delete_expired_after_days: int = 60           # jobs no longer on the employer's page are deleted after this many days (0 = keep forever). Saved/pipeline jobs are never deleted
     allow_private_hosts: bool = True              # True: users may point AI/mail connections at localhost / LAN (Ollama, local mail bridge). Set False on a public server (SSRF protection)
@@ -48,8 +49,8 @@ class Settings(BaseSettings):
     # --- crawler identity
     contact: str = "https://github.com/your-org/ai-career-tracker"
     brave_api_key: str | None = None
-    browser_slots: int = 3
-    scan_threads: int = 10
+    browser_slots: int = 5
+    scan_threads: int = 16
     # --- search / semantic
     embedding_model: str = "BAAI/bge-small-en-v1.5"   # 384-d, local ONNX via fastembed
     embedding_dim: int = 384
