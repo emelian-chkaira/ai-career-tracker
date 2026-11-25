@@ -252,7 +252,7 @@ def internships(t, db):
     """Internship-focused sweep: read every company's student/stage/graduate pages (wide path list + werkenbij/careers/jobs subdomains)."""
     ids = list(db.execute(select(Company.id).where(Company.website.is_not(None), ~Company.ats.like("board:%") | Company.ats.is_(None))
                           .order_by(Company.id.in_(select(Job.company_id).where(Job.status == "open")).desc(), Company.id)).scalars())
-    state = {"total": len(ids), "done": 0, "new_jobs": 0, "companies_with_new": 0}
+    state = {"total": len(ids), "done": 0, "new_jobs": 0, "new_internships": 0, "companies_with_new": 0}
     task_service.progress(db, t, **state)
     def one(cid):
         if _halted(t): return
@@ -262,8 +262,10 @@ def internships(t, db):
                 have = set(d2.scalars(select(Job.url).where(Job.company_id == cid)))
                 found = discovery.scan_student_pages(c.website, "", "", have)
                 if found:
+                    interns = select(func.count()).select_from(Job).where(Job.company_id == cid, Job.job_type.in_(("internship", "traineeship")))
+                    before = d2.scalar(interns)
                     n = ing.store_jobs(d2, c, found, expire=False); d2.commit()
-                    if n: state["new_jobs"] += n; state["companies_with_new"] += 1
+                    if n: state["new_jobs"] += n; state["companies_with_new"] += 1; state["new_internships"] += max(0, d2.scalar(interns) - before)
         except Exception as e: log.warning("internships %s: %s", cid, e)
         state["done"] += 1
         if state["done"] % 20 == 0:

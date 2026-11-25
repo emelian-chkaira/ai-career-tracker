@@ -25,8 +25,8 @@ def test_student_pages_found_from_links(monkeypatch):
     urls = d.student_pages("https://acme.nl", html)
     assert "https://acme.nl/en/students-graduates" in urls and all("other.com" not in u for u in urls)
 
-def test_student_page_jobs_tagged_internship(monkeypatch):
-    pages = {"https://acme.nl/internships": '<a href="/job/123456-software-dev">Software Development Project</a><a href="/job/123457-data">Data Analysis Project</a><a href="/job/123458-ops">Operations Support</a><a href="/job/123459-x">Research Assistant Role</a><a href="/job/123450-y">Hardware Design Role</a>'}
+def test_student_page_jobs_are_tagged_internship_only_when_they_say_so(monkeypatch):
+    pages = {"https://acme.nl/internships": '<a href="/job/123456-software-dev">Software Development Internship</a><a href="/job/123457-data">Data Analysis Project</a><a href="/job/123458-ops">Operations Support</a><a href="/job/123459-x">Research Assistant Role</a><a href="/job/123450-y">Hardware Design Role</a>'}
     monkeypatch.setattr(d, "get", lambda u, *a, **k: pages.get(u))
     jobs = d.scan_student_pages("https://acme.nl", "", "", set())
-    assert jobs and all(j["kind"] == "internship" for j in jobs)
+    assert jobs and all((j.get("kind") == "internship") == d.says_student(j["title"], j["url"]) for j in jobs)      # being on the page is not enough

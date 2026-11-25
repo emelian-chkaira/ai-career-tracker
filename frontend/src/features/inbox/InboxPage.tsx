@@ -91,10 +91,11 @@ function Connection({ ai, needAi, showAi, toggleAi }: { ai?: AiSettings; needAi:
     <div className="card stack fancy">
       <div className="row" style={{ gap: 12, flexWrap: "wrap", alignItems: "center" }}>
         <span className="avatar" style={{ flex: "none" }}>{a.username[0]?.toUpperCase()}</span>
-        <div style={{ flex: 1, minWidth: 200 }}><b>{a.username}</b> <span className="chip ok" style={{ margin: 0 }}>● connected</span>
+        <div style={{ flex: 1, minWidth: 200 }}><b>{a.username}</b> {a.last_error ? <span className="chip warn" style={{ margin: 0 }}>● needs reconnecting</span> : <span className="chip ok" style={{ margin: 0 }}>● connected</span>}
           <div className="small muted">{a.last_error ? <span className="err">{a.last_error}</span> : `last read ${when(a.last_sync_at)}`}</div></div>
         <select value={days} onChange={(e) => setDays(+e.target.value)} aria-label="How far back to read" disabled={state === "running"}>{[[14, "Last 2 weeks"], [30, "Last 30 days"], [60, "Last 60 days"], [90, "Last 90 days"], [180, "Last 6 months"], [365, "Last year"]].map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select>
-        <button className="btn" disabled={state === "running" || needAi || (usesExternalAi && !consent)} onClick={run}>{state === "running" ? "Reading…" : "Sync now"}</button>
+        <button className={"btn" + (a.last_error ? " ghost" : "")} disabled={state === "running" || needAi || (usesExternalAi && !consent)} onClick={run}>{state === "running" ? "Reading…" : "Sync now"}</button>
+        <button className={"btn small" + (a.last_error ? "" : " ghost")} disabled={!gm.data?.configured} onClick={connect} title="Sign in to Google again; keeps your synced events">Reconnect</button>
         <button className="btn ghost small" onClick={disconnect}>Disconnect</button>
       </div>
       <label className="small"><input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} /> Move my pipeline automatically when the AI is very confident (90%+) and the job is known. You can undo each one.</label>

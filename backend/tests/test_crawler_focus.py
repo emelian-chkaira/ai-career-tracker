@@ -35,3 +35,11 @@ def test_only_admins_change_the_speed(client, make_user):
 def test_scan_due_is_a_task_kind(client, make_user):
     h, _ = make_user("admin@example.com")
     assert client.post("/api/v1/admin/tasks", json={"kind": "scan_due"}, headers=h).status_code == 202
+
+
+def test_a_student_page_does_not_turn_every_posting_into_an_internship():
+    from app.crawler import discovery as d
+    assert d.says_student("HBO/WO Internship Machine Learning Engineer", "https://x.nl/vacature/1/ml")
+    assert d.says_student("Software Engineer", "https://x.nl/jobs/software-engineer-internship")
+    for title in ("SRE Engineer", "Data Center Technician L1", "Sales Executive Data & AI", "International Account Lead"):
+        assert not d.says_student(title, "https://x.nl/students/jobs/12345"), title

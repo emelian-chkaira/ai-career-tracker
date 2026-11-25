@@ -40,7 +40,6 @@ function doingNow(t: TaskRow): React.ReactNode {
   if (t.kind === "discover_country" && p.country) return <>{flag(String(p.country))} {(p.log as string[] | undefined)?.slice(-1)[0] ?? `Finding employers in ${p.country}`}</>;
   const log = p.log as string[] | undefined;
   if (log?.length) return <>{log[log.length - 1]}</>;
-  if (p.total) return <>{num(Number(p.done ?? 0))} of {num(Number(p.total))} done{p.new_jobs ? ` · ${num(Number(p.new_jobs))} new jobs` : ""}</>;
   return <>{info(t.kind).what}…</>;
 }
 
@@ -59,11 +58,11 @@ export function TaskCard({ t, compact = false }: { t: TaskRow; compact?: boolean
         {t.status === "paused" && <ActionButton className="btn small" run={() => act("resume")}>▶ Resume</ActionButton>}
         <ActionButton className="btn ghost small danger-text" run={() => act("cancel")} title="Stop at the next step; what was found so far is kept">■ Stop</ActionButton></div></div>
     {pct !== null && <div className="tc-prog"><div className={`tc-bar ${st}`} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><div style={{ width: `${Math.max(2, pct)}%` }} /></div><span className="tc-count">{num(done)} / {num(total)} · {pct}%</span></div>}
+    {!compact && (p.found !== undefined || p.new_jobs !== undefined || p.new_internships !== undefined) && <div className="tc-stats small">{p.found !== undefined && <span><b>{num(Number(p.found))}</b> found</span>}{p.new_internships !== undefined && <span><b>{num(Number(p.new_internships))}</b> new internships</span>}{p.new_jobs !== undefined && (p.new_internships === undefined ? <span><b>{num(Number(p.new_jobs))}</b> new jobs</span> : Number(p.new_jobs) > Number(p.new_internships) && <span><b>{num(Number(p.new_jobs) - Number(p.new_internships))}</b> other new jobs</span>)}{Number(p.blocked ?? 0) > 0 && <span className="berr"><b>{String(p.blocked)}</b> blocked</span>}{Number(p.skipped ?? 0) > 0 && <span><b>{String(p.skipped)}</b> skipped</span>}</div>}
     {!compact && t.kind === "board_search" && plan && <dl className="tc-plan">
       <div><dt>Searching for</dt><dd>{(plan.terms ?? []).map((x) => <span key={x} className="cchip on">{x}</span>)}</dd></div>
       <div><dt>In</dt><dd>{(plan.countries ?? []).map((c) => <span key={c} className="cchip">{flag(c)} {c}</span>)}</dd></div>
       <div><dt>On</dt><dd>{(plan.sites ?? []).map((x) => <span key={x} className="cchip"><BoardIcon board={x} size={16} /> {boardName(x)}</span>)}</dd></div></dl>}
-    {!compact && (p.found !== undefined || p.new_jobs !== undefined) && <div className="tc-stats small">{p.found !== undefined && <span><b>{num(Number(p.found))}</b> found</span>}{p.new_jobs !== undefined && <span><b>{num(Number(p.new_jobs))}</b> new jobs</span>}{Number(p.blocked ?? 0) > 0 && <span className="berr"><b>{String(p.blocked)}</b> blocked</span>}{Number(p.skipped ?? 0) > 0 && <span><b>{String(p.skipped)}</b> skipped</span>}</div>}
   </div>);
 }
 

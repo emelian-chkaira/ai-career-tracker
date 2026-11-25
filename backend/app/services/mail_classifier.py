@@ -62,11 +62,28 @@ def link(db: Session, user_id, res: dict, sender_addr: str = "") -> tuple[int | 
     if not cid: return None, None
     jobs = db.execute(select(Job.id, Job.title).join(UserJob, UserJob.job_id == Job.id).where(UserJob.user_id == user_id, Job.company_id == cid)).all()
     if not jobs: return cid, None
-    want = set(re.findall(r"[a-z0-9+#]{3,}", (res.get("role") or "").lower()))
-    if want:
-        best = max(jobs, key=lambda j: len(want & set(re.findall(r"[a-z0-9+#]{3,}", j[1].lower()))))
-        if want & set(re.findall(r"[a-z0-9+#]{3,}", best[1].lower())): return cid, best[0]
-    return cid, (jobs[0][0] if len(jobs) == 1 else None)
+    want = _words(res.get("role"))
+    if not want: return cid, (jobs[0][0] if len(jobs) == 1 else None)       # the e-mail names no role: only an unambiguous job
+    best = max(jobs, key=lambda j: len(want & _words(j[1])))
+    # words like "intern" are shared by unrelated roles; at least half of the telling words must match, or it is another application
+    return cid, (best[0] if len(want & _words(best[1])) * 2 >= len(want) else None)
+
+
+_GENERIC = {"intern", "internship", "internships", "junior", "senior", "student", "graduate", "trainee", "traineeship", "placement", "role", "position", "the", "and", "for", "with", "our"}
+
+
+def _words(s: str | None) -> set[str]:
+    return set(re.findall(r"[a-z0-9+#]{2,}", (s or "").lower())) - _GENERIC
+
+
+def add_applied_job(db: Session, user_id, ev: MailEvent) -> int | None:
+    """You applied for a role the crawler never collected: keep it in the pipeline anyway. Stored as a closed entry, so it never shows up in search."""
+    if ev.job_id or ev.category != "application_received" or not ev.company_id or not _words(ev.role): return ev.job_id
+    url = f"email://{user_id}/{ev.company_id}/{_norm(ev.role)}"
+    j = db.scalar(select(Job).where(Job.url == url))
+    if not j:
+        j = Job(company_id=ev.company_id, title=ev.role, location=ev.location, url=url, source="email", status="expired"); db.add(j); db.flush()
+    ev.job_id = j.id; return j.id
 
 
 def process(db: Session, user_id, cfg: llm.Cfg, mails: list[dict], account_id: int | None = None, progress=None, auto_apply: float | None = None) -> dict:
@@ -89,8 +106,9 @@ def process(db: Session, user_id, cfg: llm.Cfg, mails: list[dict], account_id: i
         cid, jid = link(db, user_id, res, m.get("sender_addr", ""))
         ev = MailEvent(user_id=user_id, account_id=account_id, message_id=m["message_id"], sender=m.get("sender"), subject=m.get("subject"), received_at=m.get("date"),
                        company_id=cid, job_id=jid, **res); db.add(ev); known.add(m["message_id"]); stats["found"] += 1
-        if auto_apply is not None and jid and res["confidence"] >= auto_apply and res["category"] in STAGE_OF:       # high confidence + a known job: apply it, the user can undo
+        if auto_apply is not None and res["confidence"] >= auto_apply and res["category"] in STAGE_OF and (jid or res["category"] == "application_received"):  # high confidence: apply it, the user can undo
             db.flush()
+            if not add_applied_job(db, user_id, ev): continue
             if apply_stage(db, user_id, ev): ev.status = "auto"; stats["auto_applied"] += 1
         if stats["found"] % 10 == 0: db.commit()
     db.commit(); return stats

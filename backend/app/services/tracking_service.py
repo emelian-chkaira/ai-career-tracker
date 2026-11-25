@@ -11,6 +11,7 @@ from app.models import Job, JobEvent, Notification, User, UserJob
 STAGES = ["shortlisted", "applied", "screening", "assessment", "team_match", "interview", "final_round", "offer", "accepted", "rejected", "withdrawn", "skipped"]
 ACTIVE = ("applied", "screening", "assessment", "team_match", "interview", "final_round", "offer")
 FUNNEL = ("applied", "screening", "assessment", "team_match", "interview", "final_round", "offer", "accepted")          # reached at least this far
+SKIPPABLE = ("screening", "assessment", "team_match")          # many processes skip these: counted only when really visited
 RANK = {s: i for i, s in enumerate(["shortlisted", "applied", "screening", "assessment", "team_match", "interview", "final_round", "offer", "accepted"])}
 RESPONDED = ("screening", "assessment", "team_match", "interview", "final_round", "offer", "rejected", "accepted")
 KINDS = ("note", "interview", "email", "follow_up", "offer")
@@ -57,7 +58,7 @@ def stats(db: Session, user_id, days: int = 30) -> dict:
         seen = {uj.stage} | {(e.meta or {}).get("to") for e in stage_events.get(jid, [])}
         best = max((RANK[s] for s in seen if s in RANK), default=-1)
         for s in FUNNEL:
-            if best >= RANK[s]: reached[s] += 1
+            if (s in seen) if s in SKIPPABLE else best >= RANK[s]: reached[s] += 1      # a test without a recruiter call is not a "recruiter screen"
         if uj.applied_at:
             nxt = [e.at for e in stage_events.get(jid, []) if (e.meta or {}).get("to") in RESPONDED and e.at > uj.applied_at]
             if nxt: first_resp.append((min(nxt) - uj.applied_at).total_seconds() / 86400)

@@ -290,8 +290,16 @@ STUDENT_MAX_PAGES = 14
 
 STUDENT_RECHECK_DAYS = 56                                # every 8 weeks all candidate paths are tried again (new pages appear)
 
+_STUDENT_WORD = re.compile(r"(?<![a-z])(intern|interns|internship|stage|stagiaire?|stageplek|afstudeer[a-z]*|werkstudent[a-z]*|working[ -]student|student|trainee[a-z]*|praktik[a-z]+|graduate|tirocinio)(?![a-z])", re.I)
+
+
+def says_student(title: str, url: str) -> bool:
+    """Does the posting itself (its title or the last part of its link) say it is for students or graduates?"""
+    return bool(_STUDENT_WORD.search(title or "") or _STUDENT_WORD.search((url or "").rstrip("/").split("/")[-1]))
+
+
 def scan_student_pages(base, home_html, careers_html, known_urls):
-    """Extra pass for internships: each student page is read via ATS embed -> JSON-LD -> job links -> headless browser. Postings are tagged kind=internship.
+    """Extra pass for internships: each student page is read via ATS embed -> JSON-LD -> job links -> headless browser. Postings that say they are for students are tagged kind=internship.
     With crawl memory, only the pages that existed last time are read, except every STUDENT_RECHECK_DAYS when every candidate is tried again."""
     found = []
     m = _mem.get(); st = (m or {}).get("student") or {}
@@ -309,7 +317,8 @@ def scan_student_pages(base, home_html, careers_html, known_urls):
         if len(jobs) < 3 and len(h) > 2000 and len(jobs) == 0: jobs, _ = render_scan(u)
         for j in jobs:
             if j["url"] not in known_urls and len(j["title"]) > 5:
-                j["kind"] = "internship"; known_urls.add(j["url"]); found.append(j)
+                if says_student(j["title"], j["url"]): j["kind"] = "internship"          # a student page often embeds the whole job board: being listed there proves nothing
+                known_urls.add(j["url"]); found.append(j)
         if len(found) > 150: break
     if m is not None: m["student"] = {"urls": worked, "full": st.get("full") if fresh else _today()}
     return found

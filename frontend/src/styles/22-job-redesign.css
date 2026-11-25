@@ -113,3 +113,12 @@ div.job{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;alig
 .jb1 .sbar>svg{align-self:center}
 .jb1 .sbar input[type=search]{padding:0 4px;height:100%}
 .jb1 .sbar .btn{height:calc(var(--btn-h) - 8px);align-self:center;padding-top:0;padding-bottom:0;display:inline-flex;align-items:center}
+
+/* which card is open, and which ones you already applied to */
+.job.applied{background:color-mix(in srgb,#30a46c 11%,var(--panel))!important;box-shadow:inset 3px 0 0 #30a46c}
+.job.sel{background:color-mix(in srgb,var(--brand) 16%,var(--panel))!important;box-shadow:inset 3px 0 0 var(--brand),0 0 0 1px var(--brand)}
+.job.sel.applied{box-shadow:inset 3px 0 0 #30a46c,0 0 0 1px var(--brand)}
+
+/* opened postings: the dot turns into an empty grey ring and the title softens */
+.job .newdot.seen{background:transparent!important;border:1.5px solid var(--muted);box-shadow:none!important;box-sizing:border-box;animation:none}
+.job.viewed:not(.sel) .tt{color:var(--muted)}

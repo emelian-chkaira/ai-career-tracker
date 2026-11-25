@@ -221,7 +221,7 @@ def patch_event(eid: int, body: EventPatch, user: User = Depends(current_user), 
 
 
 def _accept(db: Session, user: User, e: MailEvent) -> str | None:
-    stage = mc.apply_stage(db, user.id, e); e.status = "accepted"; return stage
+    mc.add_applied_job(db, user.id, e); stage = mc.apply_stage(db, user.id, e); e.status = "accepted"; return stage
 
 
 @router.post("/events/{eid}/accept", summary="Keep it, and move the linked job in your pipeline (applied / interview / offer / rejected)")

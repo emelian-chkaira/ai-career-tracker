@@ -157,7 +157,7 @@ export function JobsPage({ internships = false }: { internships?: boolean }) {
         {data && !data.items.length && (mine && Object.keys(prof).length
           ? <EmptyState icon={<Icon name="filter" size={20} />} title="No jobs match your profile yet" action={<div className="row"><button className="btn small" onClick={() => update({ scope: "all" })}>Show all jobs</button><button className="btn ghost small" onClick={openSetup}>Edit preferences</button></div>}>Fields outside tech are still small: more employers are added as they are crawled.</EmptyState>
           : <EmptyState icon={<Icon name="search" size={20} />} title="Nothing matches just yet">Try fewer filters, or ask us to re-read the employers live.</EmptyState>)}
-        {data?.items.map((j) => <JobCard key={j.id} job={j} selected={wide && open === j.id} onOpen={setOpen} picked={picked.has(j.id)} onPick={user ? pick : undefined} />)}
+        {data?.items.map((j) => <JobCard key={j.id} job={j} selected={open === j.id} onOpen={setOpen} picked={picked.has(j.id)} onPick={user ? pick : undefined} />)}
         {picked.size > 0 && <div className="bulkbar"><b>{picked.size} selected</b><button className="btn small" onClick={() => bulk("shortlisted")}>Shortlist</button><button className="btn ghost small" onClick={() => bulk("applied")}>Mark applied</button><button className="btn ghost small" onClick={() => bulk("skipped")}>Skip</button><button className="btn ghost small right" onClick={() => setPicked(new Set())}>Clear</button></div>}
         {data && <ListEnd sentinel={sentinel} more={more} loading={loadingMore} count={data.items.length} total={data.total} />}
       </div>

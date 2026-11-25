@@ -52,10 +52,10 @@ export function TasksPanel() {
         <div className="row" style={{ gap: 6 }} role="group" aria-label="Groups">{[...GROUPS.map((g) => g.title), "Clean-up"].map((g) => <button key={g} className={"pill-btn" + (group === g ? " on" : "")} onClick={() => setGroup(group === g ? "" : g)}>{g}</button>)}
           {filtering && <button className="btn ghost small" onClick={() => { setFind(""); setGroup(""); }}>Clear filters</button>}</div>
         <div className="stack" style={{ gap: 18 }}>{groups.map((g) => <section key={g.title}><h3 className="tsec">{g.title}</h3>
-          <div className="tcards">{g.items.map((t) => { const busy = items.filter((x) => x.kind === t.kind && (x.status === "running" || x.status === "queued")).length;
-            return <div key={t.kind} className={"tcard" + (busy ? " busy" : "")} title={t.note}>
-              <div className="tcard-h"><span className="tcard-i" aria-hidden>{ICON[t.kind] ?? "▶"}</span><b>{t.title}</b>{busy > 0 && <span className="badge warn right">running</span>}</div>
-              <div className="small muted tcard-d">{t.what}</div>
+          <div className="kcards">{g.items.map((t) => { const busy = items.filter((x) => x.kind === t.kind && (x.status === "running" || x.status === "queued")).length;
+            return <div key={t.kind} className={"kcard" + (busy ? " busy" : "")} title={t.note}>
+              <div className="kcard-h"><span className="kcard-i" aria-hidden>{ICON[t.kind] ?? "▶"}</span><b>{t.title}</b>{busy > 0 && <span className="badge warn right">running</span>}</div>
+              <div className="small muted kcard-d">{t.what}</div>
               <ActionButton className="btn small" disabled={busy > 0} run={() => run(t)}>{busy ? "Already queued" : "Run"}</ActionButton></div>; })}</div></section>)}
           {cleanup && <section><h3 className="tsec">Clean-up</h3><Housekeeping isAdmin={isAdmin} /></section>}</div>
         {!groups.length && !cleanup && <div className="small muted">No task matches. <button className="linkbtn" onClick={() => { setFind(""); setGroup(""); }}>Clear filters</button></div>}

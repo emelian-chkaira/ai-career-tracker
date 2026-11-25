@@ -167,6 +167,16 @@ def test_accept_moves_pipeline_and_never_downgrades(client, make_user, db):
     client.post(f"/api/v1/mail/events/{e3.id}/accept", headers=h); db.expire_all(); assert db.scalar(select(UserJob.stage)) == "interview"      # not moved back to applied
 
 
+def test_second_application_at_the_same_company_gets_its_own_entry(client, make_user, db):
+    h, _ = make_user(); j = _pipeline(db, stage="applied"); u = db.scalar(select(User))
+    assert mc.link(db, u.id, {"company": "Acme", "role": "IT Support Internship"}) == (j.company_id, None)      # not the backend job
+    assert mc.link(db, u.id, {"company": "Acme", "role": "Backend Engineer Intern"})[1] == j.id
+    e = _event(db, u, "application_received", role="IT Support Internship")
+    assert client.post(f"/api/v1/mail/events/{e.id}/accept", headers=h).json()["stage"] == "applied"
+    titles = [x["title"] for x in client.get("/api/v1/me/pipeline", headers=h).json()["items"]]
+    assert sorted(titles) == ["Backend Engineer", "IT Support Internship"]
+
+
 def test_edit_dismiss_bulk_and_delete(client, make_user, db):
     h, _ = make_user(); u = db.scalar(select(User))
     for i, c in enumerate(["offer", "rejection", "recruiter_outreach"]): _event(db, u, c, company=f"Co{i}")

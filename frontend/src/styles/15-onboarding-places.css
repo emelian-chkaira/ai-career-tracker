@@ -31,3 +31,4 @@
 .cbox{border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:10px;max-height:300px;overflow:auto;background:var(--panel2);animation:fadein .18s ease}
 .cgroup{display:flex;flex-direction:column;gap:5px}
 
+.cbox>.cpick-in{flex:none;width:100%;height:36px;box-sizing:border-box}

@@ -59,10 +59,10 @@ const sum = (o?: Record<string, number>) => Object.entries(o ?? {}).filter(([k])
 function ActionRow({ a, onAsk }: { a: (typeof ACTIONS)[number]; onAsk(): void }) {
   const pv = usePreview(a.id); const n = sum(pv.data);
   const rows = Object.entries(pv.data ?? {}).filter(([k, v]) => v && k !== "nothing_to_do");
-  return <div className={"tcard" + (a.danger ? " danger" : "")}>
-    <div className="tcard-h"><span className="tcard-i" aria-hidden>{a.danger ? "⚠" : "🧹"}</span><b>{a.title}</b></div>
-    <div className="small muted tcard-d">{a.what}</div>
-    <div className="tcard-s small">{pv.isLoading ? <Spinner /> : n ? <span className={a.danger ? "err" : "warn"}><b>{num(n)}</b> row(s) affected{rows.length > 1 ? `: ${rows.map(([k, v]) => `${num(v)} ${nice(k)}`).join(", ")}` : ""}</span> : <span className="ok">✓ Nothing to do right now</span>}</div>
+  return <div className={"kcard" + (a.danger ? " danger" : "")}>
+    <div className="kcard-h"><span className="kcard-i" aria-hidden>{a.danger ? "⚠" : "🧹"}</span><b>{a.title}</b></div>
+    <div className="small muted kcard-d">{a.what}</div>
+    <div className="kcard-s small">{pv.isLoading ? <Spinner /> : n ? <span className={a.danger ? "err" : "warn"}><b>{num(n)}</b> row(s) affected{rows.length > 1 ? `: ${rows.map(([k, v]) => `${num(v)} ${nice(k)}`).join(", ")}` : ""}</span> : <span className="ok">✓ Nothing to do right now</span>}</div>
     <button className={`btn small ${a.danger ? "danger" : "ghost"}`} disabled={!n && !a.danger} onClick={onAsk}>{a.danger ? "Review and clear…" : n ? "Review and run…" : "Nothing to do"}</button></div>;
 }
 
@@ -86,7 +86,7 @@ export function Housekeeping({ isAdmin }: { isAdmin: boolean }) {
   const [ask, setAsk] = useState<(typeof ACTIONS)[number] | null>(null);
   return (<>
       {isAdmin ? <div className="stack">
-        <div className="tcards">{ACTIONS.map((a) => <ActionRow key={a.id} a={a} onAsk={() => setAsk(a)} />)}</div>
+        <div className="kcards">{ACTIONS.map((a) => <ActionRow key={a.id} a={a} onAsk={() => setAsk(a)} />)}</div>
         {!!log.length && <div className="stack" style={{ gap: 4 }}><div className="small muted">Results (this session)</div>{log.map((l, i) => <div key={i} className={`small ${l.ok ? "" : "err"}`}>{l.at} · <b>{l.title}</b> — {l.text}</div>)}</div>}
       </div> : <div className="card small muted">Housekeeping (purge, clear, apply policy) is available to admins.</div>}
       {ask && <RunModal a={ask} onClose={() => setAsk(null)} onResult={(r, ok) => { setLog((l) => [{ at: new Date().toLocaleTimeString(), title: ask.title, text: r, ok }, ...l].slice(0, 8)); notify(`${ask.title}: ${r}`, ok ? "ok" : "bad"); setAsk(null); ["admin-policy", "admin-stats", "admin-worker", "co", "jobs-admin"].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); }} />}
