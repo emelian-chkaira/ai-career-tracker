@@ -30,7 +30,7 @@ export function JobPage() {
   if (isLoading) return <div className="stack"><div className="skel" style={{ height: 90 }} /><div className="skel" style={{ height: 300 }} /></div>;
   if (error || !j) return <div className="notice err">{(error as Error)?.message ?? "Job not found"} <button className="btn ghost small" onClick={() => go("/")}>Back to jobs</button></div>;
   const tracked = !!j.stage;
-  return (<div className="stack">
+  return (<div className="stack jobpage">
     <div className="small"><Link to="/">← Jobs</Link></div>
     <div className="card stack"><div className="row" style={{ alignItems: "flex-start", flexWrap: "nowrap" }}><Logo c={j.company} big />
       <div className="grow" style={{ minWidth: 0 }}><h1 style={{ fontSize: 24 }}>{j.title}</h1><div className="muted">{[j.company.name, j.location || (j.work_mode === "remote" ? "Remote" : ""), ago(j.posted_at ?? j.first_seen)].filter(Boolean).join(" · ")}</div></div>

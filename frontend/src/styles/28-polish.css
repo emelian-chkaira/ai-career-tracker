@@ -1,0 +1,64 @@
+/* Polish: spacing and alignment fixes found by checking every page at desktop, laptop and phone widths. */
+
+/* native selects: the arrow gets its own breathing room */
+select:not([multiple]):not([size]){-webkit-appearance:none;appearance:none;padding-right:34px!important;cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%237d8794' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")!important;
+  background-repeat:no-repeat!important;background-position:right 12px center!important}
+
+/* the Search button sits inside its field, not on its edge */
+.jb1 .sbar .btn{height:calc(var(--btn-h) - 8px);min-height:0;margin-right:1px;border-radius:calc(var(--btn-r) - 3px)}
+
+/* sidebar account button: lines up with the other items and never spills out */
+.side-ft .sitem.acct{height:auto;min-height:0;padding:5px 6px;border:0;border-radius:10px;justify-content:flex-start;overflow:hidden;font:inherit}
+.side-ft .acct .avatar{flex:none;width:24px;height:24px;font-size:11.5px}
+.side-ft .acct .email{min-width:0;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--text)}
+.app.collapsed .side-ft .sitem.acct{justify-content:center;padding:5px 0}
+
+/* job page: header card and tab content share one width */
+.jobpage{width:100%;max-width:960px}.jobpage .ktabs{max-width:none}
+
+/* inbox: connect card */
+.inbox-hero{align-items:flex-start}
+.inbox-hero>div:last-child{max-width:340px;min-width:0}
+.inbox-hero code{overflow-wrap:anywhere;white-space:normal}
+
+/* pipeline summary: wrap instead of cutting chips and range buttons off */
+.pstats{flex-wrap:wrap!important;row-gap:8px}
+.pstats .fchips{flex-wrap:wrap!important;overflow:visible!important;flex:1 1 260px;min-width:0}
+.pstats .seg{flex:none}
+
+/* crawler step cards: the step number no longer sits on the title */
+.pstep b{padding-right:18px}
+
+/* tables scroll inside their card instead of widening the page */
+.card:has(>table.table),.card:has(>.card>table.table){overflow-x:auto}
+
+@media(max-width:600px){
+  .csearch>input{flex:1 1 100%}
+  .pill-pop{position:fixed!important;left:12px!important;right:12px!important;bottom:12px;top:auto!important;width:auto!important;max-height:60vh;overflow:auto;z-index:65}
+  .inbox-hero>div:last-child{max-width:none;width:100%}
+  .main code{overflow-wrap:anywhere}
+  .inbox-bar .seg,.seg:has(>button:nth-child(5)){max-width:100%;overflow-x:auto}
+}
+/* a dot before a wrapped meta item reads as a stray indent: spacing alone separates them */
+.job .meta>span+span:before{content:none}
+/* the document picker matches the buttons beside it */
+.docbar .docsel{height:var(--btn-h);padding-block:0;box-sizing:border-box}
+@media(max-width:800px){.docbar-sep{display:none}}
+/* job facts fill their last row instead of leaving one box alone */
+.facts{display:flex;flex-wrap:wrap}.facts>div{flex:1 1 130px}
+/* collapsible rows: a rule meant for plain in-panel folds had stripped their side padding */
+.fold{padding:0;border:1px solid var(--line);border-radius:12px}
+.fold>summary{display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;padding:14px 18px;margin:0}
+.fold[open]>summary{margin:0}
+.fold>*:not(summary){margin:0;padding:0 16px 14px}
+.fold>.fold-body{padding:16px 18px}
+.fold:not(:has(>summary>.fold-caret))>summary::after{content:"›";margin-left:auto;color:var(--muted);font-size:18px;line-height:1;transition:transform .15s}
+.fold[open]:not(:has(>summary>.fold-caret))>summary::after{transform:rotate(90deg)}
+.fold:not(:has(>summary>.fold-caret))>summary+*{padding-top:12px}
+.fold>summary>.fold-caret{margin-left:auto}
+@media(max-width:700px){.fold>summary{padding:12px 14px;position:relative;padding-right:36px}.fold>summary>.fold-caret{position:absolute;right:14px;top:12px}.fold>.fold-body{padding:14px}}
+/* crawler columns shrink to the screen instead of holding a 380px minimum */
+.sgrid2{grid-template-columns:repeat(auto-fit,minmax(min(380px,100%),1fr))}
+.sgrid2>*,.sgrid2 .stack>*{min-width:0}
+.sgrid2 .cpick-row>*{max-width:100%}

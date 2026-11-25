@@ -48,7 +48,7 @@ export function TailorPanel({ jobId, title }: { jobId: number; title: string }) 
       {inRR && <button className="linkbtn small" disabled={!ready || !!busy} onClick={run}>Tailor only, do not send to Reactive Resume</button>}
     </> : <>
       <div className="tcov"><div className="tcov-top"><b>{pct}%</b><span className="small muted">of this posting's keywords are in your CV{t.report.before.percent !== pct ? ` (was ${t.report.before.percent}%)` : ""}</span></div>
-        <div className="bar"><i style={{ width: `${Math.min(100, pct)}%` }} /></div></div>
+        <div className="mbar"><i style={{ width: `${Math.min(100, pct)}%` }} /></div></div>
       {t.report.poor_match && <div className="notice small" role="alert">⚠ {t.report.poor_match} <Link to="/cv">Add what is true in CV Studio, Missing keywords.</Link></div>}
       {t.report.notes && <div className="small muted">{t.report.notes}</div>}
       {!!t.report.after.missing.length && <div className="small"><span className="muted">Not in your CV, so not added: </span>{t.report.after.missing.slice(0, 8).join(", ")}</div>}

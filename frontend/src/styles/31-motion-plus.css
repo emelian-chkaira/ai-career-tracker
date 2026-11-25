@@ -1,0 +1,43 @@
+/* Livelier motion: pages and lists arrive in sequence, cards lift, controls respond. Entrances use `backwards` so no transform
+   is left behind (that would trap fixed elements), and everything switches off for people who ask for less motion. */
+@keyframes m-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes m-pop{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
+@keyframes m-side{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+@keyframes m-grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes m-shine{from{background-position:200% 0}to{background-position:-200% 0}}
+@keyframes m-pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--brand) 55%,transparent)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+
+.main>*,.main>.stack>*{animation:m-up .42s cubic-bezier(.22,1,.36,1) backwards}
+.main>.stack>*:nth-child(2){animation-delay:60ms}.main>.stack>*:nth-child(3){animation-delay:120ms}.main>.stack>*:nth-child(n+4){animation-delay:180ms}
+
+.cgrid>*,.seccards>*,.psteps>li,.tour-flow>li,.set-col>*{animation:m-pop .38s cubic-bezier(.22,1,.36,1) backwards}
+.pstats>*,.board>*,.pboard>*,.pcol{animation:m-up .4s cubic-bezier(.22,1,.36,1) backwards}
+.pcard,.irow,.list .job{animation:m-up .36s cubic-bezier(.22,1,.36,1) backwards}
+:is(.cgrid,.seccards,.psteps,.set-col,.list)>:nth-child(2),.pcol:nth-child(2),.pcard:nth-child(2){animation-delay:45ms}
+:is(.cgrid,.seccards,.psteps,.set-col,.list)>:nth-child(3),.pcol:nth-child(3),.pcard:nth-child(3){animation-delay:90ms}
+:is(.cgrid,.seccards,.psteps,.set-col,.list)>:nth-child(4),.pcol:nth-child(4),.pcard:nth-child(4){animation-delay:135ms}
+:is(.cgrid,.seccards,.psteps,.list)>:nth-child(5),.pcol:nth-child(5){animation-delay:180ms}
+:is(.cgrid,.seccards,.psteps,.list)>:nth-child(6),.pcol:nth-child(6){animation-delay:225ms}
+:is(.cgrid,.seccards,.list)>:nth-child(n+7),.pcol:nth-child(n+7){animation-delay:260ms}
+
+.snav .sitem{animation:m-side .35s ease backwards}
+.snav .sgroup:nth-child(2) .sitem{animation-delay:80ms}.snav .sgroup:nth-child(3) .sitem{animation-delay:160ms}
+.sitem.active::before{animation:m-grow .25s ease}
+
+.ccard,.seccard,.pcard,.pstep,.si-points li,.tour-flow li{transition:transform .22s cubic-bezier(.22,1,.36,1),box-shadow .22s,border-color .18s,background .18s}
+.ccard:hover,.seccard:hover,.pcard:hover,.si-points li:hover,.tour-flow li:hover{transform:translateY(-3px);box-shadow:0 14px 28px -16px rgba(0,0,0,.45);border-color:color-mix(in srgb,var(--brand) 45%,var(--line))}
+.ccard .logo,.list .job .logo{transition:transform .25s cubic-bezier(.34,1.56,.64,1)}
+.ccard:hover .logo,.list .job:hover .logo{transform:scale(1.08)}
+
+.btn:not(:disabled):active,.cchip:active,.seg button:active,.pill>summary:active{transform:scale(.96)}
+.btn:not(.ghost):not(:disabled):hover{transform:translateY(-1px)}
+.ktabs-body,.rpane{animation:m-up .3s ease backwards}
+.pill-pop,.kmenu{animation:m-pop .16s ease-out}
+.chip,.sbadge{animation:m-pop .25s ease backwards}
+.sbadge{animation:m-pulse 2s infinite}
+.skel{background-image:linear-gradient(90deg,transparent 30%,color-mix(in srgb,var(--text) 7%,transparent) 50%,transparent 70%);background-size:200% 100%;animation:m-shine 1.4s linear infinite}
+.si-points li,.si-body h2,.si-lead{animation:m-up .5s cubic-bezier(.22,1,.36,1) backwards}
+.si-lead{animation-delay:70ms}.si-points li:nth-child(1){animation-delay:140ms}.si-points li:nth-child(2){animation-delay:200ms}.si-points li:nth-child(3){animation-delay:260ms}.si-points li:nth-child(4){animation-delay:320ms}
+.si-form>*{animation:m-up .4s ease backwards}.si-form>:nth-child(2){animation-delay:50ms}.si-form>:nth-child(3){animation-delay:100ms}.si-form>:nth-child(n+4){animation-delay:150ms}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition-duration:.001ms!important}}
