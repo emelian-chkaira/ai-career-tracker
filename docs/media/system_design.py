@@ -76,7 +76,7 @@ ext = [("🏢", "Career pages", "11 ATS APIs + HTML"), ("💼", "Job boards", "L
 for i, (e, a, b) in enumerate(ext):
     cx = 170 + i * 220
     icon(cx, 1530, e, 36, "#64748b"); t(cx, 1563, a, 14, 800); t(cx, 1582, b, 11.5, 600, "#475569")
-    if i == 1: t(cx, 1598, "Google Jobs · Bayt", 11.5, 600, "#475569")
+    if i == 1: t(cx, 1598, "Bayt", 11.5, 600, "#475569")
 arrow([(560, 1402), (190, 1494)], "brown", "crawl", lx=-95, ly=30)
 arrow([(1048, 1384), (1048, 1424), (400, 1424), (400, 1494)], "brown", "search boards", at=0.5)
 arrow([(1270, 1402), (1270, 1428), (830, 1428), (830, 1494)], "red", "fetch mail", at=0.5, lx=-120)

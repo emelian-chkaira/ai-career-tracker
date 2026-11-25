@@ -2,13 +2,28 @@
 
 <h1 align="center">AI Career Tracker</h1>
 
-<h3 align="center">Your job hunt on autopilot: jobs from employers' career pages <i>and</i> LinkedIn, Indeed, Glassdoor, Google Jobs and Bayt,<br>filtered to your spec, ranked against your CV, applied to with an AI-tailored CV, and tracked from your inbox.</h3>
+<h3 align="center">Your job hunt on autopilot: jobs from employers' career pages <i>and</i> LinkedIn, Indeed, Glassdoor and Bayt,<br>filtered to your spec, ranked against your CV, applied to with an AI-tailored CV, and tracked from your inbox.</h3>
+
+<p align="center">AI Career Tracker is an open-source job-search platform: a FastAPI and PostgreSQL backend, a React web app, a Flutter mobile app and a crawler that reads employers' own career pages.</p>
+
+<p align="center">
+  <a href="https://ai-career-tracker-gmwn.onrender.com"><img src="https://img.shields.io/badge/▶_Live_demo-0d6b63?style=for-the-badge&logo=render&logoColor=white" alt="Live demo"></a>
+  <a href="https://emelianchkaira.netlify.app"><img src="https://img.shields.io/badge/Portfolio-1f5c9e?style=for-the-badge&logo=netlify&logoColor=white" alt="Portfolio website"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/emelian-chkaira/ai-career-tracker/actions/workflows/backend.yml"><img src="https://github.com/emelian-chkaira/ai-career-tracker/actions/workflows/backend.yml/badge.svg?branch=main" alt="Backend CI"></a>
+  <a href="https://github.com/emelian-chkaira/ai-career-tracker/actions/workflows/frontend.yml"><img src="https://github.com/emelian-chkaira/ai-career-tracker/actions/workflows/frontend.yml/badge.svg?branch=main" alt="Frontend CI"></a>
+  <img src="https://img.shields.io/badge/deployed_on-Render-46E3B7?logo=render&logoColor=white" alt="Deployed on Render">
+  <img src="https://img.shields.io/badge/database-Neon_Postgres-00E599?logo=postgresql&logoColor=white" alt="Neon Postgres">
+</p>
+
+<p align="center"><sub>The demo opens with one click, no sign-up. It shows a saved snapshot of jobs and a Crawler page with sample data; the real crawler runs on your own computer. It is on free hosting, so the first visit can take about a minute.</sub></p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn">
   <img src="https://img.shields.io/badge/Indeed-2164F3?style=for-the-badge&logo=indeed&logoColor=white" alt="Indeed">
   <img src="https://img.shields.io/badge/Glassdoor-0CAA41?style=for-the-badge&logo=glassdoor&logoColor=white" alt="Glassdoor">
-  <img src="https://img.shields.io/badge/Google_Jobs-EA4335?style=for-the-badge&logo=google&logoColor=white" alt="Google Jobs">
   <img src="https://img.shields.io/badge/Bayt-F26522?style=for-the-badge" alt="Bayt">
   <img src="https://img.shields.io/badge/Employer_career_pages-1F2937?style=for-the-badge&logo=greenhouse&logoColor=white" alt="Employer career pages">
   <img src="https://img.shields.io/badge/Gmail_inbox-D14836?style=for-the-badge&logo=gmail&logoColor=white" alt="Gmail">
@@ -21,7 +36,7 @@
   <img src="https://img.shields.io/badge/📬_AI_reads_your_mail-dc2626?style=flat-square" alt="AI inbox">
   <img src="https://img.shields.io/badge/🌍_59_countries-0891b2?style=flat-square" alt="59 countries">
   <img src="https://img.shields.io/badge/🤖_bring_your_own_LLM-7c3aed?style=flat-square" alt="Bring your own LLM">
-  <img src="https://img.shields.io/badge/✅_165_+_16_+_8_tests-15803d?style=flat-square" alt="Tests">
+  <img src="https://img.shields.io/badge/✅_229_backend_+_28_frontend_tests-15803d?style=flat-square" alt="Tests">
 </p>
 
 <p align="center">
@@ -98,7 +113,7 @@
 
 You tell it what you want once: **field, countries or regions, cities, job titles, level, work mode, language, visa needs**, and upload your **CV**. From then on every job, from an employer's career page or from a job board, is filtered and ranked for you (flow ② in [How it works](#️-architecture)).
 
-- **Employer-direct first, boards on top.** Career pages are crawled continuously. LinkedIn, Indeed, Glassdoor, Google Jobs and Bayt are searched with *your* job titles in *your* countries (via [JobSpy](https://github.com/speedyapply/JobSpy), opt-in), and the Crawler page shows the exact keywords before it runs.
+- **Employer-direct first, boards on top.** Career pages are crawled continuously. LinkedIn, Indeed, Glassdoor and Bayt are searched with *your* job titles in *your* countries (via [JobSpy](https://github.com/speedyapply/JobSpy), opt-in), and the Crawler page shows the exact keywords before it runs.
 - **Your countries drive the crawler.** Pick the UAE or Germany in your profile and the crawler starts finding employers there; the job list tells you while it fills.
 - **CV-aware ranking.** Skills read from your CV join your profile skills in the match score; with an AI model the fit score explains itself and is capped by hard facts ("Dutch required, your CV lists no Dutch").
 
@@ -146,14 +161,28 @@ Interview invites, assessments, offers, rejections and recruiter messages are re
 | **API** | Python 3.12 · FastAPI · Pydantic v2 · SQLAlchemy 2 · Alembic · Uvicorn · PyJWT · Argon2 · cryptography (Fernet) |
 | **Data & search** | PostgreSQL 16 · pgvector (HNSW) · weighted full-text `tsvector` · `pg_trgm` typo tolerance · reciprocal rank fusion · fastembed (ONNX) embeddings |
 | **Crawling** | httpx · BeautifulSoup + lxml · Playwright (Chromium) · 11 ATS adapters (Greenhouse, Lever, Workday, Personio, Ashby, Recruitee, SmartRecruiters, Teamtailor, BambooHR, Workable, Homerun) · JSON-LD · robots.txt |
-| **Job boards** | JobSpy: LinkedIn · Indeed · Glassdoor · Google Jobs · Bayt, with per-board health and back-off |
+| **Job boards** | JobSpy: LinkedIn · Indeed · Glassdoor · Bayt, with per-board health and back-off |
 | **CV** | pypdf · pdfminer.six · LaTeX templates compiled by Tectonic · Reactive Resume REST API and JSON |
 | **AI** | Provider-agnostic LLM client: Ollama · Claude · OpenAI · Groq · OpenRouter · DeepSeek · Qwen · Kimi · GLM · Grok · any OpenAI-compatible endpoint; JSON mode with fallbacks; fact guard |
 | **Mail & auth** | Gmail API (read-only OAuth) · Firebase Auth · Google Sign-In · SMTP alerts |
 | **Web** | React 18 · TypeScript (strict) · Vite · TanStack Query & Virtual · React Router · Radix UI · cmdk · Recharts · Sonner |
 | **Mobile** | Flutter ([separate repository](https://github.com/emelian-chkaira/ai-career-tracker-mobile)) |
-| **Quality** | pytest on real Postgres (165) · Vitest + Testing Library (16) · Playwright end-to-end (8) · scripted screenshots and video |
-| **Ops** | Docker Compose · Caddy (HTTPS) · Render blueprint · Oracle Cloud free tier · GitHub Actions |
+| **Quality** | pytest on real Postgres (229) · Vitest + Testing Library (28) · Playwright end-to-end · scripted screenshots and video |
+| **Ops** | Docker Compose · Caddy (HTTPS) · Render · Neon Postgres · Oracle Cloud free tier · GitHub Actions CI |
+
+## 🌍 Deployment and CI/CD
+
+**Live demo:** [ai-career-tracker-gmwn.onrender.com](https://ai-career-tracker-gmwn.onrender.com)
+
+| Piece | How it runs |
+|---|---|
+| **Hosting** | [Render](https://render.com) web service built from the `Dockerfile` (API and web app in one container), Frankfurt, defined in [`render.yaml`](render.yaml) |
+| **Database** | [Neon](https://neon.com) serverless Postgres with pgvector, Frankfurt, over a direct (unpooled) connection |
+| **Continuous integration** | GitHub Actions: backend tests against a real Postgres with pgvector; frontend unit tests and production build |
+| **Continuous deployment** | A push to the `demo` branch is built and deployed by Render; Alembic migrations run when the API starts |
+| **Demo mode** | One-click guest accounts, a feature tour, and a Crawler page with made-up data. No crawler worker runs online |
+
+Releasing: merge `main` into `demo` and push. Full guide: [docs/DEPLOY_RENDER.md](docs/DEPLOY_RENDER.md).
 
 ## 🚀 Run it
 
@@ -217,8 +246,8 @@ Crawler → **Job boards** shows each board's health and exactly which keywords 
 <summary><b>Tests, media and deployment</b></summary>
 
 ```bash
-cd backend && .venv/bin/python -m pytest tests -q   # 165 tests on a real Postgres
-cd frontend && npx vitest run && npx playwright test # 16 unit + 8 end-to-end
+cd backend && .venv/bin/python -m pytest tests -q   # 229 tests on a real Postgres
+cd frontend && npx vitest run && npx playwright test # 28 unit tests + end-to-end
 cd frontend && npm run media                         # re-make screenshots and the demo video
 ```
 
@@ -226,5 +255,7 @@ Deploy for free with [Oracle Cloud](docs/DEPLOY_ORACLE.md) or [Render](docs/DEPL
 </details>
 
 ---
+
+<p align="center"><sub>👤 Built by Emelian Chkaira: <a href="https://emelianchkaira.netlify.app">portfolio website</a></sub></p>
 
 <p align="center"><sub>📱 Native app: <a href="https://github.com/emelian-chkaira/ai-career-tracker-mobile">ai-career-tracker-mobile</a> · 📐 <a href="PLAN.md">Design notes</a> · ⚖️ <a href="docs/JOBOPS_COMPARISON.md">Compared with JobOps</a> · 🤝 <a href="CONTRIBUTING.md">Contributing</a> · MIT licensed</sub></p>
