@@ -78,6 +78,7 @@ def suggest(q: str = Query("", max_length=60), db: Session = Depends(get_db)):
 
 @router.post("/live-search", summary="Ask the worker to re-read the most relevant companies' career pages right now")
 def live_search(request: Request, q: str = Query(..., min_length=2, max_length=120), db: Session = Depends(get_db)):
+    if settings.demo_mode: raise HTTPException(409, "Live search needs the crawler, which runs only on your own computer. This online demo shows a saved snapshot.")
     if not ratelimit.allow("live:" + client_ip(request), 6, 120): raise HTTPException(429, "live search is rate limited")
     t = task_service.enqueue(db, "live_search", {"q": q.strip()})
     return {"task_id": t.id, "status": t.status}

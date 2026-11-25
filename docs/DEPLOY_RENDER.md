@@ -28,6 +28,13 @@ In Render → Environment set these three to your address, then let it redeploy:
 
 Open the address, register any account and search. Starter data loads on the first start (only into an empty database).
 
+## The `demo` branch (what the public site runs)
+`demo` is `main` plus `CAREERS_DEMO_MODE=true` (set in its Dockerfile): a first-visit feature tour, one-click guest accounts with sample applications
+(removed after `CAREERS_DEMO_GUEST_DAYS`, default 7), a banner saying the jobs are a snapshot, and no crawler pages or live search.
+
+- Point the Render service at it once: **ai-career-tracker → Settings → Build & Deploy → Branch → `demo`**, then save.
+- To publish later changes: `git switch demo && git merge main && git push`.
+
 ## Notes
 - **Make yourself admin** (to see the Crawler page): set `CAREERS_ADMIN_EMAILS=you@example.com` and register with that address.
 - **Sign-in:** without `CAREERS_FIREBASE_API_KEY` the app uses its built-in email and password accounts, so no Google setup is needed. Add the key later for Google sign-in.

@@ -4,6 +4,7 @@ import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import { Icon } from "@/shared/ui/Icon";
 import { GoogleButton } from "./GoogleButton";
+import { openTour, useDemo } from "@/features/demo/useDemo";
 
 /** 0-4: length, mixed case, digit, symbol. Display only; the server enforces the real rule. */
 function strength(p: string) {
@@ -19,7 +20,7 @@ const POINTS = [
 ] as const;
 
 export function AuthPage({ mode }: { mode: "login" | "register" }) {
-  const { user, login, register, google } = useAuth();
+  const { user, login, register, google, startDemo } = useAuth(); const { demo } = useDemo();
   const nav = useNavigate(); const loc = useLocation(); const reg = mode === "register";
   const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [name, setName] = useState("");
   const [show, setShow] = useState(false); const [agree, setAgree] = useState(false); const [touched, setTouched] = useState(false);
@@ -52,6 +53,10 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
         <form className="si-form stack" onSubmit={submit} noValidate>
           <div><h1>{reg ? "Create your account" : "Welcome back"}</h1>
             <div className="muted">{reg ? "Free. Takes less than a minute." : "Sign in to your saved searches, alerts and pipeline."}</div></div>
+          {demo && <div className="stack" style={{ gap: 8 }}>
+            <button type="button" className="btn lg" style={{ justifyContent: "center" }} disabled={busy} onClick={async () => { setBusy(true); setErr(""); try { await startDemo(); nav(from, { replace: true }); } catch (x) { setErr((x as Error).message); } finally { setBusy(false); } }}>Try the demo, no sign-up</button>
+            <button type="button" className="btn ghost small" style={{ justifyContent: "center" }} onClick={openTour}>See what is inside</button>
+            <div className="small muted" style={{ textAlign: "center" }}>or use your email</div></div>}
           <GoogleButton onError={setErr} onCredential={async (c) => { setErr(""); try { await google(c); nav(from, { replace: true }); } catch (x) { setErr((x as Error).message); } }} />
           {reg && <div className="field"><label htmlFor="n">Name</label><input id="n" type="text" placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" /></div>}
           <div className="field"><label htmlFor="e">Email</label>

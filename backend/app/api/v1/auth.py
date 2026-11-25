@@ -6,7 +6,7 @@ from app.core.deps import current_user, client_ip
 from app.core import ratelimit, security
 from app.models import User
 from app.schemas.auth import RegisterIn, LoginIn, RefreshIn, TokenOut, UserOut, ProfileIn, PasswordChangeIn, EmailIn, TokenIn, ResetIn, GoogleIn
-from app.services import auth_service as svc, account_service as acct, alert_service, google_service, firebase_service as fb
+from app.services import auth_service as svc, account_service as acct, alert_service, google_service, firebase_service as fb, demo_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 COOKIE = "refresh_token"
@@ -80,7 +80,7 @@ def update_profile(body: ProfileIn, user: User = Depends(current_user), db: Sess
     from app.services import focus_service, policy_service
     focus_service.reset(); policy_service._cache["v"] = None                      # what the crawler collects follows your choices
     out = UserOut.model_validate(user)
-    if "countries" in d or "regions" in d:                                         # your places drive the crawler
+    if ("countries" in d or "regions" in d) and not settings.demo_mode:            # your places drive the crawler (the online demo has none)
         from app.services import coverage_service
         try: out.crawl = coverage_service.ensure(db, user)
         except ValueError: out.crawl = None
@@ -122,7 +122,16 @@ def reset_password(body: ResetIn, request: Request, db: Session = Depends(get_db
 
 
 @router.get("/config")
-def auth_config(): return {"google_client_id": (settings.google_ids or [None])[0], "provider": "firebase" if settings.firebase_on else "local"}
+def auth_config(): return {"google_client_id": (settings.google_ids or [None])[0], "provider": "firebase" if settings.firebase_on else "local", "demo": settings.demo_mode, "guest_days": settings.demo_guest_days}
+
+
+@router.post("/demo", response_model=TokenOut, status_code=201, summary="Public demo only: sign in as a new private guest")
+def demo_guest(request: Request, response: Response, db: Session = Depends(get_db)):
+    if not settings.demo_mode: raise HTTPException(404, "not found")
+    if not ratelimit.allow("demo:" + client_ip(request), 10, 3600): raise HTTPException(429, "too many demo accounts from your network, try again later")
+    u = demo_service.create_guest(db)
+    access, refresh = svc.issue_tokens(db, u)
+    return _respond(response, u, access, refresh)
 
 
 @router.post("/google", response_model=TokenOut)

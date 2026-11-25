@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { api } from "@/shared/api/client";
 import { useAuth } from "@/features/auth/AuthContext";
 import { flag } from "@/shared/lib/geo";
+import { useDemo } from "@/features/demo/useDemo";
 
 type Country = { code: string; name: string; collected: boolean; jobs: number; employers: number; to_read: number; finding: string | null; phase: "off" | "finding_employers" | "reading" | "ready" };
 export type Coverage = { countries: Country[]; worker: { state: string; next_start: string | null; why: string }; active: boolean };
@@ -21,7 +22,7 @@ export function announceCrawl(r?: CrawlResult | null, nameOf: (c: string) => str
 
 /** Above the job list: which of the searched countries the crawler is still filling, and what it is doing right now. Refreshes itself. */
 export function CrawlNotice({ country, region }: { country?: string[]; region?: string[] }) {
-  const { user } = useAuth(); const qc = useQueryClient();
+  const { user } = useAuth(); const qc = useQueryClient(); const { demo } = useDemo();
   const key = ["coverage", country ?? [], region ?? [], user?.id ?? "anon"];
   const q = useQuery({ queryKey: key, enabled: !!user || !!country?.length || !!region?.length, staleTime: 10_000,
     queryFn: () => api.get<Coverage>("/jobs/coverage", { country, region } as Record<string, unknown>), refetchInterval: (s) => (s.state.data?.active ? 20_000 : 120_000) });
@@ -30,7 +31,7 @@ export function CrawlNotice({ country, region }: { country?: string[]; region?: 
     if (!active) return;
     const t = setInterval(() => qc.invalidateQueries({ queryKey: ["jobs"] }), 30_000); return () => clearInterval(t);
   }, [active, qc]);
-  if (!cov) return null;
+  if (!cov || demo) return null;          // the demo has no crawler, and its banner already says so
   const finding = cov.countries.filter((c) => c.phase === "finding_employers"), reading = cov.countries.filter((c) => c.phase === "reading"), off = cov.countries.filter((c) => c.phase === "off");
   const w = cov.worker.state; const busy = finding.length + reading.length > 0;
   const collect = async () => { try { const r = await api.post<CrawlResult>("/jobs/coverage/collect", { country: off.map((c) => c.code) }); announceCrawl(r, (c) => cov.countries.find((x) => x.code === c)?.name ?? c); qc.invalidateQueries({ queryKey: ["coverage"] }); } catch (e) { toast.error((e as Error).message); } };

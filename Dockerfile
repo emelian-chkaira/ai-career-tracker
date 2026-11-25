@@ -19,6 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends libatomic1 && r
 COPY backend backend
 COPY CHANGELOG.md CHANGELOG.md
 COPY --from=web /web/dist frontend/dist
+# `demo` branch only: this image is the public online demo (feature tour, one-click guest accounts, no crawler-backed actions)
+ENV CAREERS_DEMO_MODE=true
 USER app
 WORKDIR /app/backend
 EXPOSE 8787

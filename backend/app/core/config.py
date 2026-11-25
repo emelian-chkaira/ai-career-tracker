@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     rate_limit_per_min: int = 240
     auth_rate_limit_per_min: int = 20
     allow_registration: bool = True
+    demo_mode: bool = False                       # true on the public demo only: feature tour, one-click guest accounts, no crawler-backed actions
+    demo_guest_days: int = 7                      # demo guest accounts are deleted after this many days
     firebase_api_key: str | None = None            # Firebase project Web API key: when set, Firebase Authentication is the identity provider
     google_client_id: str | None = None           # OAuth client ID(s) from Google Cloud Console, comma separated (web, iOS, Android)
     google_client_secret: str | None = None       # secret of the web OAuth client: enables "Connect Gmail" (see docs/GMAIL_OAUTH.md)

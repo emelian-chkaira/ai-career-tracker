@@ -19,6 +19,9 @@ import { WatchlistPage } from "@/features/companies/WatchlistPage";
 import { Logo } from "@/shared/ui";
 import { InboxPage } from "@/features/inbox/InboxPage";
 import { SetupWizard } from "@/features/onboarding/SetupWizard";
+import { DemoTour } from "@/features/demo/DemoTour";
+import { DemoBar } from "@/features/demo/DemoBar";
+import { useNoCrawler } from "@/features/demo/useDemo";
 import { ChangelogPage, useVersion } from "@/features/about/ChangelogPage";
 
 const NAV: { group: string; items: { to: string; text: string; icon: string; auth?: boolean; match?: string[] }[] }[] = [
@@ -28,8 +31,8 @@ const NAV: { group: string; items: { to: string; text: string; icon: string; aut
 const TITLES: Record<string, string> = { "/": "Jobs", "/internships": "Internships", "/companies": "Companies", "/pipeline": "Pipeline", "/inbox": "Inbox", "/cv": "CV Studio", "/crawler": "Crawler", "/profile": "Settings", "/sponsors": "Visa sponsors", "/watchlist": "Watchlist" };
 
 function SideNav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
-  const { user } = useAuth(); const n = useNotifications(!!user); const loc = useLocation();
-  return (<nav className="snav" aria-label="Main">{NAV.map((g) => { const items = g.items.filter((i) => !i.auth || user); if (!items.length) return null; return (
+  const { user } = useAuth(); const n = useNotifications(!!user); const loc = useLocation(); const noCrawler = useNoCrawler();
+  return (<nav className="snav" aria-label="Main">{NAV.map((g) => { const items = g.items.filter((i) => (!i.auth || user) && !(noCrawler && i.to === "/crawler")); if (!items.length) return null; return (
     <div key={g.group} className="sgroup">{!collapsed && <div className="sgroup-t">{g.group}</div>}
       {items.map((i) => { const active = i.to === "/" ? loc.pathname === "/" : loc.pathname.startsWith(i.to); return (
         <Link key={i.to} to={i.to} onClick={onNavigate} className={`sitem${active ? " active" : ""}`} title={collapsed ? i.text : undefined} aria-current={active ? "page" : undefined}>
@@ -61,9 +64,10 @@ function Layout() {
         {user ? <Menu label="Account menu" trigger={<span className="row" style={{ gap: 8, flexWrap: "nowrap" }}><span className="avatar">{(user.name || user.email)[0].toUpperCase()}</span><span className="small email">{user.name || user.email}</span></span>}
           items={[{ label: user.email, onSelect: () => go("/profile") }, { label: "Settings", onSelect: () => go("/profile") }, { label: "CV Studio", onSelect: () => go("/cv") }, { label: "Sign out", onSelect: logout, danger: true }]} />
           : <><Link className="btn ghost small" to="/login">Sign in</Link><Link className="btn small" to="/register">Sign up</Link></>}</div></header>
-      <main className="main"><VerifyBanner /><Outlet /></main></div>
+      <main className="main"><DemoBar /><VerifyBanner /><Outlet /></main></div>
     <CommandBar /><SetupWizard /></div>);
 }
+function CrawlerRoute() { return useNoCrawler() ? <Navigate to="/" replace /> : <CrawlerPage />; }
 function Protected({ admin = false }: { admin?: boolean }) {
   const { user, ready } = useAuth(); const loc = useLocation();
   if (!ready) return <p className="muted">Loading…</p>;
@@ -72,7 +76,7 @@ function Protected({ admin = false }: { admin?: boolean }) {
   return <Outlet />;
 }
 export default function App() {
-  return (<TipProvider><Routes>
+  return (<TipProvider><DemoTour /><Routes>
     <Route path="/login" element={<AuthPage mode="login" />} /><Route path="/register" element={<AuthPage mode="register" />} />
     <Route path="/forgot" element={<ForgotPage />} /><Route path="/reset" element={<ResetPage />} /><Route path="/verify" element={<VerifyPage />} /><Route path="/action" element={<ActionPage />} />
     <Route element={<Layout />}>
@@ -80,7 +84,7 @@ export default function App() {
       <Route path="changelog" element={<ChangelogPage />} /><Route path="dashboard" element={<Navigate to="/" replace />} /><Route path="cv" element={<CvPage />} />
       <Route element={<Protected />}>
         <Route path="pipeline" element={<PipelinePage />} /><Route path="alerts" element={<Navigate to="/pipeline" replace />} /><Route path="inbox" element={<InboxPage />} /><Route path="watchlist" element={<WatchlistPage />} />
-        <Route path="my" element={<Navigate to="/pipeline" replace />} /><Route path="profile" element={<ProfilePage />} /><Route path="crawler" element={<CrawlerPage />} />
+        <Route path="my" element={<Navigate to="/pipeline" replace />} /><Route path="profile" element={<ProfilePage />} /><Route path="crawler" element={<CrawlerRoute />} />
       </Route>
       <Route path="admin" element={<Navigate to="/crawler" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />

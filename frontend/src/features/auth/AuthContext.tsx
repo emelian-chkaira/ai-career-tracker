@@ -11,6 +11,7 @@ interface Ctx {
   login(email: string, password: string): Promise<void>;
   register(email: string, password: string, name: string): Promise<void>;
   google(credential: string): Promise<void>;
+  startDemo(): Promise<void>;          // online demo only: a new private guest account
   logout(): Promise<void>;
   refresh(): Promise<void>;
   saveProfile(p: Profile): Promise<User>;
@@ -42,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     register: async (email, password, name) => adopt(await api.post<TokenOut>("/auth/register", { email, password, name })),
     refresh: async () => { try { own(await api.get<User>("/auth/me")); } catch { /* not signed in */ } },
     google: async (credential) => adopt(await api.post<TokenOut>("/auth/google", { credential })),
+    startDemo: async () => adopt(await api.post<TokenOut>("/auth/demo")),
     logout: async () => { try { await api.post("/auth/logout"); } finally { clear(); } },
     saveProfile: async (p) => { const u = await api.put<User>("/auth/profile", p); own(u); return u; },
   }), [user, ready, adopt, clear, own]);
