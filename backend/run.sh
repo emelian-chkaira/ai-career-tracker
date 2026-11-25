@@ -3,8 +3,14 @@
 cd "$(dirname "$0")" || exit 1
 [ -f ../.env ] && set -a && . ../.env && set +a
 [ -f .env.local ] && set -a && . ./.env.local && set +a
+# CAREERS_DB=neon switches to the Neon database whose variables `neon deploy` wrote to ../.env.local; without it nothing changes
+if [ "$CAREERS_DB" = neon ]; then
+  [ -f ../.env.local ] || { echo "no ../.env.local: run 'neon deploy' in the project root first" >&2; exit 1; }
+  set -a && . ../.env.local && set +a
+fi
 case "$1" in
   worker) exec .venv/bin/python -m app.workers.run ;;
   migrate) exec .venv/bin/alembic upgrade head ;;
+  seed) .venv/bin/alembic upgrade head && exec .venv/bin/python -m app.cli seed ;;
   *) .venv/bin/alembic upgrade head && exec .venv/bin/uvicorn app.main:app --host "${HOST:-0.0.0.0}" --port "${PORT:-8787}" ;;
 esac

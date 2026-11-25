@@ -15,7 +15,8 @@ export function GoogleButton({ onCredential, onError }: { onCredential: (credent
     const start = () => {
       if (!window.google || !box.current) return;
       window.google.accounts.id.initialize({ client_id: id, callback: (r: { credential: string }) => onCredential(r.credential) });
-      window.google.accounts.id.renderButton(box.current, { theme: "outline", size: "large", width: 360, text: "continue_with", shape: "pill" });
+      window.google.accounts.id.renderButton(box.current, { theme: "outline", size: "large", width: Math.min(380, box.current.clientWidth || 380),   // Google wants pixels: fit the form
+        text: "continue_with", shape: "pill" });
     };
     if (window.google) { start(); return; }
     let s = document.querySelector<HTMLScriptElement>(`script[src="${SRC}"]`);

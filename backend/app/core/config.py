@@ -8,7 +8,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="CAREERS_", env_file=(".env", "../.env"), extra="ignore", populate_by_name=True)
 
     # --- infrastructure
-    database_url: str = Field("postgresql+psycopg://careers:careers@localhost:5433/careers", validation_alias=AliasChoices("DATABASE_URL", "CAREERS_DATABASE_URL"))
+    # Neon gives a pooled DATABASE_URL and a direct DATABASE_URL_UNPOOLED. The direct one wins: each connection runs a session-level SET (core/db.py),
+    # which a transaction-mode pooler would lose, Alembic needs it too, and this long-running server already pools connections itself.
+    database_url: str = Field("postgresql+psycopg://careers:careers@localhost:5433/careers", validation_alias=AliasChoices("DATABASE_URL_UNPOOLED", "DATABASE_URL", "CAREERS_DATABASE_URL"))
     db_pool_size: int = 30
     data_dir: str = "./data"                      # logos, uploads
     env: str = "dev"                              # dev | prod

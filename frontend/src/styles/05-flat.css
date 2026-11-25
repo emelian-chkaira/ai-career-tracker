@@ -42,4 +42,3 @@ body{background:var(--bg)}
 .card.kpi{border-radius:10px;box-shadow:none}.card.kpi .v{font-family:inherit}
 .opt{border-radius:10px}.modal{border-radius:12px;box-shadow:0 10px 40px #0004}
 .toast{border-radius:8px;box-shadow:0 4px 16px #0003}.badge{font-weight:600}
-.authside:after{display:none}

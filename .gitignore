@@ -17,3 +17,11 @@ frontend/playwright-report/
 
 # test runs write their data dir here
 backend/tests/.tmp-data/
+
+# credentials pulled by the Neon CLI
+.env.local
+.env*.local
+.neon
+node_modules/
+node_modules/
+.neon

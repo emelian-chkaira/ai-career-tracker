@@ -42,12 +42,6 @@ h1,h2,h3,.brand span,.empty,.statrow b,.card.kpi .v,.inbox-tile b{font-family:in
 .ktabs{max-width:880px}.ktabs-list{margin-bottom:2px}
 
 /* ---------- auth v2 ---------- */
-.authside{background:radial-gradient(900px 500px at 10% -10%,#ffffff22,transparent 60%),var(--hero)}
-.authside:after{width:520px;height:520px;right:-180px;bottom:-200px;background:radial-gradient(circle,#ffffff2a,transparent 70%)}
-.authside h2{font-size:34px}
-.authside ul{gap:18px;max-width:480px;opacity:1}.authside li{padding:0;display:flex;gap:14px;align-items:flex-start}.authside li:before{display:none}
-.authside .fi{flex:none;width:38px;height:38px;border-radius:11px;background:#ffffff26;display:grid;place-items:center;border:1px solid #ffffff30}
-.authside li b{display:block;font-size:15px}.authside li span:not(.fi){display:block;font-size:13.5px;opacity:.85;line-height:1.45}
 .authmain{background:var(--bg)}
 .authcard{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:30px;box-shadow:0 20px 60px -30px rgba(40,40,120,.35);width:min(440px,100%)}
 .authcard h1{font-size:24px}

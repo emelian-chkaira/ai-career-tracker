@@ -11,6 +11,12 @@ function strength(p: string) {
   return Math.min(s, 4);
 }
 const LABELS = ["Too short", "Weak", "Okay", "Good", "Strong"];
+const POINTS = [
+  { tone: "blue", icon: "company", title: "Straight from employers", text: "Roles read from company career pages across Europe and the Middle East." },
+  { tone: "amber", icon: "bell", title: "A feed that knows you", text: "Your field, countries and skills rank every job, with alerts for new matches." },
+  { tone: "green", icon: "cv", title: "A CV that fits the job", text: "Tailor it for each role without inventing facts, then export a clean PDF." },
+  { tone: "coral", icon: "inbox", title: "A pipeline that keeps up", text: "Connect Gmail and interviews, tests and offers are picked up for you." },
+] as const;
 
 export function AuthPage({ mode }: { mode: "login" | "register" }) {
   const { user, login, register, google } = useAuth();
@@ -29,27 +35,21 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
     catch (x) { setErr((x as Error).message); } finally { setBusy(false); }
   }
   return (
-    <div className="authwrap">
-      <aside className="authside">
-        <Logo light />
-        <div>
-          <h2>Your job hunt, guided by AI.</h2>
-          <ul>
-            <li><span className="fi"><Icon name="company" /></span><div><b>Straight from employers</b><span>Roles read from companies' own career pages across Europe and the Middle East. One role, one card.</span></div></li>
-            <li><span className="fi"><Icon name="bell" /></span><div><b>A feed that knows you</b><span>Your field, countries and skills rank every job; alerts tell you the day a match appears.</span></div></li>
-            <li><span className="fi"><Icon name="cv" /></span><div><b>A CV that fits the job</b><span>Import once, edit live, let AI tailor it per role without inventing facts, export a clean PDF.</span></div></li>
-            <li><span className="fi"><Icon name="inbox" /></span><div><b>A pipeline that updates itself</b><span>Interviews, tests, offers and rejections picked up from your Gmail.</span></div></li>
+    <div className="signin">
+      <aside className="si-story">
+        <Logo />
+        <div className="si-body">
+          <h2>Your job hunt, calm and in one place.</h2>
+          <p className="si-lead">Find roles, tailor your CV and follow every application, from first save to offer.</p>
+          <ul className="si-points">
+            {POINTS.map((x) => <li key={x.title} className={x.tone}><span className="si-ic" aria-hidden><Icon name={x.icon} /></span><b>{x.title}</b><span>{x.text}</span></li>)}
           </ul>
         </div>
-        <div className="auth-float" aria-hidden>
-          <div><b>Senior Data Engineer</b><i>Adyen · Amsterdam · 92% match</i></div>
-          <div><b>Interview invite detected</b><i>moved to Interview · just now</i></div>
-          <div><b>CV tailored for Backend Developer</b><i>3 bullets rewritten · 0 facts invented</i></div>
-        </div>
-        <div className="small" style={{ opacity: .75 }}>NL IND sponsor status is shown as a flag, never as advice.</div>
+        <p className="si-note"><span className="si-flag" role="img" aria-label="Netherlands flag" />
+          <span>Visa sponsor flags come from the Netherlands&rsquo; IND register (Immigration and Naturalisation Service). They are a signal, not immigration advice.</span></p>
       </aside>
-      <main className="authmain">
-        <form className="authform authcard stack" onSubmit={submit} noValidate>
+      <main className="si-main">
+        <form className="si-form stack" onSubmit={submit} noValidate>
           <div><h1>{reg ? "Create your account" : "Welcome back"}</h1>
             <div className="muted">{reg ? "Free. Takes less than a minute." : "Sign in to your saved searches, alerts and pipeline."}</div></div>
           <GoogleButton onError={setErr} onCredential={async (c) => { setErr(""); try { await google(c); nav(from, { replace: true }); } catch (x) { setErr((x as Error).message); } }} />

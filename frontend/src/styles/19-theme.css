@@ -77,14 +77,4 @@ button.stile{cursor:pointer}button.stile:hover{border-color:color-mix(in srgb,va
 .jhead .greet{font-weight:700;color:var(--text)}
 
 /* ---------- sign-in ---------- */
-.authside{background:#0f1f3d;color:#fff;isolation:isolate}
-.authside::after{display:none}
-.authside h2{font-size:32px}
-.authside .fi{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:6px;display:inline-grid;place-items:center}
-.authside ul{max-width:330px}
-.auth-float{position:absolute;right:28px;top:50%;width:230px;display:flex;flex-direction:column;gap:12px;transform:translateY(-50%);pointer-events:none}
-.auth-float div{background:#16294d;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.35}
-.auth-float div:nth-child(2){margin-left:24px}
-.auth-float b{display:block;font-size:13px}.auth-float i{font-style:normal;font-size:11px;opacity:.75}
 .authcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:26px;box-shadow:var(--shadow)}
-@media(max-width:1180px){.auth-float{display:none}.authside ul{max-width:440px}}
