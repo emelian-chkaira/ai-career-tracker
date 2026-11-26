@@ -2,6 +2,7 @@
 
   seed               load the ready-made starter data (only into an empty database; --force to add anyway)
   export-seed        rewrite backend/seed/ from the current database (maintainers)
+  export-snapshot    rewrite backend/seed_live/, the public demo's snapshot (maintainers; employer pages only, no personal data)
   stats              how much is stored
   backfill-domains   classify jobs that have no domain yet (--all: re-classify every job with the current rules)
   purge              delete long-expired / too-old jobs (see CAREERS_MAX_JOB_AGE_DAYS, CAREERS_DELETE_EXPIRED_AFTER_DAYS)
@@ -24,6 +25,13 @@ def main(argv: list[str]) -> int:
     if cmd in ("seed", "export_seed"):
         from app.services import seed_service as sd
         with SessionLocal() as db: print(json.dumps(sd.export(db) if cmd == "export_seed" else sd.load(db, force="--force" in argv)))
+        if cmd == "seed":
+            from app.services import snapshot_service
+            with SessionLocal() as db: print(json.dumps(snapshot_service.apply(db)))      # public demo only: the real-data snapshot
+        return 0
+    if cmd == "export_snapshot":
+        from app.services import snapshot_service
+        with SessionLocal() as db: print(json.dumps(snapshot_service.export(db)))
         return 0
     if cmd not in m.ACTIONS: print(__doc__); return 2
     if cmd in m.DESTRUCTIVE and "--yes" not in argv:

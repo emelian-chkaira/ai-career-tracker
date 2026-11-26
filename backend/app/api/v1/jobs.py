@@ -88,7 +88,7 @@ def live_search(request: Request, q: str = Query(..., min_length=2, max_length=1
 def job_detail(job_id: int, db: Session = Depends(get_db), user: User | None = Depends(optional_user)):
     j = db.scalar(select(Job).where(Job.id == job_id).options(selectinload(Job.company), selectinload(Job.skills)))
     if not j: raise HTTPException(404, "job not found")
-    if len(j.description or "") < 200 and j.source == "company-site":          # lazily read the full posting from the employer's own page
+    if len(j.description or "") < 200 and j.source == "company-site" and not settings.demo_mode:     # lazily read the full posting from the employer's own page (the public demo keeps to short excerpts)
         from app.crawler import discovery
         try:
             d = discovery.fetch_detail(j.url)
