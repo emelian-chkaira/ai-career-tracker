@@ -12,12 +12,58 @@ def enqueue(db: Session, kind: str, payload: dict | None = None, dedupe: bool = 
     t = Task(kind=kind, payload=payload or {}); db.add(t); db.commit(); return t
 
 
-def claim(db: Session) -> Task | None:
-    """Atomically take the oldest queued task (SKIP LOCKED: safe with several workers)."""
-    row = db.execute(text("""UPDATE tasks SET status='running', started_at=now() WHERE id = (
-        SELECT id FROM tasks WHERE status='queued' ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING id""")).first()
+# Which tasks must not run at the same time (only matters with more than one worker).
+SITES = {"scan_all", "scan_unscanned", "scan_due", "internships"}                     # each walks the same employers' pages
+HEAVY = SITES | {"board_search", "discover", "discover_country", "census", "broad_sources", "dedupe_jobs", "sponsors_refresh"}   # one of each at a time
+WRITERS = (HEAVY - {"dedupe_jobs", "sponsors_refresh"}) | {"scan_company", "live_search"}   # they add or change jobs: merging duplicates waits for them
+
+
+def conflicts(a: str, b: str) -> bool:
+    if a == b: return a in HEAVY
+    if a in SITES and b in SITES: return True
+    return (a == "dedupe_jobs" and b in WRITERS) or (b == "dedupe_jobs" and a in WRITERS)
+
+
+def active(db: Session) -> list[Task]:
+    """Tasks a live worker is on right now (paused ones included). A task left 'running' by a worker that died does not count."""
+    from . import schedule_service
+    ids = [w["task_id"] for w in schedule_service.workers(db) if w.get("task_id")]
+    return list(db.scalars(select(Task).where(Task.id.in_(ids), Task.status.in_(("running", "paused"))).order_by(Task.id))) if ids else []
+
+
+def claim(db: Session, on_claim=None) -> Task | None:
+    """Atomically take the oldest queued task that may run now. One claim at a time across all workers; a task also waits for
+    an older queued task it conflicts with, so the order people asked for is kept. on_claim(task) runs inside the same transaction."""
+    db.execute(text("SELECT pg_advisory_xact_lock(hashtext('careers:claim'))"))
+    ahead = [t.kind for t in active(db)]
+    for tid, kind in db.execute(select(Task.id, Task.kind).where(Task.status == "queued").order_by(Task.id)).all():
+        if any(conflicts(kind, k) for k in ahead): ahead.append(kind); continue
+        row = db.execute(text("UPDATE tasks SET status='running', started_at=now() WHERE id = :i AND status='queued' RETURNING id"), {"i": tid}).first()
+        if not row: continue                                                          # stopped a moment ago
+        t = db.get(Task, tid, populate_existing=True)
+        if on_claim: on_claim(t)
+        db.commit()
+        return t
     db.commit()
-    return db.get(Task, row[0]) if row else None
+    return None
+
+
+def waiting_reasons(db: Session) -> dict[int, dict]:
+    """For every queued task: why it has not started yet."""
+    from . import schedule_service
+    live = schedule_service.workers(db); on = active(db)
+    busy = sum(1 for w in live if w.get("task_id")); free = len(live) - busy
+    ahead = list(on); out: dict[int, dict] = {}
+    for t in db.scalars(select(Task).where(Task.status == "queued").order_by(Task.id)):
+        blocker = next((x for x in ahead if conflicts(t.kind, x.kind)), None)
+        if not live: out[t.id] = {"why": "no_worker"}
+        elif blocker: out[t.id] = {"why": "conflict", "task_id": blocker.id, "kind": blocker.kind}
+        elif free <= 0:
+            first = on[0] if on else None
+            out[t.id] = {"why": "busy", "workers": len(live), "task_id": first.id if first else None, "kind": first.kind if first else None}
+        else: out[t.id] = {"why": "next"}; free -= 1
+        ahead.append(t)
+    return out
 
 
 STOPPED = "stopped by operator"

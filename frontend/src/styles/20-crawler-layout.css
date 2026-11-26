@@ -105,3 +105,14 @@
 .kcard-d{flex:1}.kcard-s{min-height:20px}
 .kcard .btn{margin-top:2px}
 @media(prefers-reduced-motion:reduce){.kcard{transition:none}.kcard:hover{transform:none}}
+/* workers: one row each */
+.wlist{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+.wl-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.wl-count{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);font-size:11.5px;font-weight:700}
+.wlist ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:8px}
+.wlist li{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);min-width:0}
+.wl-dot{flex:none;width:9px;height:9px;border-radius:50%;background:var(--ok)}.wlist li.busy .wl-dot{background:var(--brand)}
+.wl-main{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.4;font-size:13.5px}
+.wl-tag{flex:none;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;color:var(--chip-ink);background:var(--chip)}
+.wl-tag.old{color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,transparent)}
+.wlist p{margin:0}

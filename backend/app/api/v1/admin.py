@@ -25,8 +25,10 @@ def create_task(body: TaskIn, db: Session = Depends(get_db)):
 
 @router.get("/tasks")
 def tasks(db: Session = Depends(get_db)):
-    return [{"id": t.id, "kind": t.kind, "status": t.status, "progress": t.progress, "error": t.error, "created_at": t.created_at, "finished_at": t.finished_at}
-            for t in db.scalars(select(Task).order_by(Task.id.desc()).limit(30))]
+    rows = list(db.scalars(select(Task).order_by(Task.id.desc()).limit(30)))
+    why = task_service.waiting_reasons(db)
+    return [{"id": t.id, "kind": t.kind, "status": t.status, "progress": t.progress, "error": t.error, "created_at": t.created_at, "finished_at": t.finished_at,
+             "waiting": why.get(t.id)} for t in rows]
 
 
 @router.get("/stats")
