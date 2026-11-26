@@ -1,8 +1,4 @@
-<p align="center"><img src="frontend/public/favicon.svg" width="72" alt="AI Career Tracker"></p>
-
-<h1 align="center">AI Career Tracker</h1>
-
-<h3 align="center">Your job hunt on autopilot: jobs from employers' career pages <i>and</i> LinkedIn, Indeed, Glassdoor and Bayt,<br>filtered to your spec, ranked against your CV, applied to with an AI-tailored CV, and tracked from your inbox.</h3>
+<h1 align="center"><img src="docs/media/title.svg" width="100%" alt="AI Career Tracker: jobs and internships, with IND recognised sponsor badges for the Netherlands, straight from the source, from employers' own career pages and optional LinkedIn, Indeed, Glassdoor and Bayt searches"></h1>
 
 <p align="center">AI Career Tracker is an open-source job-search platform: a FastAPI and PostgreSQL backend, a React web app, a Flutter mobile app and a crawler that reads employers' own career pages.</p>
 
@@ -19,15 +15,6 @@
 </p>
 
 <p align="center"><sub>The demo opens with one click, no sign-up. It shows a saved snapshot of jobs and a Crawler page with sample data; the real crawler runs on your own computer. It is on free hosting, so the first visit can take about a minute.</sub></p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn">
-  <img src="https://img.shields.io/badge/Indeed-2164F3?style=for-the-badge&logo=indeed&logoColor=white" alt="Indeed">
-  <img src="https://img.shields.io/badge/Glassdoor-0CAA41?style=for-the-badge&logo=glassdoor&logoColor=white" alt="Glassdoor">
-  <img src="https://img.shields.io/badge/Bayt-F26522?style=for-the-badge" alt="Bayt">
-  <img src="https://img.shields.io/badge/Employer_career_pages-1F2937?style=for-the-badge&logo=greenhouse&logoColor=white" alt="Employer career pages">
-  <img src="https://img.shields.io/badge/Gmail_inbox-D14836?style=for-the-badge&logo=gmail&logoColor=white" alt="Gmail">
-</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/🎯_jobs_matched_to_your_spec_+_CV-16a34a?style=flat-square" alt="Matched to your spec and CV">
