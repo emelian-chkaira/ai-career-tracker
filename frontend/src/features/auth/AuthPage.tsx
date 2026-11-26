@@ -1,9 +1,8 @@
-import { Logo } from "@/shared/ui";
 import { useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
-import { Icon } from "@/shared/ui/Icon";
 import { GoogleButton } from "./GoogleButton";
+import { SignInShowcase } from "./SignInShowcase";
 
 /** 0-4: length, mixed case, digit, symbol. Display only; the server enforces the real rule. */
 function strength(p: string) {
@@ -11,13 +10,6 @@ function strength(p: string) {
   return Math.min(s, 4);
 }
 const LABELS = ["Too short", "Weak", "Okay", "Good", "Strong"];
-const POINTS = [
-  { tone: "blue", icon: "company", title: "Straight from employers", text: "Roles read from company career pages across Europe and the Middle East." },
-  { tone: "amber", icon: "bell", title: "A feed that knows you", text: "Your field, countries and skills rank every job, with alerts for new matches." },
-  { tone: "green", icon: "cv", title: "A CV that fits the job", text: "Tailor it for each role without inventing facts, then export a clean PDF." },
-  { tone: "coral", icon: "inbox", title: "A pipeline that keeps up", text: "Connect Gmail and interviews, tests and offers are picked up for you." },
-] as const;
-
 export function AuthPage({ mode }: { mode: "login" | "register" }) {
   const { user, login, register, google } = useAuth();
   const nav = useNavigate(); const loc = useLocation(); const reg = mode === "register";
@@ -36,18 +28,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
   }
   return (
     <div className="signin">
-      <aside className="si-story">
-        <Logo />
-        <div className="si-body">
-          <h2>Your job hunt, calm and in one place.</h2>
-          <p className="si-lead">Find roles, tailor your CV and follow every application, from first save to offer.</p>
-          <ul className="si-points">
-            {POINTS.map((x) => <li key={x.title} className={x.tone}><span className="si-ic" aria-hidden><Icon name={x.icon} /></span><b>{x.title}</b><span>{x.text}</span></li>)}
-          </ul>
-        </div>
-        <p className="si-note"><span className="si-flag" role="img" aria-label="Netherlands flag" />
-          <span>Visa sponsor flags come from the Netherlands&rsquo; IND register (Immigration and Naturalisation Service). They are a signal, not immigration advice.</span></p>
-      </aside>
+      <SignInShowcase />
       <main className="si-main">
         <form className="si-form stack" onSubmit={submit} noValidate>
           <div><h1>{reg ? "Create your account" : "Welcome back"}</h1>
