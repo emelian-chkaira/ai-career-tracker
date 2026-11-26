@@ -6,10 +6,10 @@ import { api } from "@/shared/api/client";
 import { useAuth } from "@/features/auth/AuthContext";
 import { SourceHealth } from "./SourceHealth";
 import { WorkerPanel, type WorkerInfo } from "./WorkerPanel";
-import { CountriesCard, PauseButton, RecencyCard, ScheduleCard, StatusBanner } from "./CrawlerSetup";
+import { CountriesCard, PauseButton, RecencyCard, ScheduleCard, StatusBanner, WorkerList } from "./CrawlerSetup";
 import { PipelineExplorer, type CrawlTab } from "./PipelineExplorer";
 import { BoardsTab } from "./BoardsTab";
-import { RunningNow } from "./RunningNow";
+import { RunningNow, taskTitle } from "./RunningNow";
 import { CompaniesTab } from "./CompaniesTab";
 import { JobsTab } from "./JobsTab";
 import { StorageTab } from "./StorageTab";
@@ -48,6 +48,7 @@ export function CrawlerPage() {
         <div className="chead">
           <PageHeader eyebrow="System" icon={<Icon name="crawler" size={17} />} title="Crawler" subtitle={<>Finds employers, reads their career pages and keeps the job list fresh, on its own. {BLURB[tab]}</>} />
           <StatusBanner s={w?.status} rate={w?.rate_per_min} control={<PauseButton schedule={w?.schedule} isAdmin={isAdmin} />} />
+          <WorkerList s={w?.status} title={taskTitle} />
           <RunningNow />
         </div>
         <nav className="ctabs" role="tablist" aria-label="Crawler sections">{TABS.filter((t) => t[0] !== "users" || isAdmin).map(([k, i, l]) => (

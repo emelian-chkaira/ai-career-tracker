@@ -189,7 +189,7 @@ cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev
 .venv/bin/playwright install chromium
 cp ../.env.example ../.env                     # set CAREERS_JWT_SECRET
 ./run.sh api                                   # http://localhost:8787 · API docs at /api/docs
-./run.sh worker                                # second terminal: crawling, alerts, embeddings
+./run.sh worker                                # second terminal: crawling, alerts, embeddings (run it again for more workers)
 cd ../frontend && npm install && npm run dev   # http://localhost:5173
 ```
 </details>

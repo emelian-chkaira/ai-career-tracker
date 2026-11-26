@@ -5,7 +5,8 @@ import { flag } from "@/shared/lib/geo";
 import { BoardIcon, boardName } from "@/shared/ui/BoardIcon";
 import { ActionButton, ago, num } from "./ui";
 
-export type TaskRow = { id: number; kind: string; status: string; error?: string | null; created_at: string; finished_at?: string | null; progress?: Record<string, unknown> | null };
+export type Waiting = { why: "no_worker" | "conflict" | "busy" | "next"; task_id?: number | null; kind?: string | null; workers?: number };
+export type TaskRow = { waiting?: Waiting | null; id: number; kind: string; status: string; error?: string | null; created_at: string; finished_at?: string | null; progress?: Record<string, unknown> | null };
 
 /** Plain-language names for every task the worker can run. */
 export const TASK_INFO: Record<string, { icon: string; title: string; what: string }> = {
@@ -27,10 +28,22 @@ export const TASK_INFO: Record<string, { icon: string; title: string; what: stri
 };
 const info = (k: string) => TASK_INFO[k] ?? { icon: "crawler", title: k.replace(/_/g, " "), what: "" };
 
+export const taskTitle = (kind: string) => info(kind).title;
+
+/** Why a queued task has not started yet. */
+export function waitingText(w?: Waiting | null): string {
+  const other = w?.kind ? `${taskTitle(w.kind)} (#${w.task_id})` : "another task";
+  if (!w) return "Waiting for a worker to pick it up…";                 // an API not yet restarted sends no reason
+  if (w.why === "no_worker") return "No worker is running. Start one to run this task.";
+  if (w.why === "conflict") return `Waits for ${other}: these two should not run at the same time.`;
+  if (w.why === "busy") return (w.workers ?? 1) > 1 ? `All ${w.workers} workers are busy. It starts when one is free.` : `Waiting behind ${other}. Your one worker runs one task at a time.`;
+  return "Next up: a worker picks it up within seconds.";
+}
+
 /** One sentence: what this task is doing at this moment. */
 function doingNow(t: TaskRow): React.ReactNode {
   const p = (t.progress ?? {}) as Record<string, unknown>;
-  if (t.status === "queued") return <>Waiting for the worker to pick it up…</>;
+  if (t.status === "queued") return <>{waitingText(t.waiting)}</>;
   if (t.kind === "board_search" && p.current) {
     const [term, , country] = String(p.current).split(/ (in) /);
     const site = p.current_site as string | undefined;
@@ -51,7 +64,7 @@ export function TaskCard({ t, compact = false }: { t: TaskRow; compact?: boolean
   const plan = p.plan as { terms?: string[]; countries?: string[]; sites?: string[] } | undefined;
   return (<div className={`tcard ${st}`}>
     <div className="tc-top"><span className="tc-icon ph-icon" aria-hidden><Icon name={i.icon} size={17} /></span>
-      <div className="tc-main"><div className="tc-head"><b>{i.title}</b><span className={`tc-pill ${st}`}><i />{st === "running" ? "Running" : st === "paused" ? "Paused" : "Queued"}</span><span className="small muted">#{t.id} · started {ago(t.created_at)}</span></div>
+      <div className="tc-main"><div className="tc-head"><b>{i.title}</b><span className={`tc-pill ${st}`}><i />{st === "running" ? "Running" : st === "paused" ? "Paused" : "Queued"}</span><span className="small muted">#{t.id} · {t.status === "queued" ? "added" : "started"} {ago(t.created_at)}</span></div>
         <div className="tc-now small">{t.status === "paused" ? <>Paused. It stopped between two steps and keeps everything found so far. Press Resume to carry on.</> : doingNow(t)}</div></div>
       <div className="tc-act">
         {t.status === "running" && <ActionButton className="btn ghost small" run={() => act("pause")} title="Pause at the next step; nothing is lost">⏸ Pause</ActionButton>}

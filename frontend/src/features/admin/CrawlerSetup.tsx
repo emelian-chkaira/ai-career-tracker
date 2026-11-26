@@ -6,7 +6,8 @@ import { flag } from "@/shared/lib/geo";
 import { PlacePicker } from "@/features/onboarding/SetupWizard";
 import { ActionButton, num, useNotify } from "./ui";
 
-export type WorkerStatus = { state: "running" | "idle" | "paused" | "stopped"; seen_seconds: number | null; pid?: number; host?: string; inflight: number; task?: string | null; allowed: boolean; why: string; next_start: string | null; note: string };
+export type WorkerRow = { id: string; pid?: number; host?: string; state: string; task?: string | null; task_id?: number | null; inflight: number; lead: boolean; old: boolean; seen_seconds: number };
+export type WorkerStatus = { workers?: WorkerRow[]; state: "running" | "idle" | "paused" | "stopped"; seen_seconds: number | null; pid?: number; host?: string; inflight: number; task?: string | null; allowed: boolean; why: string; next_start: string | null; note: string };
 type Schedule = { enabled: boolean; days: number[]; start: string; end: string; tz: string; revisit_hours: number; parallel: number; allowed_now: boolean; why: string; next_start: string | null };
 type Policy = { countries: string[]; keep_remote: boolean; keep_domains: string[]; saved_domains?: string[]; max_job_age_days: number; delete_expired_after_days: number; by_age: Record<string, number>; by_country: Record<string, number>; places: { countries: { code: string; name: string; regions: string[] }[]; regions: { key: string; label: string; countries: string[] }[] } };
 
@@ -43,8 +44,25 @@ export function StatusBanner({ s, rate, control }: { s?: WorkerStatus; rate?: nu
   const pulse = s.state !== "stopped" && s.seen_seconds != null;
   return (<div className={`cstatus ${s.state}`} role="status"><span className="cdot" aria-hidden />
     <div className="cs-main"><b className="cs-title">{head}</b><span className="cs-sub">{detail}</span></div>
-    {pulse && <div className="cs-meta"><span>Worker {s.pid ? `#${s.pid}` : ""}</span><span>heartbeat {s.seen_seconds}s ago</span></div>}
+    {pulse && <div className="cs-meta"><span>{(s.workers?.length ?? 0) > 1 ? `${s.workers!.length} workers` : `Worker ${s.pid ? `#${s.pid}` : ""}`}</span><span>heartbeat {s.seen_seconds}s ago</span></div>}
     {control && <div className="cs-ctl">{control}</div>}</div>);
+}
+
+/** Every running worker: what it is on, and which one leads. Shown under the status bar while at least one worker reports. */
+export function WorkerList({ s, title }: { s?: WorkerStatus; title: (kind: string) => string }) {
+  const list = s?.workers ?? [];
+  if (!list.length) return null;
+  const old = list.some((w) => w.old);
+  return (<section className="wlist" aria-label="Workers">
+    <div className="wl-head"><b>Workers</b><span className="wl-count">{list.length}</span><span className="small muted">Each takes one task at a time. Add one by running <code>./run.sh worker</code> in another terminal.</span></div>
+    <ul>{list.map((w) => <li key={w.id} className={w.task ? "busy" : ""}>
+      <span className="wl-dot" aria-hidden />
+      <div className="wl-main"><b>{w.task ? title(w.task) : w.state === "paused" ? "Waiting for tasks (crawling paused)" : w.lead ? "Running the automatic work" : "Ready for a task"}</b>
+        <span className="small muted">#{w.pid} on {w.host}{w.task_id ? ` · task #${w.task_id}` : ""}{w.inflight ? ` · ${w.inflight} site${w.inflight === 1 ? "" : "s"} being read` : ""} · seen {w.seen_seconds}s ago</span></div>
+      {w.lead && <span className="wl-tag" title="This worker alone starts automatic scans, alerts and e-mails">Lead</span>}
+      {w.old && <span className="wl-tag old">Restart to update</span>}</li>)}</ul>
+    {old && <p className="small muted">A worker marked &ldquo;Restart to update&rdquo; still runs the previous version. Restart it before running several.</p>}
+  </section>);
 }
 
 export function ScheduleCard({ isAdmin }: { isAdmin: boolean }) {

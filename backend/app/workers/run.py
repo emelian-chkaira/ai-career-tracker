@@ -1,10 +1,11 @@
 """Worker process: `python -m app.workers.run`.
- - executes queued tasks (scan, discovery, live search, embeddings…)
+ - executes queued tasks (scan, discovery, live search, embeddings…), one at a time
  - scheduler: refreshes stale companies, embeds new jobs, runs job alerts and sends the e-mail outbox.
-Scale out by running more worker containers (tasks are claimed with SKIP LOCKED)."""
+Run as many workers as you like. Each takes its own queued task; one of the idle ones holds the "lead" and alone runs the scheduler,
+so scans, alerts and e-mails never happen twice. Tasks that would get in each other's way wait (task_service.conflicts)."""
 import logging, os, threading, time, traceback, signal
 from concurrent.futures import ThreadPoolExecutor
-from sqlalchemy import select, exists
+from sqlalchemy import select, exists, text
 from app.core.db import SessionLocal
 from app.core.config import settings
 from app.models import Company, Job
@@ -24,14 +25,21 @@ HANDLERS = {
 }
 
 
-_now: dict = {"state": "idle", "task": None, "note": "just started"}       # what the worker is doing, written by the main loop
+_now: dict = {"state": "idle", "task": None, "task_id": None, "note": "just started", "lead": False}       # what the worker is doing, written by the main loop
+_beat_lock = threading.RLock()                                              # the heartbeat row is written by the main loop (on claim) and by its own thread
+
+
+def _write_beat(db, commit: bool = True):
+    schedule_service.beat(db, _now["state"], len(_inflight), task=_now["task"], note=_now["note"], task_id=_now["task_id"], lead=_now["lead"], commit=commit)
 
 
 def _heartbeat():
     """Own thread: report every 10 s even while the main loop is busy with a long task (discovery can take many minutes)."""
     while not STOP:
         try:
-            with SessionLocal() as db: schedule_service.beat(db, _now["state"], len(_inflight), task=_now["task"], note=_now["note"])
+            with _beat_lock, SessionLocal() as db:
+                if _now["lead"]: _now["lead"] = schedule_service.take_lead(db)   # renewed here, so a long scheduler step does not lose it
+                _write_beat(db)
         except Exception: log.warning("could not write the heartbeat")
         time.sleep(10)
 
@@ -51,7 +59,19 @@ def _stop(*_):
     t.daemon = True; t.start()
 
 
+def _sign_off():
+    """Leave the worker list and hand the lead on at once, so another worker does not wait a minute.
+    A task cut off half-way is marked as such, not left 'running' with nobody on it."""
+    try:
+        with SessionLocal() as db:
+            if _now["task_id"]:
+                db.execute(text("UPDATE tasks SET status='failed', error='interrupted: the worker was stopped', finished_at=now() WHERE id=:i AND status IN ('running','paused')"), {"i": _now["task_id"]}); db.commit()
+            schedule_service.release_lead(db); schedule_service.forget(db)
+    except Exception: pass
+
+
 def engine_dispose():
+    _sign_off()
     try:
         from app.core.db import engine
         engine.dispose()
@@ -83,31 +103,42 @@ def main():
     while not STOP:
         did = False
         with SessionLocal() as db:
-            t = task_service.claim(db)
+            def started(t):                                                    # same transaction as the claim: other workers see this task as taken
+                _now.update(state="running", task=t.kind, task_id=t.id, note=f"running task #{t.id}", lead=False)
+                _write_beat(db, commit=False)
+            with _beat_lock: t = task_service.claim(db, on_claim=started)
             if t:
                 did = True; log.info("task %s #%s %s", t.kind, t.id, t.payload)
-                _now.update(state="running", task=t.kind, note=f"running task #{t.id}")
                 try:
+                    schedule_service.release_lead(db)                          # busy now: an idle worker takes over the automatic work
                     HANDLERS[t.kind](t, db); task_service.finish(db, t)
-                    _now.update(task=None, note="")
                 except Exception as e:
                     db.rollback(); log.error("task failed: %s", traceback.format_exc()); task_service.finish(db, db.get(type(t), t.id), str(e)[:300])
+                _now.update(state="idle", task=None, task_id=None, note="")
         if not did:
             try:
                 with SessionLocal() as db:
+                    _now["lead"] = schedule_service.take_lead(db)
+                    if not _now["lead"]:                                       # another worker runs the automatic work; this one waits for tasks
+                        ok, why, _ = schedule_service.window()
+                        _now.update(state=("running" if _inflight else "idle") if ok else "paused", note="waiting for tasks" if ok else why)
+                        time.sleep(3); continue
+                    busy_kinds = {x.kind for x in task_service.active(db)}     # tasks other workers are on
+                    if _every(last, "prune", 600): schedule_service.prune(db)
                     if _every(last, "alerts", 300): n = alert_service.run_due(db); alert_service.send_outbox(db); n and log.info("alerts created: %s", n); m = tracking_service.notify_due(db); m and log.info("follow-up reminders: %s", m)
                     if _every(last, "embed", 120): embeddings.backfill(limit=500)
                     if _every(last, "purge", 86400): r = maintenance_service.purge_old(db); any(r.values()) and log.info("retention purge: %s", r)      # daily retention
-                    if _every(last, "dedupe", 86400): r = maintenance_service.collapse_duplicates(db); r["jobs_merged"] and log.info("duplicates merged: %s", r)      # daily: one role, one job
+                    if not any(task_service.conflicts("dedupe_jobs", k) for k in busy_kinds) and _every(last, "dedupe", 86400):      # daily: one role, one job; never while jobs are being written
+                        r = maintenance_service.collapse_duplicates(db); r["jobs_merged"] and log.info("duplicates merged: %s", r)
                     if _every(last, "refresh", 5):                  # keep jobs fresh: top up the scan pool with the next due companies, inside the schedule
                         ok, why, nxt = schedule_service.window()
                         if ok:
-                            _refresh(db)
+                            if not busy_kinds & task_service.SITES: _refresh(db)        # a task is already walking the employers
                             if settings.board_sites.strip() and settings.board_every_hours and _every(last, "boards-check", 300) and _boards_due(db):
                                 task_service.enqueue(db, "board_search")              # EXPERIMENTAL job boards, only when switched on
                         elif _every(last, "paused-log", 600): log.info("automatic crawling paused: %s%s", why, f" (next start {nxt})" if nxt else "")
                         last["state"] = ("running" if _inflight else "idle") if ok else "paused"; last["why"] = why
-                    _now.update(state=last.get("state", "idle"), task=None, note=last.get("why", ""))
+                    _now.update(state=last.get("state", "idle"), note=last.get("why", ""))
             except Exception: log.error("scheduler error: %s", traceback.format_exc())
             time.sleep(3)
     log.info("worker stopped"); engine_dispose(); os._exit(0)                     # do not wait for hung scan threads
@@ -132,9 +163,22 @@ def _refresh(db):
     if _inflight: q = q.where(Company.id.not_in(list(_inflight)))
     fresh = list(db.scalars(q.where(Company.last_scan.is_(None)).order_by(Company.id.desc()).limit(max(1, free // 2))))     # half the slots: employers never read (new countries fill fast)
     rest = list(db.scalars(q.where(Company.id.not_in(fresh or [-1])).order_by(has_open.desc(), Company.ats_slug.is_(None), Company.next_scan.asc().nullsfirst()).limit(free - len(fresh))))
-    for cid in fresh + rest:
+    for cid in _claim_companies(db, fresh + rest):
         _inflight[cid] = time.time()
         _pool.submit(_run_scan, cid)
+
+
+CLAIM_MINUTES = 15      # = STUCK_AFTER: a claimed company is not offered again until its scan sets the real next visit, or this runs out
+
+
+def _claim_companies(db, ids: list[int]) -> list[int]:
+    """Reserve companies before reading them, so a second worker (or the next lead) never opens the same site."""
+    if not ids: return []
+    got = set(db.scalars(text("""UPDATE companies SET next_scan = now() + make_interval(mins => :m) WHERE id IN (
+        SELECT id FROM companies WHERE id = ANY(:ids) AND (next_scan IS NULL OR next_scan <= now()) FOR UPDATE SKIP LOCKED) RETURNING id"""),
+        {"ids": ids, "m": CLAIM_MINUTES}))
+    db.commit()
+    return [i for i in ids if i in got]
 
 
 def _run_scan(cid: int):
