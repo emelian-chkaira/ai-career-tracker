@@ -22,4 +22,5 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.13" }
       - run: pip install -r backend/requirements-dev.txt
+      - run: python -m playwright install --with-deps chromium   # the scan tests drive a real browser
       - run: cd backend && python -m pytest -q

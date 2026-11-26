@@ -68,6 +68,7 @@ def test_endpoints_export_preview_and_import(client):
     assert [t["id"] for t in client.get("/api/v1/cv/templates").json()["templates"]] == ["mine", "classic", "compact", "modern"]
     r = client.post("/api/v1/cv/extract?filename=resume.json", content=json.dumps(r.json()).encode(), headers={"Content-Type": "application/octet-stream"})
     assert r.status_code == 200 and r.json()["source"] == "rxresume"
+    if latexcv.compiler() is None: pytest.skip("export and import checked; the PDF preview needs a LaTeX compiler")
     p = client.post("/api/v1/cv/preview", json={"cv": CV, "template": "modern", "paper": "letter"}); assert p.status_code == 200 and p.json()["bytes"] > 1000
     assert client.post("/api/v1/cv/preview", json={"cv": CV, "template": "modern", "paper": "letter"}).json()["cached"] is True
 
