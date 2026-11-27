@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => { await page.addInitScript(() => localStorage.setItem("guide:seen", "1")); });   // the first-run guide has its own unit tests
+
 test("panes can be resized by dragging the divider, and the width is remembered", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 800 });
   await page.goto("/"); await expect(page.locator(".job").first()).toBeVisible({ timeout: 15_000 });

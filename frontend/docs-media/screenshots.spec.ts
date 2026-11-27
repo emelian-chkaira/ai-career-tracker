@@ -11,7 +11,7 @@ test("jobs", async ({ page }) => {
   await login(page);
   await shot(page, "/?scope=all&q=data%20engineer", "web-jobs", 3500);
   await shot(page, "/", "web-my-feed", 3500);
-  await shot(page, "/jobs/23336", "web-job-one-role");
+  await shot(page, "/jobs/29899", "web-job-one-role");
   await shot(page, "/sponsors", "web-sponsors");
 });
 test("pipeline, settings, inbox", async ({ page }) => {

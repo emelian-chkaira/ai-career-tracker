@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
-import { label, ago, money } from "@/shared/lib/format";
+import { label, money, posted } from "@/shared/lib/format";
 import { useJob, useSetStage } from "./api";
 import { Panel, Drawer, Dock, Tabs } from "@/shared/ui/kit";
 import { CoachDock } from "@/features/cv/CoachDock";
@@ -38,7 +38,7 @@ export function JobDetail({ id, onClose }: { id: number; onClose?: () => void })
   if (isLoading) return <div className="bd stack"><div className="skel" style={{ height: 64 }} /><div className="skel" style={{ height: 14 }} /><div className="skel" style={{ height: 240 }} /></div>;
   if (error || !j) return <div className="bd err">{(error as Error)?.message ?? "Not found"}</div>;
   const sal = j.salary?.min != null ? `${money(j.salary.min)}${j.salary.max ? `–${money(j.salary.max)}` : ""} / ${j.salary.period ?? "month"}` : "";
-  const facts: [string, string][] = ([["Salary", sal], ["Work mode", j.work_mode ? modeLabel(j.work_mode) : ""], ["Level", label(j.job_type)], ["Language", j.language !== "unknown" ? label(j.language) : ""], ["Location", j.city || j.location || ""], ["Posted", ago(j.posted_at ?? j.first_seen)]] as [string, string][]).filter((x) => x[1]);
+  const facts: [string, string][] = ([["Salary", sal], ["Work mode", j.work_mode ? modeLabel(j.work_mode) : ""], ["Level", label(j.job_type)], ["Language", j.language !== "unknown" ? label(j.language) : ""], ["Location", j.city || j.location || ""], ["Posted", posted(j.posted_at)]] as [string, string][]).filter((x) => x[1]);
   const overview = (<div className="stack">
           {facts.length > 0 && <div className="facts" aria-label="Job highlights">{facts.map(([k, v]) => <div key={k}><span>{k}</span><b>{v}</b></div>)}</div>}
           <Panel id="job-fit" title="How well you match"><FitPanel jobId={j.id} ai={j.ai} /></Panel>
@@ -53,7 +53,7 @@ export function JobDetail({ id, onClose }: { id: number; onClose?: () => void })
         <Logo c={j.company} big />
         <div className="jdtitle">
           <h1>{j.title}</h1>
-          <div className="jdsub"><b>{j.company.name}</b>{(j.location || j.work_mode === "remote") && <span>{flag(j.country)} {j.location || "Remote"}</span>}<span>{ago(j.posted_at ?? j.first_seen)}</span></div>
+          <div className="jdsub"><b>{j.company.name}</b>{(j.location || j.work_mode === "remote") && <span>{flag(j.country)} {j.location || "Remote"}</span>}<span>{posted(j.posted_at)}</span></div>
         </div>
         {matchOf(j) != null && <Match job={j} />}
         {onClose && <button className="btn ghost small jdclose" onClick={onClose} aria-label="Close">✕</button>}

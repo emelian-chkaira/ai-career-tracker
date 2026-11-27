@@ -5,6 +5,8 @@ export function ago(d?: string | null): string {
   const days = Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
   if (days <= 0) return "today"; if (days === 1) return "yesterday"; if (days < 31) return `${days}d ago`; if (days < 365) return `${Math.floor(days / 30)}mo ago`; return `${Math.floor(days / 365)}y ago`;
 }
+/** When the employer says it posted the job. The day we found it is not that date. */
+export const posted = (d?: string | null) => ago(d) || "Unknown date";
 export const money = (v?: number) => (v == null ? "" : `€${Math.round(v).toLocaleString("nl-NL")}`);
 export function qs(params: Record<string, unknown>): string {
   const u = new URLSearchParams();

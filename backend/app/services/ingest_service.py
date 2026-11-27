@@ -240,6 +240,35 @@ def scan_company(db: Session, company_id: int) -> int:
     return new
 
 
+def read_posting(db: Session, job: Job) -> None:
+    """Read a job's own page once: the posting date the employer states, and the full text when we only have a stub."""
+    d = discovery.fetch_detail(job.url)
+    if not d: return                                          # the page did not answer: try again another time
+    job.date_checked_at = now()
+    if d.get("gone"):                                         # the employer removed the posting (404 / 410)
+        drop_dead_links(db, None, [job.url]); return
+    if d.get("description") and len(job.description or "") < 200: job.description = d["description"]
+    posted = dates.norm_date(d.get("posted_at"))
+    if posted and not job.posted_at: job.posted_at = dt.date.fromisoformat(posted)
+
+
+def fill_missing_dates(db: Session, company_id: int | None = None, limit: int = 15, progress=None) -> dict:
+    """Open postings with no date whose own page has not been read yet, newest first."""
+    q = select(Job.id).where(Job.status == "open", Job.source == "company-site", Job.posted_at.is_(None), Job.date_checked_at.is_(None))
+    if company_id: q = q.where(Job.company_id == company_id)
+    ids = list(db.scalars(q.order_by(Job.id.desc()).limit(limit)))
+    out = {"checked": 0, "dated": 0}
+    for i, jid in enumerate(ids, 1):
+        job = db.get(Job, jid)
+        if not job: continue
+        try:
+            read_posting(db, job); db.commit()
+            out["checked"] += 1; out["dated"] += bool(job.posted_at)
+        except Exception: db.rollback()
+        if progress: progress(i, len(ids), out)
+    return out
+
+
 def drop_dead_links(db: Session, company_id: int | None, urls: list[str]) -> int:
     """Links that answered 404 / 410: a job whose own page is gone expires (it leaves every feed; saved and pipeline jobs keep their
     history), unless the same role is still online at another of its links, which then becomes the main one. Returns jobs expired."""

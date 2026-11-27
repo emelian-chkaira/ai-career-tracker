@@ -10,7 +10,6 @@ from app.core.deps import optional_user, current_user, client_ip
 from app.models import Job, User, UserJob
 from app.schemas.job import JobOut, SearchOut
 from app.services import jobs_service, search_service as ss, task_service
-from app.crawler import dates
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -87,17 +86,9 @@ def live_search(request: Request, q: str = Query(..., min_length=2, max_length=1
 def job_detail(job_id: int, db: Session = Depends(get_db), user: User | None = Depends(optional_user)):
     j = db.scalar(select(Job).where(Job.id == job_id).options(selectinload(Job.company), selectinload(Job.skills)))
     if not j: raise HTTPException(404, "job not found")
-    if len(j.description or "") < 200 and j.source == "company-site":          # lazily read the full posting from the employer's own page
-        from app.crawler import discovery
-        try:
-            d = discovery.fetch_detail(j.url)
-            if d.get("gone"):                                                    # the employer removed the posting (404 / 410)
-                from app.services import ingest_service; ingest_service.drop_dead_links(db, None, [j.url])
-            if d.get("description"): j.description = d["description"]
-            pd = dates.norm_date(d.get("posted_at"))
-            if pd and not j.posted_at:
-                import datetime as dt; j.posted_at = dt.date.fromisoformat(pd)
-            db.commit()
+    if j.source == "company-site" and (len(j.description or "") < 200 or (not j.posted_at and not j.date_checked_at)):   # lazily read the employer's own page
+        from app.services import ingest_service
+        try: ingest_service.read_posting(db, j); db.commit()
         except Exception: db.rollback()
     stage = db.get(UserJob, (user.id, j.id)) if user else None
     ai = None

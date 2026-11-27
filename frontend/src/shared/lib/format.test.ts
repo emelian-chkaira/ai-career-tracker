@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { ago, label, money, parseQs, qs } from "./format";
+import { ago, label, money, parseQs, qs, posted } from "./format";
 
 afterEach(() => vi.useRealTimers());
 
@@ -20,6 +20,8 @@ describe("ago", () => {
     expect(ago("2026-03-15T12:00:00Z")).toBe("3mo ago");
     expect(ago("2024-06-15T12:00:00Z")).toBe("2y ago");
     expect(ago(null)).toBe("");
+    expect(posted(null)).toBe("Unknown date");
+    expect(posted("2026-06-14T01:00:00Z")).toBe("yesterday");
   });
 });
 

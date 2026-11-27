@@ -23,7 +23,7 @@
   <img src="https://img.shields.io/badge/📬_AI_reads_your_mail-dc2626?style=flat-square" alt="AI inbox">
   <img src="https://img.shields.io/badge/🌍_59_countries-0891b2?style=flat-square" alt="59 countries">
   <img src="https://img.shields.io/badge/🤖_bring_your_own_LLM-7c3aed?style=flat-square" alt="Bring your own LLM">
-  <img src="https://img.shields.io/badge/✅_229_backend_+_28_frontend_tests-15803d?style=flat-square" alt="Tests">
+  <img src="https://img.shields.io/badge/✅_246_backend_+_30_frontend_tests-15803d?style=flat-square" alt="Tests">
 </p>
 
 <p align="center">
@@ -154,7 +154,7 @@ Interview invites, assessments, offers, rejections and recruiter messages are re
 | **Mail & auth** | Gmail API (read-only OAuth) · Firebase Auth · Google Sign-In · SMTP alerts |
 | **Web** | React 18 · TypeScript (strict) · Vite · TanStack Query & Virtual · React Router · Radix UI · cmdk · Recharts · Sonner |
 | **Mobile** | Flutter ([separate repository](https://github.com/emelian-chkaira/ai-career-tracker-mobile)) |
-| **Quality** | pytest on real Postgres (229) · Vitest + Testing Library (28) · Playwright end-to-end · scripted screenshots and video |
+| **Quality** | pytest on real Postgres (246) · Vitest + Testing Library (30) · Playwright end-to-end (8) · scripted screenshots and video |
 | **Ops** | Docker Compose · Caddy (HTTPS) · Render · Neon Postgres · Oracle Cloud free tier · GitHub Actions CI |
 
 ## 🌍 Deployment and CI/CD
@@ -173,12 +173,39 @@ Releasing: merge `main` into `demo` and push. Full guide: [docs/DEPLOY_RENDER.md
 
 ## 🚀 Run it
 
+You need **[Docker](https://docs.docker.com/get-docker/)**, installed and running. Python 3.11+ and Node 18+ are optional: without them everything runs in Docker.
+
 ```bash
 git clone https://github.com/emelian-chkaira/ai-career-tracker.git && cd ai-career-tracker
-./setup.sh          # needs only Docker: installs, migrates, loads starter data, starts everything
+./setup.sh          # installs, creates the database, loads starter data, starts everything
 ```
 
-Open **http://localhost:8787** and register; the first account is the admin. The starter data holds 6,583 companies, 11,000+ listings and the NL IND register, so the app is full from the first minute.
+On Windows, run it inside WSL. The first run downloads a lot and takes several minutes.
+
+**Then open http://localhost:8787.** On a fresh install a welcome guide opens by itself:
+
+1. **Create your account.** The first one is the administrator.
+2. **Answer the short setup:** field, countries or remote, job titles, skills.
+3. **Browse.** The starter data (6,583 companies, 11,000+ listings, the NL IND sponsor register) is there from the first minute. It is a snapshot; the worker brings it up to date.
+
+| To | Do this |
+|---|---|
+| Stop | `Ctrl+C` (Docker mode: `docker compose down`) |
+| Start again | `./setup.sh` (safe to repeat, nothing is overwritten) |
+| See what the crawler is doing | The **Crawler** page, or `backend/data/worker.log` (Docker mode: `docker compose logs -f worker`) |
+
+### Optional features
+
+Each one is off until you set it up. Settings go in the `.env` file that `setup.sh` creates; restart afterwards.
+
+| Feature | What to do |
+|---|---|
+| **AI scoring, CV tailoring, inbox reading** | In the app: **Settings → AI model & CV**. Choose local [Ollama](https://ollama.com) or paste your own API key. Nothing in `.env`. |
+| **Sign in with Google** | Create a free Google OAuth *Web application* client, add `http://localhost:8787` as an authorized JavaScript origin, set `CAREERS_GOOGLE_CLIENT_ID`. |
+| **Connect Gmail** | The same client plus `CAREERS_GOOGLE_CLIENT_SECRET`, the Gmail API and a redirect address: [step by step](docs/GMAIL_OAUTH.md). |
+| **E-mail alerts and password reset** | Set `CAREERS_SMTP_*` (examples in [.env.example](.env.example)). |
+| **Job boards** (LinkedIn, Indeed, Glassdoor, Bayt) | See *Optional job boards* below. |
+| **Identify your crawler** | Set `CAREERS_CONTACT` to your website or e-mail so site owners can reach you. |
 
 <details>
 <summary><b>Manual setup</b></summary>
@@ -233,8 +260,8 @@ Crawler → **Job boards** shows each board's health and exactly which keywords 
 <summary><b>Tests, media and deployment</b></summary>
 
 ```bash
-cd backend && .venv/bin/python -m pytest tests -q   # 229 tests on a real Postgres
-cd frontend && npx vitest run && npx playwright test # 28 unit tests + end-to-end
+cd backend && .venv/bin/python -m pytest tests -q   # 246 tests on a real Postgres
+cd frontend && npx vitest run && npx playwright test # 30 unit tests, then 8 end-to-end (app must be running)
 cd frontend && npm run media                         # re-make screenshots and the demo video
 ```
 

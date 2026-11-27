@@ -2,7 +2,7 @@ import { flag, SCOPE } from "@/shared/lib/geo";
 import { BoardIcon, boardName } from "@/shared/ui/BoardIcon";
 import type { Job } from "@/shared/api/types";
 import { markViewed, useViewed } from "./viewed";
-import { ago, label, money } from "@/shared/lib/format";
+import { label, money, posted } from "@/shared/lib/format";
 
 export function Logo({ c, big = false }: { c: Job["company"]; big?: boolean }) {
   const cls = "logo" + (big ? " lg" : "");
@@ -23,7 +23,7 @@ export function Match({ job, pending = false }: { job: Job; pending?: boolean })
 
 export function JobCard({ job, selected, onOpen, picked, onPick, pending }: { job: Job; selected?: boolean; onOpen(id: number): void; picked?: boolean; onPick?(id: number, on: boolean): void; pending?: boolean }) {
   const viewed = useViewed(job.id); const openIt = () => { markViewed(job.id); onOpen(job.id); };
-  const when = job.posted_at ?? job.first_seen; const place = job.city ?? (job.work_mode === "remote" && !job.city ? "Remote" : job.location) ?? "";
+  const place = job.city ?? (job.work_mode === "remote" && !job.city ? "Remote" : job.location) ?? "";
   const extra = (job.countries?.length ?? 0) > 1 ? ` +${job.countries!.length - 1}` : "";
   const alts = job.alternates?.length ? `${new Set([job.city, ...job.alternates.map((a) => a.city)].filter(Boolean)).size > 1 ? "several locations" : `${job.alternates.length + 1} listings`}` : "";
   // at most three chips: what the person needs to decide quickly
@@ -36,12 +36,12 @@ export function JobCard({ job, selected, onOpen, picked, onPick, pending }: { jo
     <div aria-current={selected || undefined} className={"job" + (selected ? " sel" : "") + (viewed ? " viewed" : "") + (job.stage && !["shortlisted", "skipped"].includes(job.stage) ? " applied" : "")} onClick={openIt} role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && openIt()}>
       <div className="jlogo">{onPick && <input className="pick" type="checkbox" checked={!!picked} aria-label={`Select ${job.title}`} onClick={(e) => e.stopPropagation()} onChange={(e) => onPick(job.id, e.target.checked)} />}<Logo c={job.company} /></div>
       <div className="jmain">
-        <div className="t"><span className="tt">{job.title}</span>{viewed ? <span className="newdot seen" title="Viewed" aria-label="Viewed" /> : isNew(when) && <span className="newdot" title="New in the last 3 days" />}</div>
+        <div className="t"><span className="tt">{job.title}</span>{viewed ? <span className="newdot seen" title="Viewed" aria-label="Viewed" /> : isNew(job.posted_at) && <span className="newdot" title="New in the last 3 days" />}</div>
         <div className="meta"><span className="co">{job.company.name}</span>{place && <span>{flag(job.country)} {place}{extra}</span>}
           {job.salary?.min != null && <span>{money(job.salary.min)}{job.salary.max ? `–${money(job.salary.max)}` : ""}/{job.salary.period ?? "mo"}</span>}
           {job.source?.startsWith("board:") && <span title="Found on a job board, not on the employer's own careers page"><BoardIcon board={job.source} size={12} /> {boardName(job.source)}</span>}
           {alts && <span title={`The same role is listed in ${alts}`}>{alts}</span>}
-          <span className="when">{ago(when)}</span></div>
+          <span className="when">{posted(job.posted_at)}</span></div>
         {job.snippet && <div className="snip" dangerouslySetInnerHTML={{ __html: sanitize(job.snippet) }} />}
         {(chips.length > 0 || !!job.skills?.length) && <div className="jchips">{chips.slice(0, 3)}{job.skills?.slice(0, 4).map((k) => <span key={k} className="skill">{k}</span>)}</div>}
       </div>

@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => { await page.addInitScript(() => localStorage.setItem("guide:seen", "1")); });   // the first-run guide has its own unit tests
+
 const stamp = Date.now();
 const email = `e2e+${stamp}@example.com`;
 const password = "correct-horse-1";
@@ -29,15 +31,15 @@ test("search, sign up, track a job and open the AI panels", async ({ page }) => 
   const done = page.getByRole("dialog", { name: "Your feed is ready" }); await expect(done.getByText("Software, IT & data")).toBeVisible();
   await done.getByRole("button", { name: "Show my jobs" }).click(); await expect(done).toHaveCount(0);
   await expect(page.getByRole("button", { name: "My feed" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByText(/From your profile: .*Software, IT & data.*Amsterdam or remote/)).toBeVisible();
-  await page.reload(); await expect(page.getByRole("dialog")).toHaveCount(0);                       // finished: never pops up again
+  await expect(page.getByText(/Showing jobs for your profile: .*Software, IT & data/)).toBeVisible();
+  await page.reload(); await expect(page.getByRole("button", { name: "Account menu" }).first()).toBeVisible(); await expect(page.getByRole("dialog")).toHaveCount(0);                       // finished: never pops up again
 
   // open a job, see the AI fit box, track it
   await page.goto("/");
   await page.locator(".job").first().click();
   await expect(page.getByRole("button", { name: /How well you match/ })).toBeVisible();
   await page.locator("select").filter({ hasText: "Track…" }).first().selectOption("applied");
-  await expect(page.getByRole("tab", { name: /Tracking/ })).toBeVisible();
+  await page.getByRole("tab", { name: /Tracking/ }).click();
   await page.getByPlaceholder("Add to the timeline…").fill("Sent the application");
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(page.getByText("Sent the application")).toBeVisible();

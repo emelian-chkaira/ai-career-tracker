@@ -1,3 +1,4 @@
+from sqlalchemy import select
 from fastapi import APIRouter, Depends, Request, Response, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.core.config import settings
@@ -122,7 +123,9 @@ def reset_password(body: ResetIn, request: Request, db: Session = Depends(get_db
 
 
 @router.get("/config")
-def auth_config(): return {"google_client_id": (settings.google_ids or [None])[0], "provider": "firebase" if settings.firebase_on else "local"}
+def auth_config(db: Session = Depends(get_db)):
+    return {"google_client_id": (settings.google_ids or [None])[0], "provider": "firebase" if settings.firebase_on else "local",
+            "first_run": db.scalar(select(User.id).limit(1)) is None}                          # a fresh install: the web app opens its guide
 
 
 @router.post("/google", response_model=TokenOut)

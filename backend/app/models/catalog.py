@@ -65,7 +65,8 @@ class Job(Base):
     salary_min: Mapped[float | None] = mapped_column(Float)
     salary_max: Mapped[float | None] = mapped_column(Float)
     salary_period: Mapped[str | None] = mapped_column(String(10))
-    posted_at: Mapped[dt.date | None] = mapped_column(Date)
+    posted_at: Mapped[dt.date | None] = mapped_column(Date)                          # the date the employer or board states; None = unknown
+    date_checked_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))   # its own page was read for that date
     first_seen: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
     last_seen: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     status: Mapped[str] = mapped_column(String(10), default="open", index=True)      # open | expired
