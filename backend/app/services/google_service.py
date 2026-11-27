@@ -3,11 +3,11 @@ import secrets
 import jwt
 from app.services import auth_service
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core import security
-from app.models import User
+from app.models import User, RefreshToken
 from app.crawler.scoring import DEFAULT_PROFILE
 from app.services.account_service import now
 
@@ -24,11 +24,19 @@ def verify_id_token(credential: str) -> dict:
     return claims
 
 
+def drop_unproven_access(db: Session, u: User) -> None:
+    """Nobody had confirmed this address, so whoever created the account may not own it. Google now proves who does:
+    the old password and every open session stop working. ("Forgot password" sets a new one.)"""
+    u.password_hash = security.hash_password(secrets.token_urlsafe(32))
+    db.execute(update(RefreshToken).where(RefreshToken.user_id == u.id).values(revoked=True))
+
+
 def sign_in(db: Session, credential: str) -> User:
     c = verify_id_token(credential); email = c["email"].lower()
     u = db.scalar(select(User).where(User.email == email))
     if u:
         if not u.is_active: raise HTTPException(401, "account disabled")
+        if not u.email_verified: drop_unproven_access(db, u)
         u.email_verified_at = u.email_verified_at or now()                      # Google vouches for the address
     else:
         if not settings.allow_registration: raise HTTPException(403, "registration is closed")

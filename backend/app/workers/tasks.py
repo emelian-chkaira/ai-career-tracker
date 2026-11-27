@@ -16,7 +16,10 @@ PW_SLOTS = threading.Semaphore(settings.browser_slots)
 
 def _scan_one(cid: int) -> int:
     with SessionLocal() as db:
-        return ing.scan_company(db, cid)     # headless-browser concurrency is already capped inside discovery.render_scan
+        new = ing.scan_company(db, cid)      # headless-browser concurrency is already capped inside discovery.render_scan
+        try: ing.fill_missing_dates(db, cid)  # listings often leave the date out; the posting's own page usually states it
+        except Exception as e: log.warning("dates %s failed: %s", cid, e); db.rollback()
+        return new
 
 
 _halt: set[int] = set()

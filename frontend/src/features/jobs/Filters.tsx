@@ -37,6 +37,7 @@ export function Filters({ params, facets, onChange }: { params: SearchParams; fa
           <span><b>{m.label}</b><small>{m.hint}</small><small className="eg">{m.eg}</small></span></label>)}</div></div>
       <label className="frow">Order<select value={params.sort ?? ""} onChange={(e) => onChange({ sort: e.target.value || undefined })}><option value="">{params.q ? "Relevance" : "Newest first"}</option>{params.q && <option value="newest">Newest first</option>}<option value="ai_fit">AI score (highest first)</option><option value="oldest">Oldest first</option><option value="salary">Highest salary</option></select></label>
       <label className="frow">Posted<select value={params.days ?? ""} onChange={(e) => onChange({ days: e.target.value ? +e.target.value : undefined })}><option value="">Any time</option><option value="1">Last 24 hours</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select></label>
+      <p className="small muted" style={{ margin: "2px 0 0" }}>A time range leaves out jobs with an unknown date. Date order puts them last.</p>
     </Section>
     <Group title="Field" facets={sectorFacets} selected={params.sector ?? []} onToggle={(v) => onChange({ sector: toggle(params.sector, v) })} fmt={name} max={20} open />
     <Group title="Work mode" facets={modeFacets} selected={params.work_mode ?? []} onToggle={(v) => onChange({ work_mode: toggle(params.work_mode, v) })} fmt={(v) => WORK_MODES.find((m) => m[0] === v)?.slice(2, 3).concat(modeLabel(v)).join(" ") ?? v} />

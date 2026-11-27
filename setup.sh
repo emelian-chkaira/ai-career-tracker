@@ -7,7 +7,7 @@
 #   ./setup.sh --no-browser  skip the Chromium download (JS-rendered career pages will not be crawled)
 #
 # What it does: creates .env with a random secret, starts Postgres (pgvector) in Docker, installs the backend and the web app,
-# creates the tables, loads the ready-made starter data (3,000+ Dutch tech companies, a snapshot of open jobs, the IND sponsor list)
+# creates the tables, loads the ready-made starter data (6,500+ companies, 11,000+ job listings, the NL IND sponsor register)
 # and starts the API, the crawler worker and the website. Safe to run again: nothing is overwritten.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -75,6 +75,9 @@ ok "website built"
 if [ "$START" = 0 ]; then printf "\n\033[1;32m✓ Set up.\033[0m Start it with: ./backend/run.sh api   (and, in another terminal, ./backend/run.sh worker)\n"; exit 0; fi
 
 say "Starting the crawler worker in the background and the app in front"
-mkdir -p backend/data; ( nohup ./backend/run.sh worker > backend/data/worker.log 2>&1 & )
-printf "\n\033[1;32m✓ Ready: http://localhost:8787\033[0m\n  Register an account: the first one becomes the admin.\n  The crawler is refreshing jobs in the background (log: backend/data/worker.log). Press Ctrl+C to stop the app.\n\n"
-exec ./backend/run.sh api
+mkdir -p backend/data
+./backend/run.sh worker > backend/data/worker.log 2>&1 &
+WORKER=$!
+trap 'kill "$WORKER" 2>/dev/null || true' EXIT      # stopping the app stops its crawler too
+printf "\n\033[1;32m✓ Ready: http://localhost:8787\033[0m\n  Register an account: the first one becomes the admin.\n  The crawler is refreshing jobs in the background (log: backend/data/worker.log). Press Ctrl+C to stop both.\n\n"
+./backend/run.sh api

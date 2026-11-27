@@ -14,13 +14,15 @@ const at = (s: number) => ({ "--d": `${s}s` }) as CSSProperties;
 export function SignInShowcase() {
   return (
     <aside className="si-story">
+      <div className="si-dots" aria-hidden />
       <Logo />
       <div className="si-body">
         <header className="si-head si-rise">
-          <h2>Jobs <em>straight from the source.</em></h2>
+          <h2>Jobs worldwide, <em>straight from the source.</em></h2>
           <ul className="si-pills">
-            <li className="intern"><span aria-hidden>🎓</span> Jobs and internships</li>
-            <li className="ind"><span className="si-flag" aria-hidden /> Netherlands: IND recognised sponsors</li>
+            <li className="world"><span aria-hidden>🌍</span> Any country or remote</li>
+            <li className="intern"><span aria-hidden>🎓</span> Jobs + internships</li>
+            <li className="ind"><span className="si-flag" aria-hidden /> NL: IND recognised sponsors</li>
           </ul>
         </header>
         <div className="si-show">
@@ -50,7 +52,7 @@ export function SignInShowcase() {
         </div>
       </div>
       <p className="si-note"><span className="si-flag" role="img" aria-label="Netherlands flag" />
-        <span>Example employers shown. Job boards stay off until you switch them on. Sponsor flags come from the Netherlands&rsquo; IND register (Immigration and Naturalisation Service): a signal, not immigration advice.</span></p>
+        <span>Example employers shown. Job boards stay off until you switch them on. For the Netherlands, sponsor flags come from the IND register (Immigration and Naturalisation Service): a signal, not immigration advice.</span></p>
     </aside>
   );
 }

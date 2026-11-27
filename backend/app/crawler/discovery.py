@@ -2,10 +2,12 @@
 Order (career-ops style): ATS public APIs by slug guess, then website + careers-page crawl, JSON-LD, generic links.
 Polite: robots.txt honoured, 1 req/sec/host, UA names the project. Never scrapes LinkedIn/Indeed/Glassdoor or search-engine result pages."""
 import re, json, time, os, urllib.robotparser, threading, contextvars
+import datetime as dt
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urljoin, urlparse
 import httpx
 from bs4 import BeautifulSoup
+from . import dates
 from .text import norm
 
 from app.core.config import settings
@@ -117,7 +119,7 @@ def greenhouse(s):
     d = get(f"https://boards-api.greenhouse.io/v1/boards/{s}/jobs?content=true", True, False)
     if not d or "jobs" not in d: return None
     return [dict(title=j["title"], location=(j.get("location") or {}).get("name", ""), url=j["absolute_url"],
-                 description=_txt(j.get("content", "")), posted_at=j.get("updated_at")) for j in d["jobs"]]
+                 description=_txt(j.get("content", "")), posted_at=j.get("first_published") or j.get("updated_at")) for j in d["jobs"]]
 def lever(s):
     d = get(f"https://api.lever.co/v0/postings/{s}?mode=json", True, False)
     if not isinstance(d, list): return None
@@ -346,6 +348,27 @@ def jsonld_jobs(html, base):
                 out.append(dict(title=it.get("title", ""), location=addr.get("addressLocality", "") if isinstance(addr, dict) else "",
                                 url=it.get("url") or base, description=_txt(it.get("description")), posted_at=it.get("datePosted")))
     return out
+
+def page_date(html):
+    """The posting date an employer's page states in its structured data (JSON-LD JobPosting or itemprop="datePosted"). None when it states none."""
+    soup = BeautifulSoup(html or "", "lxml"); found = []
+    def walk(n, depth=0):
+        if depth > 6: return
+        if isinstance(n, list):
+            for x in n: walk(x, depth + 1)
+        elif isinstance(n, dict):
+            t = n.get("@type")
+            if (t == "JobPosting" or (isinstance(t, list) and "JobPosting" in t)) and n.get("datePosted"): found.append(n["datePosted"])
+            for x in n.values(): walk(x, depth + 1)
+    for sc in soup.find_all("script", type="application/ld+json"):
+        try: walk(json.loads(sc.string or "", strict=False))
+        except Exception: continue
+    for el in soup.find_all(attrs={"itemprop": "datePosted"}): found.append(el.get("content") or el.get("datetime") or el.get_text(strip=True))
+    for v in found:
+        if isinstance(v, dict): v = v.get("date") or v.get("@value") or v.get("value")
+        d = dates.norm_date(v)
+        if d and d <= (dt.date.today() + dt.timedelta(days=1)).isoformat(): return d
+    return None
 
 JOBLINK = re.compile(r"/(job|jobs|vacature|vacatures|vacancy|vacancies|position|positions|careers?|find-your-job)/[^/?#]+", re.I)
 def generic_links(html, base):
@@ -611,13 +634,14 @@ def fetch_detail(url):
         return {"description": _txt(o.get("description")), "posted_at": o.get("datePosted")}
     html = get(url)
     if not html: return {"gone": True} if gone(url) else out
+    posted = page_date(html)
     for j in jsonld_jobs(html, url):
-        if j.get("description"): return {"description": j["description"], "posted_at": j.get("posted_at")}
+        if j.get("description"): return {"description": j["description"], "posted_at": posted}
     soup = BeautifulSoup(html, "lxml")
     for t in soup(["script", "style", "nav", "header", "footer"]): t.decompose()
     node = soup.find("main") or soup.find("article") or soup.body
     txt = re.sub(r"\n{3,}", "\n\n", node.get_text("\n", strip=True))[:15000] if node else ""
-    return {"description": txt if len(txt) > 200 else ""}
+    return {"description": txt if len(txt) > 200 else "", "posted_at": posted}
 
 def fetch_logo(base, html, cid):
     """Company logo from its own website: apple-touch-icon / icon links / og:image / favicon.ico. Cached to static/logos/<id>.<ext>. -> relative path or None"""

@@ -23,6 +23,7 @@ import { DemoTour } from "@/features/demo/DemoTour";
 import { DemoBar } from "@/features/demo/DemoBar";
 import { useNoCrawler } from "@/features/demo/useDemo";
 import { CrawlerDemo } from "@/features/demo/CrawlerDemo";
+import { FirstRunGuide } from "@/features/onboarding/FirstRunGuide";
 import { ChangelogPage, useVersion } from "@/features/about/ChangelogPage";
 
 const NAV: { group: string; items: { to: string; text: string; icon: string; auth?: boolean; match?: string[] }[] }[] = [
@@ -52,7 +53,7 @@ function Layout() {
         <button className="sitem" onClick={next} aria-label="Change theme" title={`Theme: ${theme}`}><span className="ticon">{theme === "light" ? "☀️" : theme === "dark" ? "🌙" : "🖥️"}</span><span className="sl">Theme: {theme}</span></button>
         {user ? <Menu className="sitem acct" label="Account menu" trigger={<span className="row" style={{ gap: 10, flexWrap: "nowrap", minWidth: 0 }}><span className="avatar">{(user.name || user.email)[0].toUpperCase()}</span><span className="small email sl">{user.name || user.email}</span></span>}
           items={[{ label: user.email, onSelect: () => go("/profile") }, { label: "Settings", onSelect: () => go("/profile") }, { label: "CV Studio", onSelect: () => go("/cv") }, { label: "Sign out", onSelect: logout, danger: true }]} />
-          : <><Link className="sitem" to="/login"><Icon name="profile" /><span className="sl">Sign in</span></Link><Link className="sitem" to="/register"><Icon name="bell" /><span className="sl">Sign up</span></Link></>}
+          : <><Link className="sitem" to="/login"><Icon name="profile" /><span className="sl">Sign in</span></Link><Link className="sitem" to="/register"><Icon name="signup" /><span className="sl">Sign up</span></Link></>}
         <button className="sitem" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}><Icon name={collapsed ? "expand" : "collapse"} /><span className="sl">Collapse</span></button>
         {ver.data && <Link className="small muted sl" to="/changelog" style={{ padding: "2px 10px", textDecoration: "none" }} title="What's new">v{ver.data.version}</Link>}</div></aside>
     <Drawer open={mobile} onOpenChange={setMobile} title="Menu" side="left" size={280}><SideNav collapsed={false} onNavigate={() => setMobile(false)} /></Drawer>
@@ -77,7 +78,7 @@ function Protected({ admin = false }: { admin?: boolean }) {
   return <Outlet />;
 }
 export default function App() {
-  return (<TipProvider><DemoTour /><Routes>
+  return (<TipProvider><DemoTour /><FirstRunGuide /><Routes>
     <Route path="/login" element={<AuthPage mode="login" />} /><Route path="/register" element={<AuthPage mode="register" />} />
     <Route path="/forgot" element={<ForgotPage />} /><Route path="/reset" element={<ResetPage />} /><Route path="/verify" element={<VerifyPage />} /><Route path="/action" element={<ActionPage />} />
     <Route element={<Layout />}>

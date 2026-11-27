@@ -16,7 +16,7 @@ test("tour", async ({ page }) => {
   const cards = page.locator(".list .job"); await cards.nth(1).click(); await pause(1800); await cards.nth(3).click(); await pause(1800);
   await page.locator(".list").hover(); await page.mouse.wheel(0, 500); await pause(1200);
   await page.getByRole("button", { name: "My feed" }).click(); await pause(2500);
-  await page.goto("/jobs/23336"); await pause(1500); await page.mouse.wheel(0, 400); await pause(2000);
+  await page.goto("/jobs/29899"); await pause(1500); await page.mouse.wheel(0, 400); await pause(2000);
   await page.goto("/pipeline"); await pause(3000);
   await page.goto("/cv"); await pause(3500);
   if (png) await page.evaluate((b64) => { const f = document.querySelector("iframe.pdfview"); if (!f) return; const img = document.createElement("img"); img.src = "data:image/png;base64," + b64;

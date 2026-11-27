@@ -5,6 +5,7 @@
   export-snapshot    rewrite backend/seed_live/, the public demo's snapshot (maintainers; employer pages only, no personal data)
   stats              how much is stored
   backfill-domains   classify jobs that have no domain yet (--all: re-classify every job with the current rules)
+  fill-dates         read the posting pages of jobs with no date (--limit N, default all)
   purge              delete long-expired / too-old jobs (see CAREERS_MAX_JOB_AGE_DAYS, CAREERS_DELETE_EXPIRED_AFTER_DAYS)
   prune              apply the storage policy (CAREERS_KEEP_DOMAINS, max age) to jobs already stored
   clear-jobs         delete ALL jobs                     (asks for confirmation, or pass --yes)
@@ -32,6 +33,12 @@ def main(argv: list[str]) -> int:
     if cmd == "export_snapshot":
         from app.services import snapshot_service
         with SessionLocal() as db: print(json.dumps(snapshot_service.export(db)))
+        return 0
+    if cmd == "fill_dates":
+        from app.services import ingest_service as ing
+        limit = int(argv[argv.index("--limit") + 1]) if "--limit" in argv else 100_000
+        say = lambda i, n, o: print(f"{i}/{n} read, {o['dated']} dated", flush=True) if i % 25 == 0 else None
+        with SessionLocal() as db: print(json.dumps(ing.fill_missing_dates(db, limit=limit, progress=say)))
         return 0
     if cmd not in m.ACTIONS: print(__doc__); return 2
     if cmd in m.DESTRUCTIVE and "--yes" not in argv:

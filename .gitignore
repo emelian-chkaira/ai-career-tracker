@@ -25,3 +25,6 @@ backend/tests/.tmp-data/
 node_modules/
 node_modules/
 .neon
+
+# LinkedIn promo material (local only)
+promo/

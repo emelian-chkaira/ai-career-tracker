@@ -2,7 +2,7 @@
 import re
 from pathlib import Path
 
-__version__ = "1.0.2"
+__version__ = "1.1.0"
 
 _FILE = Path(__file__).resolve().parents[2] / "CHANGELOG.md"          # repo root (the Docker image copies it next to backend/)
 

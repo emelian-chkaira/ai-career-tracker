@@ -32,7 +32,8 @@ export function FilterPills({ params, onChange, onAll, count }: { params: Search
     {params.q?.trim() && <Pill name="Match" value={mode.label} on={!!params.mode && params.mode !== "hybrid"}>
       {SEARCH_MODES.map((m) => <Choice key={m.key} checked={(params.mode ?? "hybrid") === m.key} onChange={() => onChange({ mode: m.key })} hint={m.hint}>{m.label}</Choice>)}</Pill>}
     <Pill name="Date posted" value={DAYS.find((d) => d[0] === params.days)?.[0] ? DAYS.find((d) => d[0] === params.days)![1].replace("Past ", "") : undefined} on={!!params.days}>
-      {DAYS.map(([v, n]) => <Choice key={n} checked={params.days === v} onChange={() => onChange({ days: v })}>{n}</Choice>)}</Pill>
+      {DAYS.map(([v, n]) => <Choice key={n} checked={params.days === v} onChange={() => onChange({ days: v })}>{n}</Choice>)}
+      <p className="small muted" style={{ margin: "6px 4px 0" }}>A time range leaves out jobs with an unknown date.</p></Pill>
     <Pill name="Work mode" value={short(params.work_mode, MODES)} on={!!params.work_mode?.length}>
       {MODES.map(([v, n]) => <Choice key={v} type="checkbox" checked={!!params.work_mode?.includes(v)} onChange={() => onChange({ work_mode: toggle(params.work_mode, v) })}>{n}</Choice>)}</Pill>
     <Pill name="Level" value={short(params.job_type, LEVELS)} on={!!params.job_type?.length}>

@@ -8,7 +8,8 @@ def norm_date(v):
             x = float(v); x = x / 1000 if x > 1e11 else x
             return dt.datetime.fromtimestamp(x, dt.timezone.utc).date().isoformat()
         s = str(v).strip()
-        m = re.search(r"(\d+)\+?\s*days?\s*ago", s, re.I)
+        if re.search(r"\d+\+\s*days?\s*ago", s, re.I): return None          # "30+ days ago" is not a date: the posting's own page has the real one
+        m = re.search(r"(\d+)\s*days?\s*ago", s, re.I)
         if m: return (dt.date.today() - dt.timedelta(days=int(m.group(1)))).isoformat()
         if re.search(r"today|just now", s, re.I): return dt.date.today().isoformat()
         if re.search(r"yesterday", s, re.I): return (dt.date.today() - dt.timedelta(days=1)).isoformat()

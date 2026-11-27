@@ -50,7 +50,7 @@ export function JobsTab({ isAdmin }: { isAdmin: boolean }) {
           <td><input type="checkbox" checked={sel.has(j.id)} onChange={() => setSel((s) => { const n = new Set(s); n.has(j.id) ? n.delete(j.id) : n.add(j.id); return n; })} /></td>
           <td className="clip" title={j.title}><span title={j.source?.startsWith("board:") ? `Found on ${boardName(j.source)}` : "From the employer's own site"}><BoardIcon board={j.source?.startsWith("board:") ? j.source : "site"} size={15} /></span> <a href={j.url} target="_blank" rel="noreferrer">{j.title}</a>{j.saved_by > 0 && <span className="badge" title="Saved in someone's pipeline" style={{ marginLeft: 6 }}>saved ×{j.saved_by}</span>}</td>
           <td className="clip">{j.company}<div className="muted small">{flag(j.country)} {j.city ?? j.country ?? ""}{(j.countries?.length ?? 0) > 1 ? ` +${j.countries!.length - 1}` : ""}{j.work_mode && j.work_mode !== "onsite" ? ` · ${modeLabel(j.work_mode)}` : ""}</div></td><td><span className="badge">{j.domain ?? "—"}</span></td><td className="small">{label(j.job_type)}</td>
-          <td className="small muted">{j.posted_at ?? "—"}</td><td className="small muted">{new Date(j.first_seen).toLocaleDateString()}</td>
+          <td className="small muted">{j.posted_at ?? "Unknown date"}</td><td className="small muted">{new Date(j.first_seen).toLocaleDateString()}</td>
           <td><span className={`badge ${j.status === "open" ? "ok" : "warn"}`}>{j.status}</span></td></tr>)}
           {!items.length && <tr><td colSpan={8} className="empty">{list.isLoading ? "Loading…" : "No jobs match these filters."}</td></tr>}</tbody>
       </table></div>

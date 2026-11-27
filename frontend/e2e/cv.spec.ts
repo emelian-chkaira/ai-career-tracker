@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => { await page.addInitScript(() => localStorage.setItem("guide:seen", "1")); });   // the first-run guide has its own unit tests
+
 const CV = `Sam Doe
 sam@example.com | Utrecht
 Summary
@@ -16,8 +18,9 @@ BSc Computer Science  TU Delft  2017 - 2021
 
 test("CV Studio: import, live preview, switch layout, export Reactive Resume JSON", async ({ page }) => {
   await page.goto("/cv");
-  await page.locator('input[type="file"]').setInputFiles({ name: "cv.txt", mimeType: "text/plain", buffer: Buffer.from(CV) });
-  await expect(page.getByRole("heading", { name: "Layout & PDF" })).toBeVisible({ timeout: 15_000 });
+  await page.locator('input[type="file"]').last().setInputFiles({ name: "cv.txt", mimeType: "text/plain", buffer: Buffer.from(CV) });
+  await page.getByRole("tab", { name: /Layout/ }).click({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "Layout & PDF" })).toBeVisible();
   const frame = page.locator("iframe.pdfview");
   await expect(frame).toBeVisible({ timeout: 30_000 });                       // live preview appears without pressing anything
   const first = await frame.getAttribute("src");
@@ -42,10 +45,10 @@ test("each account has its own CV: a second account on the same browser starts e
   const signOut = async () => { await page.getByRole("button", { name: "Account menu" }).first().click(); await page.getByRole("menuitem", { name: "Sign out" }).click(); };
   await signUp("Alice");
   await page.goto("/cv");
-  await page.locator('input[type="file"]').setInputFiles({ name: "cv.txt", mimeType: "text/plain", buffer: Buffer.from(CV) });
+  await page.locator('input[type="file"]').last().setInputFiles({ name: "cv.txt", mimeType: "text/plain", buffer: Buffer.from(CV) });
   await expect(page.getByText("Saved to your account")).toBeVisible({ timeout: 15_000 });
   await page.waitForTimeout(1500);                                                               // the debounced save reaches the server
   await signOut();
   await signUp("Bob"); await page.goto("/cv");
-  await expect(page.getByRole("heading", { name: /Drop your CV here/ })).toBeVisible(); await expect(page.getByText("Sam Doe")).toHaveCount(0);   // Bob never sees Alice's CV
+  await expect(page.getByRole("heading", { name: /Drop your CVs? here/ })).toBeVisible(); await expect(page.getByText("Sam Doe")).toHaveCount(0);   // Bob never sees Alice's CV
 });

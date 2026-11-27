@@ -31,6 +31,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
     <div className="signin">
       <SignInShowcase />
       <main className="si-main">
+        <div className="si-dots" aria-hidden />
         <form className="si-form stack" onSubmit={submit} noValidate>
           <div><h1>{reg ? "Create your account" : "Welcome back"}</h1>
             <div className="muted">{reg ? "Free. Takes less than a minute." : "Sign in to your saved searches, alerts and pipeline."}</div></div>

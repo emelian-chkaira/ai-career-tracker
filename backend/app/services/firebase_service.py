@@ -92,7 +92,12 @@ def _finish(db: Session, u: User) -> User:
 def google(db: Session, credential: str) -> User:
     r = _call("signInWithIdp", {"postBody": f"id_token={credential}&providerId=google.com", "requestUri": settings.public_url, "returnSecureToken": True, "returnIdpCredential": True})
     if not r.get("email"): raise HTTPException(401, "Google sign-in failed")
-    return _finish(db, _link(db, r["email"], r["localId"], r.get("displayName") or "", verified=bool(r.get("emailVerified", True))))
+    verified = bool(r.get("emailVerified", True))
+    old = db.scalar(select(User).where(User.email == r["email"].strip().lower()))
+    if verified and old and not old.email_verified:
+        from app.services import google_service
+        google_service.drop_unproven_access(db, old)
+    return _finish(db, _link(db, r["email"], r["localId"], r.get("displayName") or "", verified=verified))
 
 
 def forgot(email: str):

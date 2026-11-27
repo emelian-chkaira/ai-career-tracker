@@ -2,7 +2,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/shared/api/client";
 import { useAuth } from "@/features/auth/AuthContext";
-import { label, ago } from "@/shared/lib/format";
+import { label, ago, posted } from "@/shared/lib/format";
 import { useJob, useSetStage } from "./api";
 import { Tabs } from "@/shared/ui/kit";
 import { Logo, sponsorChip } from "./JobCard";
@@ -33,7 +33,7 @@ export function JobPage() {
   return (<div className="stack jobpage">
     <div className="small"><Link to="/">← Jobs</Link></div>
     <div className="card stack"><div className="row" style={{ alignItems: "flex-start", flexWrap: "nowrap" }}><Logo c={j.company} big />
-      <div className="grow" style={{ minWidth: 0 }}><h1 style={{ fontSize: 24 }}>{j.title}</h1><div className="muted">{[j.company.name, j.location || (j.work_mode === "remote" ? "Remote" : ""), ago(j.posted_at ?? j.first_seen)].filter(Boolean).join(" · ")}</div></div>
+      <div className="grow" style={{ minWidth: 0 }}><h1 style={{ fontSize: 24 }}>{j.title}</h1><div className="muted">{[j.company.name, j.location || (j.work_mode === "remote" ? "Remote" : ""), posted(j.posted_at)].filter(Boolean).join(" · ")}</div></div>
       {j.ai && <span className="chip plain" title="AI fit score">Fit {j.ai.score}</span>}</div>
       {j.status === "expired" && <div className="notice warn" role="status">This posting is no longer online: the employer removed it. It stays here only for your history.</div>}
       <div>{sponsorChip(j.company.sponsor_status)}<span className="chip">{label(j.job_type)}</span>{j.language !== "unknown" && <span className="chip">{label(j.language)}</span>}{j.remote && <span className="chip">Remote friendly</span>}</div>

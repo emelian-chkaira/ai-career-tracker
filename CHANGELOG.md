@@ -5,6 +5,21 @@ The current version is also shown in the app (sidebar, "What's new") and by `GET
 
 To release: add an entry here, then set the same number in `backend/app/version.py` and `frontend/package.json` (a test checks all three agree).
 
+## [1.1.0] - 2026-11-26
+
+### Added
+- A welcome guide that opens by itself on a fresh installation.
+- Several crawler workers can run side by side, with a worker list and the reason a task is waiting.
+- Posting dates are read from the employer's own page.
+
+### Changed
+- Jobs show the employer's posting date or "Unknown date". The date filter leaves unknown dates out and date ordering puts them last.
+- New sign-in page: worldwide search, a dark job preview and a gently moving background.
+- Clearer setup instructions; stopping the app now stops the crawler too.
+
+### Fixed
+- Google sign-in now removes the password and sessions of an account whose e-mail address was never confirmed.
+
 ## [1.0.2] - 2026-11-24
 
 ### Added

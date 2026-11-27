@@ -1,3 +1,4 @@
+from sqlalchemy import select
 from fastapi import APIRouter, Depends, Request, Response, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.core.config import settings
@@ -122,7 +123,10 @@ def reset_password(body: ResetIn, request: Request, db: Session = Depends(get_db
 
 
 @router.get("/config")
-def auth_config(): return {"google_client_id": (settings.google_ids or [None])[0], "provider": "firebase" if settings.firebase_on else "local", "demo": settings.demo_mode, "guest_days": settings.demo_guest_days}
+def auth_config(db: Session = Depends(get_db)):
+    return {"google_client_id": (settings.google_ids or [None])[0], "provider": "firebase" if settings.firebase_on else "local",
+            "demo": settings.demo_mode, "guest_days": settings.demo_guest_days,
+            "first_run": not settings.demo_mode and db.scalar(select(User.id).limit(1)) is None}      # a fresh install: the web app opens its guide
 
 
 @router.post("/demo", response_model=TokenOut, status_code=201, summary="Public demo only: sign in as a new private guest")

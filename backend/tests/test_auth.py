@@ -124,6 +124,12 @@ def test_smtp_modes(db, monkeypatch):
         assert ("starttls" in calls) == (sec == "starttls") and calls[0][0] == ("FakeSSL" if sec == "ssl" else "Fake")
 
 
+def test_config_says_when_the_install_is_fresh(client, make_user):
+    assert client.get("/api/v1/auth/config").json()["first_run"] is True
+    make_user()
+    assert client.get("/api/v1/auth/config").json()["first_run"] is False
+
+
 def test_google_sign_in(client, monkeypatch):
     from app.core.config import settings
     from app.services import google_service
@@ -141,3 +147,18 @@ def test_google_sign_in(client, monkeypatch):
     claims["email"] = "p@example.com"
     u = client.post("/api/v1/auth/google", json={"credential": "x" * 30}).json()["user"]
     assert u["email"] == "p@example.com" and u["email_verified"] is True
+    # nobody had confirmed that address, so the password set before may be a stranger's: it stops working
+    assert client.post("/api/v1/auth/login", json={"email": "p@example.com", "password": "correct-horse-1"}).status_code == 401
+
+
+def test_google_ends_the_sessions_of_whoever_registered_an_unconfirmed_address(client, monkeypatch):
+    from app.core.config import settings
+    from app.services import google_service
+    stranger = client.post("/api/v1/auth/register", json={"email": "victim@example.com", "password": "correct-horse-1"}); assert stranger.status_code == 201
+    cookies = dict(client.cookies); client.cookies.clear()
+    monkeypatch.setattr(settings, "google_client_id", "cid.apps.googleusercontent.com")
+    monkeypatch.setattr(google_service, "verify_id_token", lambda c: {"email": "victim@example.com", "email_verified": True, "sub": "9"})
+    assert client.post("/api/v1/auth/google", json={"credential": "x" * 30}).status_code == 200
+    client.cookies.clear()
+    for k, v in cookies.items(): client.cookies.set(k, v)
+    assert client.post("/api/v1/auth/refresh", json={}).status_code == 401

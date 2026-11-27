@@ -100,7 +100,7 @@ def _filters(p: SearchParams) -> tuple[str, dict]:
     if p.remote is not None: w.append("j.remote = :remote"); a["remote"] = p.remote
     if p.sponsor: w.append("c.sponsor_status IN ('recognised','possible')")
     if p.company_id: w.append("j.company_id = :cid"); a["cid"] = p.company_id
-    if p.days: w.append("COALESCE(j.posted_at, j.first_seen::date) >= current_date - make_interval(days => :days)"); a["days"] = p.days
+    if p.days: w.append("j.posted_at >= current_date - make_interval(days => :days)"); a["days"] = p.days          # an unknown date is never "recent"
     if p.min_salary:
         w.append("(CASE WHEN j.salary_period='year' THEN j.salary_min/12 ELSE j.salary_min END) >= :minsal"); a["minsal"] = p.min_salary
     if p.skills:
@@ -174,7 +174,7 @@ def _browse_ids(db: Session, p: SearchParams, pq: dict, order: str, limit=5000):
     return db.execute(text(f"SELECT j.id {BASE} WHERE {where} ORDER BY {order} LIMIT {limit}"), args).scalars().all()
 
 
-ORDERS = {"newest": "COALESCE(j.posted_at, j.first_seen::date) DESC, j.first_seen DESC, j.id DESC", "oldest": "COALESCE(j.posted_at, j.first_seen::date) ASC, j.id ASC",
+ORDERS = {"newest": "j.posted_at DESC NULLS LAST, j.first_seen DESC, j.id DESC", "oldest": "j.posted_at ASC NULLS LAST, j.id ASC",           # unknown dates go last either way
           "salary": "(CASE WHEN j.salary_period='year' THEN j.salary_min/12 ELSE j.salary_min END) DESC NULLS LAST, j.id DESC"}
 
 
