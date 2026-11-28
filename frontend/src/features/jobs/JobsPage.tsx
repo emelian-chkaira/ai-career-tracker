@@ -133,7 +133,7 @@ export function JobsPage({ internships = false }: { internships?: boolean }) {
         </Menu>
       </div>
       <div className="jb2">
-        <FilterPills params={params} onChange={(p) => update(p)} onAll={() => setFiltersOpen(true)} count={active.length} />
+        <FilterPills params={params} onChange={(p) => update(p)} onAll={() => setFiltersOpen(true)} count={active.length} mine={mine} />
         <div className="jb2r">
           <span className="jcount"><strong>{data ? `${data.total.toLocaleString()} ${internships ? "internship" : "job"}${data.total === 1 ? "" : "s"}` : "…"}</strong>{isFetching && <em>updating…</em>}{batch && <em>{batch}</em>}{live && <em>{live}</em>}</span>
           <select className="jsort" value={params.sort ?? ""} onChange={(e) => update({ sort: e.target.value || undefined })} aria-label="Order">{sorts.map(([v, name]) => <option key={v || "default"} value={v}>{name}</option>)}</select>
