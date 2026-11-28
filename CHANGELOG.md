@@ -5,6 +5,11 @@ The current version is also shown in the app (sidebar, "What's new") and by `GET
 
 To release: add an entry here, then set the same number in `backend/app/version.py` and `frontend/package.json` (a test checks all three agree).
 
+## [1.2.0] - 2026-11-28
+
+### Added
+- A Country filter directly on the Jobs and Internships filter bar, with a search box. In My feed it replaces your preferred places until you clear it.
+
 ## [1.1.0] - 2026-11-26
 
 ### Added

@@ -96,6 +96,9 @@ div.job{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;alig
 .pill-opt input{margin-top:3px;flex:none}
 .pill-opt span{display:grid;gap:2px}
 .pill-opt small{font-size:12px;color:var(--muted);font-weight:400;line-height:1.35}
+.pill-find{margin:2px 2px 6px;width:calc(100% - 4px);box-sizing:border-box}
+.pill-scroll{max-height:min(320px,45vh);overflow-y:auto;display:flex;flex-direction:column;gap:1px}
+.pill-scroll .pill-opt{flex:none}
 
 /* ---- alert bar, card skills, job facts ---- */
 .alertbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:8px 12px;font-size:13.5px;color:var(--muted)}

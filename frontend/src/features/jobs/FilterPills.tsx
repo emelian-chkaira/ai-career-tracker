@@ -1,6 +1,9 @@
 import { useEffect, useRef } from "react";
 import type { SearchParams } from "@/shared/api/types";
+import { useSectors } from "@/shared/api/meta";
+import { flag } from "@/shared/lib/geo";
 import { SEARCH_MODES } from "./Filters";
+import { CountryPicker } from "./CountryPicker";
 
 /** One pill that opens a small popover (LinkedIn / Indeed style). The pill shows the current choice and turns blue when a filter is on. */
 function Pill({ name, value, on, children }: { name: string; value?: string; on: boolean; children: React.ReactNode }) {
@@ -26,11 +29,16 @@ const SALARY: [number | undefined, string][] = [[undefined, "Any"], [2500, "€2
 const toggle = (a: string[] | undefined, v: string) => (a?.includes(v) ? a.filter((x) => x !== v) : [...(a ?? []), v]);
 const short = (list: string[] | undefined, all: [string, string][]) => { const n = (list ?? []).map((v) => all.find((x) => x[0] === v)?.[1] ?? v); return n.length > 1 ? `${n[0]} +${n.length - 1}` : n[0]; };
 
-export function FilterPills({ params, onChange, onAll, count }: { params: SearchParams; onChange(p: Partial<SearchParams>): void; onAll(): void; count: number }) {
+export function FilterPills({ params, onChange, onAll, count, mine = false }: { params: SearchParams; onChange(p: Partial<SearchParams>): void; onAll(): void; count: number; mine?: boolean }) {
+  const countries = useSectors().data?.countries ?? []; const picked = params.country ?? [];
+  const pickedName = picked.length ? `${flag(picked[0])} ${countries.find((c) => c.code === picked[0])?.name ?? picked[0]}${picked.length > 1 ? ` +${picked.length - 1}` : ""}` : undefined;
   const mode = SEARCH_MODES.find((m) => m.key === (params.mode ?? "hybrid"))!;
   return (<div className="pills" role="group" aria-label="Quick filters">
     {params.q?.trim() && <Pill name="Match" value={mode.label} on={!!params.mode && params.mode !== "hybrid"}>
       {SEARCH_MODES.map((m) => <Choice key={m.key} checked={(params.mode ?? "hybrid") === m.key} onChange={() => onChange({ mode: m.key })} hint={m.hint}>{m.label}</Choice>)}</Pill>}
+    <Pill name="Country" value={pickedName} on={!!picked.length}>
+      <CountryPicker countries={countries} selected={picked} onChange={(country) => onChange({ country })} clearLabel={mine ? "Back to my preferred places" : "All countries"} />
+      {mine && !picked.length && <p className="small muted" style={{ margin: "6px 4px 0" }}>My feed uses the places in your preferences until you pick one.</p>}</Pill>
     <Pill name="Date posted" value={DAYS.find((d) => d[0] === params.days)?.[0] ? DAYS.find((d) => d[0] === params.days)![1].replace("Past ", "") : undefined} on={!!params.days}>
       {DAYS.map(([v, n]) => <Choice key={n} checked={params.days === v} onChange={() => onChange({ days: v })}>{n}</Choice>)}
       <p className="small muted" style={{ margin: "6px 4px 0" }}>A time range leaves out jobs with an unknown date.</p></Pill>
